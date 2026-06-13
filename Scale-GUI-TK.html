@@ -2497,6 +2497,16 @@ const state = {
   dryRun: true
 };
 
+// ===== HTML ESCAPE =====
+function h(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ===== COLLAPSIBLE =====
 function toggleCollapsible(header) {
   const body = header.nextElementSibling;
@@ -2623,7 +2633,7 @@ function updateNodeDisplay() {
 
   tbody.innerHTML = state.nodes.map((n, i) => `
     <tr>
-      <td class="mono">${n.hostname}</td>
+      <td class="mono">${h(n.hostname)}</td>
       <td style="text-align:center">${n.roles.includes('quorum') ? tick : dash}</td>
       <td style="text-align:center">${n.roles.includes('manager') ? tick : dash}</td>
       <td style="text-align:center">${n.roles.includes('nsd') ? tick : dash}</td>
@@ -2640,8 +2650,8 @@ function updateNodeDisplay() {
   const grid = document.getElementById('role-assign-grid');
   grid.innerHTML = state.nodes.map((n, i) => `
     <div class="node-card">
-      <div class="node-card-header"><span class="node-card-hostname">${n.hostname}</span></div>
-      <div class="node-card-roles">${n.roles.map(r => `<span class="tag tag-${roleTagColors[r]||'gray'}">${r === 'nsd' ? 'NSD Server' : r === 'gui' ? 'GUI Server' : r === 'gateway' ? 'AFM Gateway' : r}</span>`).join(' ')}</div>
+      <div class="node-card-header"><span class="node-card-hostname">${h(n.hostname)}</span></div>
+      <div class="node-card-roles">${n.roles.map(r => `<span class="tag tag-${h(roleTagColors[r]||'gray')}">${r === 'nsd' ? 'NSD Server' : r === 'gui' ? 'GUI Server' : r === 'gateway' ? 'AFM Gateway' : h(r)}</span>`).join(' ')}</div>
     </div>`).join('');
 }
 
@@ -2652,7 +2662,7 @@ function updateNSDServerList() {
     const curVal = sel.value;
     sel.innerHTML = id === 'nsd-backup' ? '<option value="">None</option>' : '<option value="">Select NSD server node...</option>';
     servers.forEach(s => {
-      sel.innerHTML += `<option value="${s.hostname}">${s.hostname}</option>`;
+      sel.innerHTML += `<option value="${h(s.hostname)}">${h(s.hostname)}</option>`;
     });
     if (curVal) sel.value = curVal;
   });
@@ -2663,7 +2673,7 @@ function updateNSDServerList() {
     const curVal = partSel.value;
     partSel.innerHTML = '<option value="">Select node...</option>';
     state.nodes.forEach(n => {
-      partSel.innerHTML += `<option value="${n.hostname}">${n.hostname}</option>`;
+      partSel.innerHTML += `<option value="${h(n.hostname)}">${h(n.hostname)}</option>`;
     });
     if (curVal) partSel.value = curVal;
   }
@@ -2705,7 +2715,10 @@ async function listPartitions(btn) {
         const msg = JSON.parse(dataLine.slice(5));
         if (msg.type === 'done') break;
         const cls = msg.type === 'error' ? 'error' : 'normal';
-        term.innerHTML += `<div class="terminal-line ${cls}">${msg.line}</div>`;
+        const lineDiv = document.createElement('div');
+        lineDiv.className = `terminal-line ${cls}`;
+        lineDiv.textContent = msg.line;
+        term.appendChild(lineDiv);
         term.scrollTop = term.scrollHeight;
       } catch {}
     }
@@ -2746,11 +2759,11 @@ function updateNSDDisplay() {
   } else {
     tbody.innerHTML = state.nsds.map((n, i) => `
       <tr>
-        <td class="mono">${n.disk}</td>
-        <td class="mono">${n.server}</td>
-        <td>${n.failureGroup}</td>
-        <td><span class="tag tag-blue">${n.usage}</span></td>
-        <td>${n.size}</td>
+        <td class="mono">${h(n.disk)}</td>
+        <td class="mono">${h(n.server)}</td>
+        <td>${h(n.failureGroup)}</td>
+        <td><span class="tag tag-blue">${h(n.usage)}</span></td>
+        <td>${h(n.size)}</td>
         <td><button class="btn btn-sm btn-danger" onclick="removeNSD(${i})">Remove</button></td>
       </tr>`).join('');
   }
@@ -2763,11 +2776,11 @@ function updateNSDStanza() {
   
   const lines = state.nsds.map(n => [
     `<div style="color:#4589ff">%nsd:</div>`,
-    `<div>&nbsp; device=${n.disk}</div>`,
-    `<div>&nbsp; nsd=${n.disk.replace(/\//g,'_').replace(/^_/,'nsd')}</div>`,
-    `<div>&nbsp; servers=${n.server}${n.backup ? ',' + n.backup : ''}</div>`,
-    `<div>&nbsp; usage=${n.usage}</div>`,
-    `<div>&nbsp; failureGroup=${n.failureGroup}</div>`,
+    `<div>&nbsp; device=${h(n.disk)}</div>`,
+    `<div>&nbsp; nsd=${h(n.disk.replace(/\//g,'_').replace(/^_/,'nsd'))}</div>`,
+    `<div>&nbsp; servers=${h(n.server)}${n.backup ? ',' + h(n.backup) : ''}</div>`,
+    `<div>&nbsp; usage=${h(n.usage)}</div>`,
+    `<div>&nbsp; failureGroup=${h(n.failureGroup)}</div>`,
     ``
   ].join(''));
   el.innerHTML = lines.join('<br>');
@@ -2933,7 +2946,10 @@ function _showLoadLog(logId, msg, type = 'muted') {
   const el = document.getElementById(logId);
   if (!el) return;
   el.style.display = 'block';
-  el.innerHTML += `<div class="terminal-line ${type}">${msg}</div>`;
+  const div = document.createElement('div');
+  div.className = `terminal-line ${type}`;
+  div.textContent = msg;
+  el.appendChild(div);
 }
 function _clearLoadLog(logId) {
   const el = document.getElementById(logId);
@@ -3117,7 +3133,7 @@ function appendToTerminal(termId, line, type = 'normal', delay = 0) {
     term.querySelectorAll('.terminal-cursor').forEach(el => el.classList.remove('terminal-cursor'));
     const div = document.createElement('div');
     div.className = `terminal-line ${type}`;
-    div.innerHTML = line;
+    div.textContent = line;
     term.appendChild(div);
     // Add cursor
     const cursor = document.createElement('div');
@@ -3244,6 +3260,49 @@ async function streamToTerminal(termId, url, onDone) {
           if (el) { el.value = msg.line; updatePreparePreviews(); }
           continue;
         }
+        appendToTerminal(termId, msg.line, sseTypeToTerminalType(msg.type));
+      }
+    }
+  } catch (err) {
+    appendToTerminal(termId, `[ERROR] Stream interrupted: ${err.message}`, 'error');
+  }
+  if (onDone) onDone();
+}
+
+async function streamToTerminalPost(termId, url, body, onDone) {
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  } catch (err) {
+    appendToTerminal(termId, `[ERROR] Could not reach backend: ${err.message}`, 'error');
+    if (onDone) onDone();
+    return;
+  }
+  if (!response.ok) {
+    appendToTerminal(termId, `[ERROR] Server returned HTTP ${response.status}`, 'error');
+    if (onDone) onDone();
+    return;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split('\n\n');
+      buffer = events.pop();
+      for (const event of events) {
+        const dataLine = event.split('\n').find(l => l.startsWith('data: '));
+        if (!dataLine) continue;
+        let msg;
+        try { msg = JSON.parse(dataLine.slice(6)); } catch { continue; }
+        if (msg.type === 'done') { if (onDone) onDone(); return; }
         appendToTerminal(termId, msg.line, sseTypeToTerminalType(msg.type));
       }
     }
@@ -3546,8 +3605,7 @@ async function applyPostConfig(action, btn) {
     const role     = document.getElementById('pc-gui-role')?.value || 'SecurityAdmin';
     const password = document.getElementById('pc-gui-pass')?.value;
     if (!username || !password) { appendToTerminal(termId, '[ERROR] Username and password are required.', 'error'); if (btn) btn.disabled = false; return; }
-    const params = new URLSearchParams({ username, role, password });
-    await streamToTerminal(termId, `${getBackendUrl()}/api/stream/postconfig/guiuser?${params}`);
+    await streamToTerminalPost(termId, `${getBackendUrl()}/api/stream/postconfig/guiuser`, { username, role, password });
 
   } else if (action === 'mmchconfig') {
     const vals = {};
@@ -3577,23 +3635,23 @@ async function applyPostConfig(action, btn) {
     const node    = document.getElementById('pc-afm-node')?.value.trim();
     const mode    = document.getElementById('pc-afm-mode')?.value || 'ro';
     if (!fs || !fileset || !node) { appendToTerminal(termId, '[ERROR] Filesystem, fileset, and gateway node are required.', 'error'); if (btn) btn.disabled = false; return; }
-    const params = new URLSearchParams({ proto, fs, fileset, node, mode });
+    const body = { proto, fs, fileset, node, mode };
     if (proto === 'nfs') {
       const nfsTarget = document.getElementById('pc-afm-nfs-target')?.value.trim();
       if (!nfsTarget) { appendToTerminal(termId, '[ERROR] NFS target is required.', 'error'); if (btn) btn.disabled = false; return; }
-      params.set('nfs_target', nfsTarget);
+      body.nfs_target = nfsTarget;
     } else {
       const s3url    = document.getElementById('pc-afm-s3-url')?.value.trim();
       const s3bucket = document.getElementById('pc-afm-s3-bucket')?.value.trim();
       const s3key    = document.getElementById('pc-afm-s3-key')?.value.trim();
       const s3secret = document.getElementById('pc-afm-s3-secret')?.value;
       if (!s3url || !s3bucket || !s3key || !s3secret) { appendToTerminal(termId, '[ERROR] All S3 fields are required.', 'error'); if (btn) btn.disabled = false; return; }
-      params.set('s3_url', s3url);
-      params.set('s3_bucket', s3bucket);
-      params.set('s3_key', s3key);
-      params.set('s3_secret', s3secret);
+      body.s3_url    = s3url;
+      body.s3_bucket = s3bucket;
+      body.s3_key    = s3key;
+      body.s3_secret = s3secret;
     }
-    await streamToTerminal(termId, `${getBackendUrl()}/api/stream/postconfig/afmgateway?${params}`);
+    await streamToTerminalPost(termId, `${getBackendUrl()}/api/stream/postconfig/afmgateway`, body);
   }
 
   if (btn) btn.disabled = false;
