@@ -1,6 +1,6 @@
 # Scale GUInstall — IBM Storage Scale Installation Toolkit GUI
 
-A single-file web frontend for the IBM Storage Scale Installation Toolkit (`spectrumscale`). Open [Scale-GUI-TK.html](Scale-GUI-TK.html) in any modern browser to get a guided, form-driven interface for installing, deploying, and upgrading IBM Storage Scale clusters.
+A single-file web frontend for the IBM Storage Scale Installation Toolkit (`spectrumscale`). Open [Scale-GUInstall.html](Scale-GUInstall.html) in any modern browser to get a guided, form-driven interface for installing, deploying, and upgrading IBM Storage Scale clusters.
 
 > **Disclaimer:** This is an unofficial community helper tool. It is not an IBM product or service. All operations target real cluster infrastructure — read every command preview before executing.
 
@@ -41,7 +41,7 @@ A single-file web frontend for the IBM Storage Scale Installation Toolkit (`spec
 
 ### New cluster installation
 
-1. Open `Scale-GUI-TK.html` in a browser and accept the disclaimer.
+1. Open `Scale-GUInstall.html` in a browser and accept the disclaimer.
 2. **Dry Run mode is on by default** — commands are previewed only. Disable in Settings when you're ready to execute.
 3. Go to **Prepare Software** and work through Steps 1–4 to get `spectrumscale` installed and the setup service running.
 4. Follow the sidebar workflow in order:
@@ -91,7 +91,7 @@ Dry Run is enabled by default. In this mode every button generates and displays 
 
 ```
 Scale-GUInstall/
-└── Scale-GUI-TK.html   # Self-contained single-file app (HTML + CSS + JS)
+└── Scale-GUInstall.html   # Self-contained single-file app (HTML + CSS + JS)
 ```
 
 The entire tool is one HTML file — no build step, no dependencies, no install. Copy it anywhere and open it in a browser.
