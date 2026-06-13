@@ -6,20 +6,67 @@ A single-file web frontend for the IBM Storage Scale Installation Toolkit (`spec
 
 ---
 
+## Getting Started
+
+The GUI has two components: the HTML file (runs in your browser) and a lightweight backend server (`scale-server.py`) that executes commands on the installer node. The HTML alone works as a command generator in dry-run mode — you only need the server when you're ready to run real commands.
+
+### 1. Install dependencies
+
+On the installer node (the machine that will run `spectrumscale`):
+
+```bash
+pip install flask
+```
+
+### 2. Start the backend server
+
+```bash
+python3 scale-server.py
+```
+
+Or use the convenience script that handles the pip install automatically:
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+The server listens on `http://127.0.0.1:5001` — loopback only, not accessible from the network.
+
+### 3. Open the GUI
+
+Open `Scale-GUInstall.html` in a browser on the same machine. On most Linux systems:
+
+```bash
+xdg-open Scale-GUInstall.html
+```
+
+Or transfer the HTML file to your workstation and point the Backend URL field at `http://<installer-node-ip>:5001` if your browser is running remotely.
+
+> **Dry Run mode is on by default.** Every button shows the command it would run without executing anything. Disable it in Settings only when you're ready to apply changes to the cluster.
+
+### 4. Work through the pages in order
+
+```
+Prepare Software → Node Configuration → Cluster Settings → NSD Storage → Filesystem → Protocol Services → Install & Deploy → Post Configuration
+```
+
+---
+
 ## Features
 
 | Section | What it does |
 |---|---|
 | **Dashboard** | Live summary of configured nodes, NSDs, filesystems, and protocols; workflow progress tracker |
-| **Prepare Software** | Extract the Scale zip package, verify checksum, run the installer, and start the `spectrumscale` setup service |
-| **Node Configuration** | Add nodes one at a time or via bulk import; assign roles (NSD, Manager, Quorum, Admin, Protocol/CES, GUI, EMS, Call Home); generates `spectrumscale node add` commands |
-| **Cluster Settings** | Set GPFS cluster name, I/O profile, remote shell/copy binaries, port range, call home, performance monitoring, and file audit logging via `spectrumscale config gpfs` |
-| **NSD Storage** | Define Network Shared Disks with server, disk path, failure group, usage type, and size; generates the NSD stanza file; discover partitions on a node via `/proc/partitions` |
+| **Prepare Software** | Extract the Scale zip package, verify checksum, run the installer, check Ansible and locale prerequisites, and start the `spectrumscale` setup service |
+| **Node Configuration** | Add nodes one at a time or via bulk import; assign roles (NSD, Manager, Quorum, Admin, Protocol/CES, GUI, EMS, Call Home, Archive EE); generates `spectrumscale node add` commands |
+| **Cluster Settings** | Set GPFS cluster name, I/O profile, remote shell/copy binaries, port range, GPL binary directory, call home, performance monitoring, and file audit logging |
+| **NSD Storage** | Define Network Shared Disks with server, disk path, failure group, usage type, and size; inline edit and remove; discover partitions on a node |
 | **Filesystem** | Configure GPFS filesystem name, mount point, block size, replication, metadata replication, inodes, and advanced options (quotas, compression, encryption, IAM) |
 | **Protocol Services** | Enable and configure NFS (v3/v4/v4.1), SMB/Samba, Object Storage (Swift), and CES floating IPs |
-| **Install & Deploy** | Guided pre-check → install → post-check → deploy → verify flow using `spectrumscale install` / `spectrumscale deploy` |
-| **Post Configuration** | Set up GPFS PATH, create GUI admin users, tune `mmchconfig` performance parameters, configure health monitoring intervals, and set up AFM gateways (NFS or S3) |
-| **Populate from Cluster** | Pull an existing cluster's configuration into the toolkit via `spectrumscale config populate` |
+| **Install & Deploy** | Guided pre-check → install → enable daemon → deploy → verify flow using `spectrumscale install` / `spectrumscale deploy` / `scaleadmd enable` |
+| **Post Configuration** | Set up GPFS PATH, create GUI admin users, tune `mmchconfig` performance parameters, configure health monitoring, NFS core dump collection, and AFM gateways (NFS or S3) |
+| **Populate from Cluster** | CCR status check, then pull an existing cluster's configuration via `spectrumscale config populate` |
 | **Upgrade** | Online (rolling, no downtime) or offline cluster upgrade via `spectrumscale upgrade` |
 | **Pre/Post Checks** | Run standalone pre-checks and post-checks at any time |
 | **Settings** | Toggle dry run mode, set toolkit binary path |
@@ -28,48 +75,46 @@ A single-file web frontend for the IBM Storage Scale Installation Toolkit (`spec
 
 ## Requirements
 
+**On the installer node:**
+
 - **IBM Storage Scale** — Developer Edition (free, up to 12 TB) or licensed. [Download →](https://www.ibm.com/products/storage-scale)
-- **`spectrumscale` toolkit** — installed and accessible on the installer node
-- **Python 3.10+** — required on the installer node for the setup service
+- **`spectrumscale` toolkit** — installed and accessible (produced by the Prepare Software steps)
+- **Python 3.10+** — required for the setup service and the backend server
+- **Flask** — `pip install flask` (backend server only)
 - **SSH key-based auth** — from the installer node to all target nodes before running setup
-- **`unzip`** — needed for the package extraction step (`sudo apt install unzip` / `sudo yum install unzip`)
-- **A local backend server** (optional) — the Prepare Software page connects to `http://127.0.0.1:5001` to execute shell commands. Without a backend, all other pages work as a command generator and the commands must be run manually.
+- **`unzip`** — needed for package extraction (`sudo apt install unzip` / `sudo yum install unzip`)
+- **Ansible compatibility** — ansible-core **2.23 or earlier** is required; ansible-core 2.24+ is incompatible with the toolkit
 
----
+**On Ubuntu specifically:**
 
-## Quick Start
-
-### New cluster installation
-
-1. Open `Scale-GUInstall.html` in a browser and accept the disclaimer.
-2. **Dry Run mode is on by default** — commands are previewed only. Disable in Settings when you're ready to execute.
-3. Go to **Prepare Software** and work through Steps 1–4 to get `spectrumscale` installed and the setup service running.
-4. Follow the sidebar workflow in order:
-
+```bash
+export LC_ALL=en_US.UTF-8      # set before installing
+sudo apt install python3-apt   # required by the toolkit's Ansible playbooks
 ```
-Node Configuration → Cluster Settings → NSD Storage → Filesystem → Protocol Services → Install & Deploy
-```
-
-5. On the **Install & Deploy** page, run Pre-check, then Install, then Post-check, then Deploy.
-6. Use **Post Configuration** for environment PATH, GUI admin user, and tuning.
-
-### Existing cluster
-
-- Use **Populate from Cluster** to pull the current cluster state into the toolkit.
-- Then use **Upgrade Cluster** for rolling or offline upgrades.
 
 ---
 
 ## Workflow Reference
 
-```
-spectrumscale setup -s <installer-ip>           # Step 4 of Prepare Software
-spectrumscale node add <hostname> -r <roles>    # Node Configuration
-spectrumscale config gpfs -c <cluster-name>     # Cluster Settings
-spectrumscale nsd add -F <stanza-file>          # NSD Storage
-spectrumscale install --precheck                # Install & Deploy
+```bash
+# Prepare
+spectrumscale setup -s <installer-ip>
+
+# Build cluster definition
+spectrumscale node add <hostname> -r <roles>
+spectrumscale config gpfs -c <cluster-name>
+spectrumscale nsd add -F <stanza-file>
+
+# Install
+spectrumscale install --precheck
 spectrumscale install
 spectrumscale install --postcheck
+
+# Enable daemon (6.0.1+)
+spectrumscale scaleadmd enable
+spectrumscale nodeid define
+
+# Deploy protocols
 spectrumscale deploy --precheck
 spectrumscale deploy
 spectrumscale deploy --postcheck
@@ -87,19 +132,33 @@ Dry Run is enabled by default. In this mode every button generates and displays 
 
 ---
 
+## Backend Server
+
+`scale-server.py` is a Flask app that runs locally on the installer node. It provides SSE-streaming endpoints that the GUI calls to execute `spectrumscale` commands and stream output back to the browser terminal.
+
+**Security properties:**
+- Binds to `127.0.0.1` only — not reachable from the network
+- CORS restricted to `localhost`, `127.0.0.1`, and `file://` origins
+- Credentials (GUI user passwords, S3 secret keys) are sent in POST request bodies, never in URLs or query strings
+- All executed commands are explicit and allowlisted — no generic shell execution endpoint
+
+**The server is only needed for live execution.** In Dry Run mode the GUI generates command previews entirely in the browser with no server required.
+
+---
+
 ## File Structure
 
 ```
 Scale-GUInstall/
-└── Scale-GUInstall.html   # Self-contained single-file app (HTML + CSS + JS)
+├── Scale-GUInstall.html   # Self-contained single-file app (HTML + CSS + JS)
+├── scale-server.py        # Local backend server (Flask) for live command execution
+└── start.sh               # Convenience script: installs Flask and starts the server
 ```
-
-The entire tool is one HTML file — no build step, no dependencies, no install. Copy it anywhere and open it in a browser.
 
 ---
 
 ## Notes
 
 - The GUI uses IBM Carbon Design System tokens and IBM Plex fonts for a native-looking IBM interface.
-- The tool targets IBM Storage Scale 6.x and the `spectrumscale` Installation Toolkit.
-- Official IBM documentation: [IBM Storage Scale docs →](https://www.ibm.com/docs/en/storage-scale)
+- The tool targets IBM Storage Scale 6.0.1 and the `spectrumscale` Installation Toolkit.
+- Official IBM documentation: [IBM Storage Scale 6.0.1 docs →](https://www.ibm.com/docs/en/storage-scale/6.0.1)

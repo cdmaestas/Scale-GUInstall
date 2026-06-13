@@ -845,20 +845,24 @@
                 <tr><td class="mono">nsd add</td><td>Adds NSD (Network Shared Disk) specifications to the cluster definition file</td></tr>
                 <tr><td class="mono">nsd clear / delete / list / modify</td><td>Manage NSDs in the cluster definition</td></tr>
                 <tr><td class="mono">filesystem list / modify</td><td>List or change block size and mount point of a filesystem</td></tr>
-                <tr><td class="mono">config gpfs</td><td>Adds IBM Storage Scale–specific properties to the cluster definition file</td></tr>
+                <tr><td class="mono">config gpfs</td><td>Adds IBM Storage Scale–specific properties to the cluster definition file (including <code>--gplbin_dir</code> for prebuilt kernel modules)</td></tr>
+                <tr><td class="mono">config clear gpfs</td><td>Clears a specific property from the GPFS configuration (e.g. <code>--gplbin_dir</code>)</td></tr>
                 <tr><td class="mono">config protocols</td><td>Provides CES shared filesystem and environment details for protocol deployment</td></tr>
                 <tr><td class="mono">config perfmon</td><td>Configures performance monitoring (zimon/GUI) settings</td></tr>
                 <tr><td class="mono">config populate</td><td>Populates cluster definition file from an existing running cluster</td></tr>
                 <tr><td class="mono">install</td><td>Installs GPFS packages, creates the cluster, creates NSDs</td></tr>
+                <tr><td class="mono">scaleadmd enable</td><td>Enables the Scale Admin Daemon on configured nodes (new in 6.0.1)</td></tr>
+                <tr><td class="mono">nodeid define</td><td>Defines node identity mapping in the cluster definition (new in 6.0.1)</td></tr>
                 <tr><td class="mono">deploy</td><td>Creates filesystems and deploys protocol services on configured nodes</td></tr>
                 <tr><td class="mono">upgrade</td><td>Upgrades GPFS and protocol components across the cluster</td></tr>
                 <tr><td class="mono">callhome</td><td>Configures IBM call home (support notification) settings</td></tr>
                 <tr><td class="mono">fileauditlogging</td><td>Configures file audit logging settings</td></tr>
+                <tr><td class="mono">nfs_core_dump enable</td><td>Enables NFS core dump collection on protocol nodes for troubleshooting (new in 6.0.1)</td></tr>
               </tbody>
             </table>
           </div>
           <div style="padding:var(--spacing-05) var(--spacing-06); border-top:1px solid var(--cds-border-subtle-01)">
-            <p style="font-size:13px; color:var(--cds-text-secondary)">Installation has two stages: (1) use <code>spectrumscale</code> commands to build the cluster definition file, then (2) run <code>spectrumscale install</code> to apply it. Deployment follows the same pattern with <code>spectrumscale deploy</code>. See <a href="https://www.ibm.com/docs/en/storage-scale/6.0.0?topic=toolkit-understanding-installation-options" target="_blank" style="color:var(--cds-link-primary)">IBM documentation →</a></p>
+            <p style="font-size:13px; color:var(--cds-text-secondary)">Installation has two stages: (1) use <code>spectrumscale</code> commands to build the cluster definition file, then (2) run <code>spectrumscale install</code> to apply it. Deployment follows the same pattern with <code>spectrumscale deploy</code>. See <a href="https://www.ibm.com/docs/en/storage-scale/6.0.1?topic=toolkit-understanding-installation-options" target="_blank" style="color:var(--cds-link-primary)">IBM documentation →</a></p>
           </div>
         </div>
       </div>
@@ -900,6 +904,32 @@
           <label style="font-size:13px; font-weight:500; white-space:nowrap">Working Directory</label>
           <input type="text" class="path-input" id="prepare-work-dir" value="/tmp/scale-pkg" placeholder="/tmp/scale-pkg" style="flex:1; min-width:240px" oninput="updatePreparePreviews()">
           <span style="font-size:12px; color:var(--cds-text-secondary)">Used by all steps below as the extract destination, checksum directory, and installer target.</span>
+        </div>
+      </div>
+
+      <!-- Prerequisites Check -->
+      <div class="panel" style="margin-bottom:var(--spacing-06)">
+        <div class="panel-header"><div><h3>Prerequisites Check</h3><p>Verify Ansible version and locale before installation</p></div></div>
+        <div class="panel-body">
+          <div style="display:flex; align-items:flex-start; gap:var(--spacing-03); padding:var(--spacing-03) var(--spacing-04); background:rgba(250,77,86,0.07); border:1px solid rgba(250,77,86,0.3); margin-bottom:var(--spacing-05); font-size:12px; color:var(--cds-support-error)">
+            <svg width="14" height="14" viewBox="0 0 32 32" fill="currentColor" style="flex-shrink:0; margin-top:1px"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm-1 6h2v9h-2zm1 14a1.5 1.5 0 111.5-1.5A1.5 1.5 0 0116 22z"/></svg>
+            <span><strong>Ansible compatibility:</strong> ansible-core 2.24 and later is <strong>incompatible</strong> with the IBM Storage Scale Installation Toolkit. Use ansible-core ≤ 2.23.</span>
+          </div>
+          <div style="display:flex; align-items:flex-start; gap:var(--spacing-03); padding:var(--spacing-03) var(--spacing-04); background:rgba(241,194,27,0.08); border:1px solid rgba(241,194,27,0.3); margin-bottom:var(--spacing-05); font-size:12px; color:var(--cds-support-warning)">
+            <svg width="14" height="14" viewBox="0 0 32 32" fill="currentColor" style="flex-shrink:0; margin-top:1px"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm-1 6h2v9h-2zm1 14a1.5 1.5 0 111.5-1.5A1.5 1.5 0 0116 22z"/></svg>
+            <span><strong>Ubuntu prerequisite:</strong> Set locale before installing — <code style="font-family:var(--font-mono)">export LC_ALL=en_US.UTF-8</code>. Also ensure <code style="font-family:var(--font-mono)">python3-apt</code> is installed: <code style="font-family:var(--font-mono)">sudo apt install python3-apt</code>.</span>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-secondary btn-sm" onclick="runPrepare('checkansible', this)">Check Ansible Version</button>
+            <button class="btn btn-secondary btn-sm" onclick="runPrepare('checklocale', this)">Check Locale</button>
+          </div>
+          <div class="cmd-preview" style="margin-top:var(--spacing-05)" id="prereq-cmd-preview">
+            <div><span class="cmd-prompt">$ </span>ansible --version | head -1</div>
+            <div><span class="cmd-prompt">$ </span>locale | grep LC_ALL</div>
+          </div>
+          <div id="ansible-version-warning" style="display:none; margin-top:var(--spacing-04); padding:var(--spacing-03) var(--spacing-04); background:rgba(250,77,86,0.1); border:1px solid var(--cds-support-error); font-size:12px; color:var(--cds-support-error)">
+            ⚠ ansible-core 2.24+ detected — toolkit may fail. Downgrade with: <code style="font-family:var(--font-mono)">pip install ansible-core==2.15</code>
+          </div>
         </div>
       </div>
 
@@ -1062,6 +1092,9 @@
                   <label class="checkbox-item">
                     <input type="checkbox" id="role-callhome"> <div><span>Call Home <code>-c</code></span><span class="label-desc">Designated node for IBM call home reporting.</span></div>
                   </label>
+                  <label class="checkbox-item">
+                    <input type="checkbox" id="role-archive-ee"> <div><span>Archive EE</span><span class="label-desc">IBM Storage Archive Enterprise Edition node. Requires separate Archive EE installation workflow after cluster setup.</span></div>
+                  </label>
                 </div>
               </div>
               <div class="btn-group">
@@ -1092,6 +1125,7 @@
                   <option value="gui">GUI Server</option>
                   <option value="ems">EMS</option>
                   <option value="callhome">Call Home</option>
+                  <option value="archive-ee">Archive EE</option>
                 </select>
               </div>
               <button class="btn btn-secondary" onclick="bulkImport()">
@@ -1236,6 +1270,16 @@
               <label class="form-label">Ephemeral Port Range <code>-e</code></label>
               <input type="text" class="form-input" id="cluster-ports" placeholder="60000-61000" value="60000-61000" oninput="updateClusterCmdPreview()">
               <div class="form-help">Communication ports used by all GPFS nodes. Default: <code>60000-61000</code></div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Prebuilt GPLbin Directory <code>--gplbin_dir</code></label>
+              <div style="display:flex; gap:var(--spacing-03)">
+                <input type="text" class="form-input" id="cluster-gplbin-dir" placeholder="e.g. my_gplbin_repo" oninput="updateClusterCmdPreview()" style="flex:1">
+                <button class="btn btn-sm btn-secondary" onclick="clearGplbinDir()">Clear</button>
+              </div>
+              <div class="form-help">Directory name inside <code>/usr/lpp/mmfs/6.0.1.0/</code> containing a prebuilt <code>gpfs.gplbin</code> RPM. Use when nodes cannot build the kernel module from source. Leave blank to skip.</div>
             </div>
           </div>
         </div>
@@ -1764,12 +1808,16 @@
           <div class="step-circle">3</div>
           <div class="step-label">Post-check</div>
         </div>
-        <div class="progress-step" id="ps-deploy">
+        <div class="progress-step" id="ps-enable-daemon">
           <div class="step-circle">4</div>
+          <div class="step-label">Enable Daemon</div>
+        </div>
+        <div class="progress-step" id="ps-deploy">
+          <div class="step-circle">5</div>
           <div class="step-label">Deploy</div>
         </div>
         <div class="progress-step" id="ps-postcheck-deploy">
-          <div class="step-circle">5</div>
+          <div class="step-circle">6</div>
           <div class="step-label">Verify</div>
         </div>
       </div>
@@ -1796,8 +1844,26 @@
             </div>
           </div>
 
+          <div class="panel" style="margin-bottom:var(--spacing-05)">
+            <div class="panel-header"><div><h3>Step 2: Enable Admin Daemon &amp; Node Identity</h3></div></div>
+            <div class="panel-body">
+              <p style="color:var(--cds-text-secondary); margin-bottom:var(--spacing-05); font-size:13px">After install, enable the Scale Admin Daemon on all nodes and define node identity mappings. Required for cluster management in IBM Storage Scale 6.0.1+.</p>
+              <div class="btn-group">
+                <button class="btn btn-primary" onclick="runPhase('enable-daemon', this)">
+                  <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm0 26A12 12 0 1128 16 12 12 0 0116 28z"/><path d="M11 21l10-5-10-5v10z"/></svg>
+                  Enable Daemon
+                </button>
+                <button class="btn btn-secondary" onclick="runPhase('nodeid-define', this)">Node ID Define</button>
+              </div>
+              <div class="cmd-preview" style="margin-top:var(--spacing-05)">
+                <div><span class="cmd-prompt">$ </span>sudo <span class="toolkit-path-display-inline">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> scaleadmd enable</div>
+                <div><span class="cmd-prompt">$ </span>sudo <span class="toolkit-path-display-inline">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> nodeid define</div>
+              </div>
+            </div>
+          </div>
+
           <div class="panel">
-            <div class="panel-header"><div><h3>Step 2: Deploy Protocol Services</h3></div></div>
+            <div class="panel-header"><div><h3>Step 3: Deploy Protocol Services</h3></div></div>
             <div class="panel-body">
               <p style="color:var(--cds-text-secondary); margin-bottom:var(--spacing-05); font-size:13px">Validates deploy prerequisites, then deploys and starts enabled protocol services (NFS, SMB, Object) on designated protocol nodes.</p>
               <div class="btn-group">
@@ -1970,7 +2036,24 @@
             </div>
           </div>
 
-          <!-- 5. AFM Gateway -->
+          <!-- 5. NFS Core Dump -->
+          <div class="panel" style="margin-bottom:var(--spacing-05)">
+            <div class="panel-header">
+              <div><h3>NFS Core Dump</h3><p>Enable or disable NFS core dump collection on protocol nodes (6.0.1+)</p></div>
+            </div>
+            <div class="panel-body">
+              <p style="color:var(--cds-text-secondary); margin-bottom:var(--spacing-05); font-size:13px">Captures NFS daemon core dumps for troubleshooting protocol node crashes. Enable during debugging; disable in production to conserve disk space.</p>
+              <div class="btn-group">
+                <button class="btn btn-primary btn-sm" onclick="applyNfsCoreDump('enable', this)">Enable</button>
+                <button class="btn btn-secondary btn-sm" onclick="applyNfsCoreDump('disable', this)">Disable</button>
+              </div>
+              <div class="cmd-preview" style="margin-top:var(--spacing-05)" id="pc-nfs-coredump-preview">
+                <div><span class="cmd-prompt">$ </span>sudo <span class="toolkit-path-display-inline">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> nfs_core_dump enable</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 6. AFM Gateway -->
           <div class="panel">
             <div class="panel-header">
               <div><h3>AFM Gateway</h3><p>Active File Management — link a fileset to an NFS or S3 target</p></div>
@@ -2079,6 +2162,22 @@
         <div class="notification-content">
           <h4>About Population</h4>
           <p>The <code>spectrumscale config populate</code> command reads the existing cluster configuration and populates the installer toolkit cluster definition file. This is useful for managing or upgrading an existing cluster through the toolkit.</p>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:var(--spacing-06)">
+        <div class="panel-header"><div><h3>CCR Status Check</h3><p>Cluster Configuration Repository must be enabled before using the toolkit</p></div></div>
+        <div class="panel-body" style="display:flex; align-items:center; gap:var(--spacing-05); flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="checkCCRStatus(this)">Check CCR Status</button>
+          <div class="cmd-preview" style="flex:1; margin:0">
+            <div><span class="cmd-prompt">$ </span>mmlscluster | grep -i Repository</div>
+          </div>
+          <div id="ccr-status-badge" style="display:none"></div>
+        </div>
+        <div id="ccr-status-output" style="display:none; padding:0 var(--spacing-05) var(--spacing-05)">
+          <div class="terminal" style="height:80px; font-size:12px" id="ccr-terminal">
+            <div class="terminal-line normal terminal-cursor"></div>
+          </div>
         </div>
       </div>
 
@@ -2566,12 +2665,13 @@ function addNode() {
   if (document.getElementById('role-gui').checked) roles.push('gui');
   if (document.getElementById('role-ems').checked) roles.push('ems');
   if (document.getElementById('role-callhome').checked) roles.push('callhome');
+  if (document.getElementById('role-archive-ee').checked) roles.push('archive-ee');
   if (roles.length === 0) { alert('Please select at least one role'); return; }
 
   state.nodes.push({ hostname, roles });
 
   document.getElementById('node-hostname').value = '';
-  ['role-nsd','role-manager','role-quorum','role-admin','role-protocol','role-gui','role-ems','role-callhome'].forEach(id => {
+  ['role-nsd','role-manager','role-quorum','role-admin','role-protocol','role-gui','role-ems','role-callhome','role-archive-ee'].forEach(id => {
     const el = document.getElementById(id); if (el) el.checked = false;
   });
   
@@ -2629,7 +2729,7 @@ function updateNodeDisplay() {
     return;
   }
 
-  const roleTagColors = { nsd:'cyan', client:'teal', manager:'purple', quorum:'gray', protocol:'green', gui:'blue', gateway:'warning' };
+  const roleTagColors = { nsd:'cyan', client:'teal', manager:'purple', quorum:'gray', protocol:'green', gui:'blue', gateway:'warning', 'archive-ee':'teal', ems:'gray', callhome:'gray' };
 
   tbody.innerHTML = state.nodes.map((n, i) => `
     <tr>
@@ -2651,7 +2751,7 @@ function updateNodeDisplay() {
   grid.innerHTML = state.nodes.map((n, i) => `
     <div class="node-card">
       <div class="node-card-header"><span class="node-card-hostname">${h(n.hostname)}</span></div>
-      <div class="node-card-roles">${n.roles.map(r => `<span class="tag tag-${h(roleTagColors[r]||'gray')}">${r === 'nsd' ? 'NSD Server' : r === 'gui' ? 'GUI Server' : r === 'gateway' ? 'AFM Gateway' : h(r)}</span>`).join(' ')}</div>
+      <div class="node-card-roles">${n.roles.map(r => `<span class="tag tag-${h(roleTagColors[r]||'gray')}">${r === 'nsd' ? 'NSD Server' : r === 'gui' ? 'GUI Server' : r === 'gateway' ? 'AFM Gateway' : r === 'archive-ee' ? 'Archive EE' : r === 'ems' ? 'EMS' : r === 'callhome' ? 'Call Home' : h(r)}</span>`).join(' ')}</div>
     </div>`).join('');
 }
 
@@ -2751,6 +2851,25 @@ function removeNSD(i) {
   updateAllPreviews();
 }
 
+function editNSD(i) {
+  const n = state.nsds[i];
+  document.getElementById('nsd-server').value = n.server;
+  document.getElementById('nsd-disk').value = n.disk;
+  document.getElementById('nsd-fg').value = n.failureGroup;
+  document.getElementById('nsd-usage').value = n.usage;
+  document.getElementById('nsd-backup').value = n.backup || '';
+  const sizeMatch = n.size ? n.size.match(/^([\d.]+)\s*(GiB|TiB|MiB)?$/i) : null;
+  if (sizeMatch) {
+    document.getElementById('nsd-size').value = sizeMatch[1];
+    if (sizeMatch[2]) document.getElementById('nsd-size-unit').value = sizeMatch[2];
+  }
+  state.nsds.splice(i, 1);
+  updateNSDDisplay();
+  updateAllPreviews();
+  document.getElementById('nsd-disk').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('nsd-disk').focus();
+}
+
 function updateNSDDisplay() {
   document.getElementById('stat-disks').textContent = state.nsds.length;
   const tbody = document.getElementById('nsd-table-body');
@@ -2764,7 +2883,10 @@ function updateNSDDisplay() {
         <td>${h(n.failureGroup)}</td>
         <td><span class="tag tag-blue">${h(n.usage)}</span></td>
         <td>${h(n.size)}</td>
-        <td><button class="btn btn-sm btn-danger" onclick="removeNSD(${i})">Remove</button></td>
+        <td style="display:flex;gap:4px">
+          <button class="btn btn-sm btn-secondary" onclick="editNSD(${i})">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="removeNSD(${i})">Remove</button>
+        </td>
       </tr>`).join('');
   }
   updateNSDStanza();
@@ -2830,6 +2952,7 @@ function updateClusterCmdPreview() {
   const perfmonNode = document.getElementById('perfmon-querynode')?.value.trim() || '';
   const fileauditOn = document.getElementById('fileaudit-toggle')?.classList.contains('on');
   const fileauditFs = document.getElementById('fileaudit-logfs')?.value.trim() || '';
+  const gplbinDir   = document.getElementById('cluster-gplbin-dir')?.value.trim() || '';
 
   // Keep toggle labels in sync
   const chLabel = document.getElementById('callhome-toggle-label');
@@ -2845,6 +2968,7 @@ function updateClusterCmdPreview() {
   if (rsh  !== '/usr/bin/ssh') cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -r ${rsh}</div>`);
   if (rcp  !== '/usr/bin/scp') cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -rc ${rcp}</div>`);
   if (ports !== '60000-61000') cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -e ${ports}</div>`);
+  if (gplbinDir) cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs --gplbin_dir ${gplbinDir}</div>`);
   cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs --list</div>`);
 
   // Call Home
@@ -2865,6 +2989,11 @@ function updateClusterCmdPreview() {
   if (el) el.innerHTML = cmds.length > 1 ? cmds.join('') : '<div style="color:#6f6f6f"># Fill in Cluster Name above to generate commands</div>';
 }
 
+function clearGplbinDir() {
+  const el = document.getElementById('cluster-gplbin-dir');
+  if (el) { el.value = ''; updateClusterCmdPreview(); }
+}
+
 function clearClusterTerminal() {
   document.getElementById('cluster-terminal').innerHTML =
     '<div class="terminal-line muted"># Terminal cleared</div><div class="terminal-line normal terminal-cursor"></div>';
@@ -2883,6 +3012,7 @@ async function applyClusterConfig(btn) {
   const perfmonOn   = document.getElementById('perfmon-toggle')?.classList.contains('on');
   const fileauditOn = document.getElementById('fileaudit-toggle')?.classList.contains('on');
   const fileauditFs = document.getElementById('fileaudit-logfs')?.value.trim() || '';
+  const gplbinDirLive = document.getElementById('cluster-gplbin-dir')?.value.trim() || '';
 
   if (!name) {
     appendToTerminal(termId, '[ERROR] Cluster Name is required.', 'error');
@@ -2895,6 +3025,7 @@ async function applyClusterConfig(btn) {
     if (rsh !== '/usr/bin/ssh')  appendToTerminal(termId, `$ sudo ${tp} config gpfs -r ${rsh}  # (dry run)`, 'info');
     if (rcp !== '/usr/bin/scp')  appendToTerminal(termId, `$ sudo ${tp} config gpfs -rc ${rcp}  # (dry run)`, 'info');
     if (ports !== '60000-61000') appendToTerminal(termId, `$ sudo ${tp} config gpfs -e ${ports}  # (dry run)`, 'info');
+    if (gplbinDirLive) appendToTerminal(termId, `$ sudo ${tp} config gpfs --gplbin_dir ${gplbinDirLive}  # (dry run)`, 'info');
     appendToTerminal(termId, `$ sudo ${tp} callhome ${callhomeOn ? 'enable' : 'disable'}  # (dry run)`, 'info');
     appendToTerminal(termId, `$ sudo ${tp} config perfmon -r ${perfmonOn ? 'on' : 'off'}  # (dry run)`, 'info');
     const faFlag = fileauditFs ? ` --log-fileset ${fileauditFs}` : '';
@@ -2921,6 +3052,7 @@ async function applyClusterConfig(btn) {
   if (rsh  !== '/usr/bin/ssh')  gpfsParams.push({ flag: '-r',  value: rsh });
   if (rcp  !== '/usr/bin/scp')  gpfsParams.push({ flag: '-rc', value: rcp });
   if (ports !== '60000-61000')  gpfsParams.push({ flag: '-e',  value: ports });
+  if (gplbinDirLive)            gpfsParams.push({ flag: '--gplbin_dir', value: gplbinDirLive });
   for (const p of gpfsParams) {
     await streamToTerminal(termId, `${getBackendUrl()}/api/stream/config-gpfs?toolkit=${encodeURIComponent(tp)}&flag=${encodeURIComponent(p.flag)}&value=${encodeURIComponent(p.value)}`);
   }
@@ -3089,8 +3221,10 @@ function updateAllPreviews() {
     let cmds = '';
     const roleFlagMap = { nsd:'-n', manager:'-m', quorum:'-q', admin:'-a', protocol:'-p', gui:'-g', ems:'-e', callhome:'-c' };
     state.nodes.forEach(n => {
-      const flags = n.roles.map(r => roleFlagMap[r]).filter(Boolean).join(' ');
-      cmds += `<div><span class="cmd-prompt">$ </span>sudo ${tp} node add ${n.hostname} ${flags}</div>`;
+      const coreRoles = n.roles.filter(r => r !== 'archive-ee');
+      const flags = coreRoles.map(r => roleFlagMap[r]).filter(Boolean).join(' ');
+      const archiveNote = n.roles.includes('archive-ee') ? '<span style="color:#6f6f6f">  # Archive EE: requires separate install workflow</span>' : '';
+      cmds += `<div><span class="cmd-prompt">$ </span>sudo ${tp} node add ${h(n.hostname)} ${h(flags)}${archiveNote}</div>`;
     });
     nodesCmdEl.innerHTML = cmds;
   } else if (nodesCmdEl) {
@@ -3324,6 +3458,8 @@ async function runPrepare(phase, btn) {
       extract:     `$ unzip -o ${zip} -d ${dir}`,
       checksum:    `$ cd ${dir} && md5sum -c *.md5`,
       install:     `$ sh ${installer || dir + '/Storage_Scale_Developer-x.x.x.x-x86_64-Linux-install'} --dir ${dir} --silent`,
+      checkansible: `$ ansible --version | head -1`,
+      checklocale:  `$ locale | grep LC_ALL`,
       checkpython: `$ python3 --version`,
       setup:       `$ sudo ${dir}/ansible-toolkit/spectrumscale setup -s ${ip || 'SERVER_IP'}`,
     };
@@ -3370,6 +3506,41 @@ async function runPrepare(phase, btn) {
     const url = `${getBackendUrl()}/api/stream/install?installer=${encodeURIComponent(installer)}&dir=${encodeURIComponent(dir)}`;
     streamToTerminal(termId, url, () => { btn.disabled = false; });
 
+  } else if (phase === 'checkansible') {
+    // Stream manually so we can read the ansible-compat SSE type for the warning banner
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/stream/check-ansible`);
+      const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const parts = buf.split('\n\n');
+        buf = parts.pop();
+        for (const chunk of parts) {
+          for (const line of chunk.split('\n')) {
+            if (!line.startsWith('data:')) continue;
+            try {
+              const ev = JSON.parse(line.slice(5));
+              if (ev.type === 'ansible-compat') {
+                document.getElementById('ansible-version-warning').style.display =
+                  ev.line === 'ok' || ev.line === 'missing' ? 'none' : 'block';
+              } else if (ev.type !== 'done') {
+                appendToTerminal(termId, ev.line, ev.type);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      appendToTerminal(termId, `[ERROR] ${err}`, 'error');
+    }
+    btn.disabled = false;
+
+  } else if (phase === 'checklocale') {
+    await streamToTerminal(termId, `${getBackendUrl()}/api/stream/check-locale`);
+    btn.disabled = false;
+
   } else if (phase === 'checkpython') {
     const url = `${getBackendUrl()}/api/stream/checkpython`;
     streamToTerminal(termId, url, () => { btn.disabled = false; });
@@ -3402,8 +3573,10 @@ async function applyNodeConfig(btn) {
   const roleFlagMap = { nsd:'-n', manager:'-m', quorum:'-q', admin:'-a', protocol:'-p', gui:'-g', ems:'-e', callhome:'-c' };
   if (state.dryRun) {
     state.nodes.forEach(n => {
-      const flags = n.roles.map(r => roleFlagMap[r]).filter(Boolean).join(' ');
-      appendToTerminal(termId, `$ sudo ${tp} node add ${n.hostname} ${flags}  # (dry run)`, 'info');
+      const coreRoles = n.roles.filter(r => r !== 'archive-ee');
+      const flags = coreRoles.map(r => roleFlagMap[r]).filter(Boolean).join(' ');
+      const archiveNote = n.roles.includes('archive-ee') ? '  # Archive EE: requires separate install workflow' : '';
+      appendToTerminal(termId, `$ sudo ${tp} node add ${n.hostname} ${flags}${archiveNote}  # (dry run)`, 'info');
     });
     appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
     return;
@@ -3440,6 +3613,8 @@ async function runPhase(phase, btn) {
       'precheck-install':  `sudo ${tp} install --precheck`,
       install:             `sudo ${tp} install`,
       'postcheck-install': `sudo ${tp} install --postcheck`,
+      'enable-daemon':     `sudo ${tp} scaleadmd enable`,
+      'nodeid-define':     `sudo ${tp} nodeid define`,
       'precheck-deploy':   `sudo ${tp} deploy --precheck`,
       deploy:              `sudo ${tp} deploy`,
       'postcheck-deploy':  `sudo ${tp} deploy --postcheck`,
@@ -3463,7 +3638,7 @@ async function runPhase(phase, btn) {
   await streamToTerminal(termId, `${getBackendUrl()}/api/stream/phase?${params}`);
 
   // Mark step complete in progress indicator
-  const phaseSteps = ['precheck-install','install','postcheck-install','precheck-deploy','deploy','postcheck-deploy'];
+  const phaseSteps = ['precheck-install','install','postcheck-install','enable-daemon','precheck-deploy','deploy','postcheck-deploy'];
   const idx = phaseSteps.indexOf(phase);
   if (idx >= 0) {
     const stepEl = document.getElementById('ps-' + phase);
@@ -3576,6 +3751,27 @@ function updatePostConfigPreview() {
   }
 }
 
+async function applyNfsCoreDump(mode, btn) {
+  const termId = 'pc-terminal';
+  const tp = state.toolkitPath;
+  const cmd = `sudo ${tp} nfs_core_dump ${mode}`;
+  const preview = document.getElementById('pc-nfs-coredump-preview');
+  if (preview) {
+    preview.innerHTML = '';
+    const d = document.createElement('div');
+    d.textContent = `$ ${cmd}`;
+    preview.appendChild(d);
+  }
+  if (state.dryRun) {
+    appendToTerminal(termId, `$ ${cmd}  # (dry run)`, 'info');
+    appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
+    return;
+  }
+  if (btn) btn.disabled = true;
+  await streamToTerminalPost(termId, `${getBackendUrl()}/api/stream/nfs-core-dump`, { toolkit: tp, mode });
+  if (btn) btn.disabled = false;
+}
+
 async function applyPostConfig(action, btn) {
   const termId = 'pc-terminal';
   const tp = state.toolkitPath;
@@ -3658,6 +3854,57 @@ async function applyPostConfig(action, btn) {
 }
 
 // ===== POPULATE =====
+async function checkCCRStatus(btn) {
+  const termId = 'ccr-terminal';
+  document.getElementById('ccr-status-output').style.display = 'block';
+  const badge = document.getElementById('ccr-status-badge');
+  badge.style.display = 'none';
+
+  if (state.dryRun) {
+    appendToTerminal(termId, '$ mmlscluster | grep -i Repository  # (dry run)', 'info');
+    appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  appendToTerminal(termId, '$ mmlscluster | grep -i Repository', 'info');
+
+  try {
+    const ping = await fetch(getBackendUrl() + '/api/ping', { signal: AbortSignal.timeout(2000) });
+    if (!ping.ok) throw new Error();
+  } catch {
+    appendToTerminal(termId, '[ERROR] Backend not reachable — run command manually', 'error');
+    if (btn) btn.disabled = false;
+    return;
+  }
+
+  let output = '';
+  const res = await fetch(`${getBackendUrl()}/api/stream/ccr-status`);
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const lines = dec.decode(value).split('\n');
+    for (const line of lines) {
+      if (line.startsWith('data:')) {
+        const text = line.slice(5).trim();
+        if (text) { appendToTerminal(termId, text, 'normal'); output += text; }
+      }
+    }
+  }
+
+  badge.style.display = 'inline-block';
+  if (/enabled/i.test(output)) {
+    badge.innerHTML = '<span style="background:var(--cds-support-success);color:#000;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500">CCR Enabled</span>';
+  } else if (/disabled/i.test(output)) {
+    badge.innerHTML = '<span style="background:var(--cds-support-error);color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500">CCR Disabled</span>';
+  } else {
+    badge.innerHTML = '<span style="background:var(--cds-support-warning);color:#000;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500">Unknown</span>';
+  }
+  if (btn) btn.disabled = false;
+}
+
 function testConnection() {
   const node = document.getElementById('pop-node').value;
   const termId = 'pop-terminal';
