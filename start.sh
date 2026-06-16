@@ -16,7 +16,7 @@ fi
 # Ensure Flask is available
 if ! python3 -c "import flask" 2>/dev/null; then
   echo "Flask not found — installing..."
-  pip install flask
+  pip install "flask>=3.0,<4"
 fi
 
 # Verify Python >= 3.10

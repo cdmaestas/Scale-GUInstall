@@ -34,9 +34,20 @@ def cors(response):
 app.after_request(cors)
 
 
+_ALLOWED_ROOTS = ("/tmp", "/opt", "/usr", "/home", "/var", "/srv", "/mnt", "/data", "/ibm")
+
+
 def resolve_path(path):
-    """Resolve a path relative to the server's working directory."""
-    return os.path.abspath(path)
+    """
+    Resolve a path and verify it starts with a known safe root.
+    Returns (resolved_path, None) on success, (None, error_message) on failure.
+    """
+    if not path:
+        return None, "No path provided."
+    resolved = os.path.abspath(path)
+    if not any(resolved.startswith(root) for root in _ALLOWED_ROOTS):
+        return None, f"Path not within an allowed directory: {resolved}"
+    return resolved, None
 
 
 # ---------------------------------------------------------------------------
@@ -54,9 +65,9 @@ def ping():
 
 @app.route("/api/check-file")
 def check_file():
-    path = resolve_path(request.args.get("path", "").strip())
-    if not path:
-        return jsonify({"exists": False, "error": "No path provided"}), 400
+    path, err = resolve_path(request.args.get("path", "").strip())
+    if err:
+        return jsonify({"exists": False, "error": err}), 400
     return jsonify({"exists": os.path.isfile(path), "path": path})
 
 
@@ -109,13 +120,16 @@ def stream_process(cmd, cwd=None):
 
 @app.route("/api/stream/extract")
 def stream_extract():
-    zip_path = resolve_path(request.args.get("zip", "").strip())
-    dest     = resolve_path(request.args.get("dest", "").strip())
+    zip_path, _zip_err = resolve_path(request.args.get("zip", "").strip())
+    dest,     _dst_err = resolve_path(request.args.get("dest", "").strip())
 
     def generate():
         try:
-            if not zip_path:
-                yield sse("error", "[ERROR] No zip path provided.")
+            if _zip_err:
+                yield sse("error", f"[ERROR] Invalid zip path: {_zip_err}")
+                return
+            if _dst_err:
+                yield sse("error", f"[ERROR] Invalid destination path: {_dst_err}")
                 return
 
             if not os.path.isfile(zip_path):
@@ -171,12 +185,12 @@ def stream_extract():
 
 @app.route("/api/stream/checksum")
 def stream_checksum():
-    directory = resolve_path(request.args.get("dir", "").strip())
+    directory, _dir_err = resolve_path(request.args.get("dir", "").strip())
 
     def generate():
         try:
-            if not directory:
-                yield sse("error", "[ERROR] No directory provided.")
+            if _dir_err:
+                yield sse("error", f"[ERROR] Invalid directory: {_dir_err}")
                 return
 
             if not os.path.isdir(directory):
@@ -212,13 +226,16 @@ def stream_checksum():
 
 @app.route("/api/stream/install")
 def stream_install():
-    installer  = resolve_path(request.args.get("installer", "").strip())
-    target_dir = resolve_path(request.args.get("dir", "").strip())
+    installer,  _inst_err = resolve_path(request.args.get("installer", "").strip())
+    target_dir, _dir_err  = resolve_path(request.args.get("dir", "").strip())
 
     def generate():
         try:
-            if not installer:
-                yield sse("error", "[ERROR] No installer path provided.")
+            if _inst_err:
+                yield sse("error", f"[ERROR] Invalid installer path: {_inst_err}")
+                return
+            if _dir_err:
+                yield sse("error", f"[ERROR] Invalid target directory: {_dir_err}")
                 return
 
             if not os.path.isfile(installer):
@@ -379,13 +396,13 @@ def stream_checkpython():
 
 @app.route("/api/stream/setup")
 def stream_setup():
-    directory  = resolve_path(request.args.get("dir", "").strip())
+    directory, _dir_err = resolve_path(request.args.get("dir", "").strip())
     server_ip  = request.args.get("ip", "").strip()
 
     def generate():
         try:
-            if not directory:
-                yield sse("error", "[ERROR] No working directory provided.")
+            if _dir_err:
+                yield sse("error", f"[ERROR] Invalid working directory: {_dir_err}")
                 return
 
             if not server_ip:
@@ -428,25 +445,25 @@ def stream_setup():
 # Apply node configuration (spectrumscale node add)
 # ---------------------------------------------------------------------------
 
-@app.route("/api/stream/nodes")
+@app.route("/api/stream/nodes", methods=["POST", "OPTIONS"])
 def stream_nodes():
-    import json as _json
-    toolkit = request.args.get("toolkit", "").strip()
-    nodes_raw = request.args.get("nodes", "[]")
+    if request.method == "OPTIONS":
+        return "", 204
+    body             = request.get_json(silent=True) or {}
+    toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
+    nodes            = body.get("nodes", [])
 
     def generate():
         try:
-            if not toolkit:
-                yield sse("error", "[ERROR] Toolkit path not set. Configure it in the toolbar.")
+            if _tk_err:
+                yield sse("error", f"[ERROR] Invalid toolkit path: {_tk_err}")
                 return
 
             if not os.path.isfile(toolkit):
                 yield sse("error", f"[ERROR] spectrumscale binary not found: {toolkit}")
                 return
 
-            try:
-                nodes = _json.loads(nodes_raw)
-            except Exception:
+            if not isinstance(nodes, list):
                 yield sse("error", "[ERROR] Invalid node data.")
                 return
 
@@ -488,14 +505,14 @@ def stream_nodes():
 
 @app.route("/api/stream/config-gpfs")
 def stream_config_gpfs():
-    toolkit = resolve_path(request.args.get("toolkit", "").strip())
+    toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
     flag    = request.args.get("flag", "").strip()
     value   = request.args.get("value", "").strip()
 
     def generate():
         try:
-            if not toolkit:
-                yield sse("error", "[ERROR] Toolkit path not set.")
+            if _tk_err:
+                yield sse("error", f"[ERROR] Invalid toolkit path: {_tk_err}")
                 return
 
             if not os.path.isfile(toolkit):
@@ -627,9 +644,9 @@ def _parse_kv(output):
 
 @app.route("/api/list/nodes")
 def list_nodes():
-    toolkit = resolve_path(request.args.get("toolkit", "").strip())
-    if not toolkit or not os.path.isfile(toolkit):
-        return jsonify({"ok": False, "error": f"Toolkit not found: {toolkit}"}), 400
+    toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
+    if _tk_err or not os.path.isfile(toolkit):
+        return jsonify({"ok": False, "error": _tk_err or f"Toolkit not found: {toolkit}"}), 400
 
     raw, rc = _run_cmd(["sudo", toolkit, "node", "list"])
     if rc != 0:
@@ -659,9 +676,9 @@ def list_nodes():
 
 @app.route("/api/list/nsds")
 def list_nsds():
-    toolkit = resolve_path(request.args.get("toolkit", "").strip())
-    if not toolkit or not os.path.isfile(toolkit):
-        return jsonify({"ok": False, "error": f"Toolkit not found: {toolkit}"}), 400
+    toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
+    if _tk_err or not os.path.isfile(toolkit):
+        return jsonify({"ok": False, "error": _tk_err or f"Toolkit not found: {toolkit}"}), 400
 
     raw, rc = _run_cmd(["sudo", toolkit, "nsd", "list"])
     if rc != 0:
@@ -691,9 +708,9 @@ def list_nsds():
 
 @app.route("/api/list/filesystem")
 def list_filesystem():
-    toolkit = resolve_path(request.args.get("toolkit", "").strip())
-    if not toolkit or not os.path.isfile(toolkit):
-        return jsonify({"ok": False, "error": f"Toolkit not found: {toolkit}"}), 400
+    toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
+    if _tk_err or not os.path.isfile(toolkit):
+        return jsonify({"ok": False, "error": _tk_err or f"Toolkit not found: {toolkit}"}), 400
 
     raw, rc = _run_cmd(["sudo", toolkit, "filesystem", "list"])
     if rc != 0:
@@ -721,9 +738,9 @@ def list_filesystem():
 
 @app.route("/api/list/config")
 def list_config():
-    toolkit = resolve_path(request.args.get("toolkit", "").strip())
-    if not toolkit or not os.path.isfile(toolkit):
-        return jsonify({"ok": False, "error": f"Toolkit not found: {toolkit}"}), 400
+    toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
+    if _tk_err or not os.path.isfile(toolkit):
+        return jsonify({"ok": False, "error": _tk_err or f"Toolkit not found: {toolkit}"}), 400
 
     raw, rc = _run_cmd(["sudo", toolkit, "config", "gpfs", "--list"])
     if rc != 0:
@@ -770,13 +787,13 @@ def list_config():
 
 @app.route("/api/stream/callhome")
 def stream_callhome():
-    toolkit = resolve_path(request.args.get("toolkit", "").strip())
+    toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
     enable  = request.args.get("enable", "false").lower() in ("true", "1", "yes")
 
     def generate():
         try:
-            if not toolkit or not os.path.isfile(toolkit):
-                yield sse("error", f"[ERROR] Toolkit not found: {toolkit}")
+            if _tk_err or not os.path.isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
                 return
             action = "enable" if enable else "disable"
             cmd = ["sudo", toolkit, "callhome", action]
@@ -800,13 +817,13 @@ def stream_callhome():
 
 @app.route("/api/stream/perfmon")
 def stream_perfmon():
-    toolkit   = resolve_path(request.args.get("toolkit", "").strip())
+    toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
     enable    = request.args.get("enable", "false").lower() in ("true", "1", "yes")
 
     def generate():
         try:
-            if not toolkit or not os.path.isfile(toolkit):
-                yield sse("error", f"[ERROR] Toolkit not found: {toolkit}")
+            if _tk_err or not os.path.isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
                 return
             cmd = ["sudo", toolkit, "config", "perfmon", "-r", "on" if enable else "off"]
             yield sse("info", f"$ {' '.join(cmd)}")
@@ -829,14 +846,14 @@ def stream_perfmon():
 
 @app.route("/api/stream/fileaudit")
 def stream_fileaudit():
-    toolkit = resolve_path(request.args.get("toolkit", "").strip())
+    toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
     enable  = request.args.get("enable", "false").lower() in ("true", "1", "yes")
     logfs   = request.args.get("logfs", "").strip()
 
     def generate():
         try:
-            if not toolkit or not os.path.isfile(toolkit):
-                yield sse("error", f"[ERROR] Toolkit not found: {toolkit}")
+            if _tk_err or not os.path.isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
                 return
             if enable:
                 cmd = ["sudo", toolkit, "fileauditlogging", "enable"]
@@ -871,7 +888,7 @@ def stream_list_partitions():
             if not node:
                 yield sse("error", "[ERROR] Node is required.")
                 return
-            cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10", node, "cat", "/proc/partitions"]
+            cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10", node, "cat", "/proc/partitions"]
             yield sse("info", f"$ ssh {node} cat /proc/partitions")
             rc = yield from stream_process(cmd)
             if rc != 0:
@@ -888,16 +905,34 @@ def stream_list_partitions():
 # Post-configuration endpoints
 # ---------------------------------------------------------------------------
 
+_SAFE_PATH_RE = __import__("re").compile(r'^[/a-zA-Z0-9_.:-]+$')
+
+
 @app.route("/api/stream/postconfig/profiled")
 def stream_profiled():
     binpath = request.args.get("binpath", "/usr/lpp/mmfs/bin").strip()
 
     def generate():
         try:
-            script = f"export PATH=$PATH:{binpath}"
-            cmd = ["sudo", "bash", "-c", f"echo '{script}' > /etc/profile.d/gpfs.sh && chmod 644 /etc/profile.d/gpfs.sh"]
-            yield sse("info", f"$ sudo bash -c \"echo '{script}' > /etc/profile.d/gpfs.sh && chmod 644 /etc/profile.d/gpfs.sh\"")
+            if not _SAFE_PATH_RE.fullmatch(binpath):
+                yield sse("error", "[ERROR] Invalid binpath — only alphanumeric characters, '/', '.', '_', '-', and ':' are allowed.")
+                return
+
+            profile_content = f"export PATH=$PATH:{binpath}\n"
+            import tempfile, shutil
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as tf:
+                tf.write(profile_content)
+                tmp_path = tf.name
+
+            dest = "/etc/profile.d/gpfs.sh"
+            cmd = ["sudo", "cp", tmp_path, dest]
+            yield sse("info", f"$ sudo cp <tmpfile> {dest}  # content: export PATH=$PATH:{binpath}")
             rc = yield from stream_process(cmd)
+            __import__("os").unlink(tmp_path)
+
+            if rc == 0:
+                chmod_cmd = ["sudo", "chmod", "644", dest]
+                yield from stream_process(chmod_cmd)
             if rc == 0:
                 yield sse("success", "[OK] /etc/profile.d/gpfs.sh created. Source it or re-login to apply.")
             else:
@@ -1079,13 +1114,13 @@ PHASE_CMDS = {
 
 @app.route("/api/stream/phase")
 def stream_phase():
-    toolkit = resolve_path(request.args.get("toolkit", "").strip())
+    toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
     phase   = request.args.get("phase", "").strip()
 
     def generate():
         try:
-            if not toolkit or not os.path.isfile(toolkit):
-                yield sse("error", f"[ERROR] Toolkit not found: {toolkit}")
+            if _tk_err or not os.path.isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
                 return
             args = PHASE_CMDS.get(phase)
             if args is None:
@@ -1219,17 +1254,17 @@ def stream_check_locale():
 def stream_nfs_core_dump():
     if request.method == "OPTIONS":
         return "", 204
-    body    = request.get_json(silent=True) or {}
-    toolkit = resolve_path(body.get("toolkit", "").strip())
-    mode    = body.get("mode", "enable").strip().lower()
+    body             = request.get_json(silent=True) or {}
+    toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
+    mode             = body.get("mode", "enable").strip().lower()
 
     def generate():
         try:
             if mode not in ("enable", "disable"):
                 yield sse("error", f"[ERROR] Invalid mode '{mode}'. Use 'enable' or 'disable'.")
                 return
-            if not toolkit or not os.path.isfile(toolkit):
-                yield sse("error", f"[ERROR] Toolkit not found: {toolkit}")
+            if _tk_err or not os.path.isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
                 return
             cmd = ["sudo", toolkit, "nfs_core_dump", mode]
             yield sse("info", f"$ {' '.join(cmd)}")
