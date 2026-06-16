@@ -876,6 +876,90 @@ def stream_fileaudit():
 
 
 # ---------------------------------------------------------------------------
+# Apply all cluster config commands in one stream
+# ---------------------------------------------------------------------------
+
+@app.route("/api/stream/apply-cluster-config", methods=["POST", "OPTIONS"])
+def stream_apply_cluster_config():
+    if request.method == "OPTIONS":
+        return "", 204
+    body = request.get_json(silent=True) or {}
+    toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
+
+    gpfs_flags   = body.get("gpfs_flags", [])   # list of {flag, value}
+    callhome_on  = body.get("callhome", False)
+    perfmon_on   = body.get("perfmon", False)
+    perfmon_node = body.get("perfmon_node", "")
+    fileaudit_on = body.get("fileaudit", False)
+    fileaudit_fs = body.get("fileaudit_fs", "")
+
+    def generate():
+        try:
+            if _tk_err or not os.path.isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
+                return
+
+            # config gpfs flags
+            for entry in gpfs_flags:
+                flag  = entry.get("flag", "")
+                value = entry.get("value", "")
+                if not flag:
+                    continue
+                cmd = ["sudo", toolkit, "config", "gpfs", flag]
+                if value:
+                    cmd.append(value)
+                yield sse("info", f"$ {' '.join(cmd)}")
+                rc = yield from stream_process(cmd)
+                if rc == 0:
+                    yield sse("success", f"[OK] config gpfs {flag} completed.")
+                else:
+                    yield sse("error", f"[ERROR] config gpfs {flag} exited with code {rc}.")
+
+            # callhome
+            ch_action = "enable" if callhome_on else "disable"
+            cmd = ["sudo", toolkit, "callhome", ch_action]
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd)
+            if rc == 0:
+                yield sse("success", f"[OK] Call Home {ch_action}d.")
+            else:
+                yield sse("error", f"[ERROR] callhome {ch_action} exited with code {rc}.")
+
+            # perfmon
+            pm_flag = "on" if perfmon_on else "off"
+            cmd = ["sudo", toolkit, "config", "perfmon", "-r", pm_flag]
+            if perfmon_node:
+                cmd += ["-N", perfmon_node]
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd)
+            if rc == 0:
+                yield sse("success", f"[OK] Performance monitoring {pm_flag}.")
+            else:
+                yield sse("error", f"[ERROR] config perfmon exited with code {rc}.")
+
+            # fileaudit
+            if fileaudit_on:
+                cmd = ["sudo", toolkit, "fileauditlogging", "enable"]
+                if fileaudit_fs:
+                    cmd += ["--log-fileset", fileaudit_fs]
+            else:
+                cmd = ["sudo", toolkit, "fileauditlogging", "disable"]
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd)
+            if rc == 0:
+                yield sse("success", f"[OK] File audit logging {'enabled' if fileaudit_on else 'disabled'}.")
+            else:
+                yield sse("error", f"[ERROR] fileauditlogging exited with code {rc}.")
+
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+        finally:
+            yield sse("done", "")
+
+    return sse_response(generate())
+
+
+# ---------------------------------------------------------------------------
 # List partitions on a remote node via SSH
 # ---------------------------------------------------------------------------
 

@@ -3075,28 +3075,25 @@ async function applyClusterConfig(btn) {
 
   btn.disabled = true;
 
-  // config gpfs flags
-  const gpfsParams = [];
-  if (name)  gpfsParams.push({ flag: '-c', value: name });
-  if (prof)  gpfsParams.push({ flag: '-p', value: prof });
-  if (rsh  !== '/usr/bin/ssh')  gpfsParams.push({ flag: '-r',  value: rsh });
-  if (rcp  !== '/usr/bin/scp')  gpfsParams.push({ flag: '-rc', value: rcp });
-  if (ports !== '60000-61000')  gpfsParams.push({ flag: '-e',  value: ports });
-  if (gplbinDirLive)            gpfsParams.push({ flag: '--gplbin_dir', value: gplbinDirLive });
-  for (const p of gpfsParams) {
-    await streamToTerminal(termId, `${getBackendUrl()}/api/stream/config-gpfs?toolkit=${encodeURIComponent(tp)}&flag=${encodeURIComponent(p.flag)}&value=${encodeURIComponent(p.value)}`);
-  }
+  const gpfsFlags = [];
+  if (name)  gpfsFlags.push({ flag: '-c', value: name });
+  if (prof)  gpfsFlags.push({ flag: '-p', value: prof });
+  if (rsh  !== '/usr/bin/ssh')  gpfsFlags.push({ flag: '-r',  value: rsh });
+  if (rcp  !== '/usr/bin/scp')  gpfsFlags.push({ flag: '-rc', value: rcp });
+  if (ports !== '60000-61000')  gpfsFlags.push({ flag: '-e',  value: ports });
+  if (gplbinDirLive)            gpfsFlags.push({ flag: '--gplbin_dir', value: gplbinDirLive });
 
-  // callhome
-  await streamToTerminal(termId, `${getBackendUrl()}/api/stream/callhome?toolkit=${encodeURIComponent(tp)}&enable=${callhomeOn}`);
+  const perfmonNode = document.getElementById('perfmon-querynode')?.value.trim() || '';
 
-  // perfmon
-  const pmParams = new URLSearchParams({ toolkit: tp, enable: perfmonOn });
-  await streamToTerminal(termId, `${getBackendUrl()}/api/stream/perfmon?${pmParams}`);
-
-  // file audit logging
-  const faParams = new URLSearchParams({ toolkit: tp, enable: fileauditOn, logfs: fileauditFs });
-  await streamToTerminal(termId, `${getBackendUrl()}/api/stream/fileaudit?${faParams}`);
+  await streamToTerminalPost(termId, `${getBackendUrl()}/api/stream/apply-cluster-config`, {
+    toolkit:      tp,
+    gpfs_flags:   gpfsFlags,
+    callhome:     callhomeOn,
+    perfmon:      perfmonOn,
+    perfmon_node: perfmonNode,
+    fileaudit:    fileauditOn,
+    fileaudit_fs: fileauditFs,
+  });
 
   btn.disabled = false;
 }
