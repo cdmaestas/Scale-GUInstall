@@ -1157,6 +1157,7 @@
                 <th>GPFS Node</th>
                 <th style="text-align:center">Quorum</th>
                 <th style="text-align:center">Manager</th>
+                <th style="text-align:center">Admin</th>
                 <th style="text-align:center">NSD Server</th>
                 <th style="text-align:center">Protocol</th>
                 <th style="text-align:center">GUI Server</th>
@@ -1166,7 +1167,7 @@
               </tr>
             </thead>
             <tbody id="nodes-table-body">
-              <tr><td colspan="9" style="color:var(--cds-text-secondary); text-align:center; padding:var(--spacing-07)">No nodes configured yet</td></tr>
+              <tr><td colspan="10" style="color:var(--cds-text-secondary); text-align:center; padding:var(--spacing-07)">No nodes configured yet</td></tr>
             </tbody>
           </table>
         </div>
@@ -2751,7 +2752,7 @@ function updateNodeDisplay() {
   document.getElementById('node-count-label').textContent = count + ' node' + (count !== 1 ? 's' : '') + ' configured';
 
   if (count === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" style="color:var(--cds-text-secondary); text-align:center; padding:var(--spacing-07)">No nodes configured yet</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="color:var(--cds-text-secondary); text-align:center; padding:var(--spacing-07)">No nodes configured yet</td></tr>';
     document.getElementById('role-assign-grid').innerHTML = '<div style="color:var(--cds-text-secondary); grid-column:1/-1; text-align:center; padding:var(--spacing-07)">Add nodes first to assign roles here</div>';
     return;
   }
@@ -2769,6 +2770,7 @@ function updateNodeDisplay() {
       <td class="mono">${h(n.hostname)}</td>
       <td style="text-align:center">${chk(i,'quorum',  n.roles.includes('quorum'))}</td>
       <td style="text-align:center">${chk(i,'manager', n.roles.includes('manager'))}</td>
+      <td style="text-align:center">${chk(i,'admin',   n.roles.includes('admin'))}</td>
       <td style="text-align:center">${chk(i,'nsd',     n.roles.includes('nsd'))}</td>
       <td style="text-align:center">${chk(i,'protocol',n.roles.includes('protocol'))}</td>
       <td style="text-align:center">${chk(i,'gui',     n.roles.includes('gui'))}</td>
