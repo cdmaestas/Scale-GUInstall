@@ -653,28 +653,66 @@ def list_nodes():
     if rc != 0:
         return jsonify({"ok": False, "error": raw.strip(), "raw": raw})
 
-    # Strip [ INFO ] / [ WARN ] prefixes so _parse_table sees clean column-aligned text
-    _INFO_RE = __import__("re").compile(r"^\[\s*\w+\s*\]\s?")
-    stripped_lines = []
-    for line in raw.splitlines():
-        stripped_lines.append(_INFO_RE.sub("", line))
-    stripped = "\n".join(stripped_lines)
+    import re as _re
+    _INFO_RE = _re.compile(r"^\[\s*\w+\s*\]\s?")
 
-    rows = _parse_table(stripped)
+    # Strip [ INFO ] / [ WARN ] prefixes
+    stripped = [_INFO_RE.sub("", ln) for ln in raw.splitlines()]
+
+    # Find the first header line: starts with "GPFS" and contains "Admin" or "Quorum"
+    header_idx = None
+    for i, line in enumerate(stripped):
+        if line.strip().upper().startswith("GPFS") and (
+            "Admin" in line or "Quorum" in line or "admin" in line.lower()
+        ):
+            header_idx = i
+            break
+
     nodes = []
-    role_col_map = {
-        "quorum": "quorum", "manager": "manager", "nsd": "nsd",
-        "protocol": "protocol", "gui": "gui", "ems": "ems",
-        "admin": "admin", "callhome": "callhome",
-    }
-    _truthy = {"yes", "true", "1", "x"}
-    for row in rows:
-        hostname = row.get("node", "").strip()
-        if not hostname or hostname.startswith("-"):
-            continue
-        roles = [r for r, col in role_col_map.items()
-                 if row.get(col, "").lower() in _truthy]
-        nodes.append({"hostname": hostname, "roles": roles})
+    if header_idx is not None:
+        header = stripped[header_idx]
+        # Build column start positions from first header line words
+        col_starts = {}
+        pos = 0
+        for word in header.split():
+            idx = header.index(word, pos)
+            col_starts[word.lower()] = idx
+            pos = idx + len(word)
+
+        # Map header keywords → role names (hostname is the "gpfs" column)
+        role_map = {
+            "admin":    "admin",
+            "quorum":   "quorum",
+            "manager":  "manager",
+            "nsd":      "nsd",
+            "protocol": "protocol",
+            "callhome": "callhome",
+            "gui":      "gui",
+            "ems":      "ems",
+        }
+        hostname_col = col_starts.get("gpfs", 0)
+        # Next col after gpfs gives the width of the hostname field
+        sorted_cols = sorted(col_starts.values())
+        hostname_end = sorted_cols[sorted_cols.index(hostname_col) + 1] if hostname_col in sorted_cols and sorted_cols.index(hostname_col) + 1 < len(sorted_cols) else hostname_col + 20
+
+        _truthy = {"x", "yes", "true", "1"}
+        # Skip the second header line (e.g. "Node   Node   Node   Server …") and blank lines
+        for line in stripped[header_idx + 2:]:
+            s = line.strip()
+            if not s or s.startswith("[") or s.startswith("-"):
+                break  # end of node table
+            hostname = line[hostname_col:hostname_end].strip()
+            if not hostname:
+                continue
+            roles = []
+            for kw, role in role_map.items():
+                col = col_starts.get(kw)
+                if col is None:
+                    continue
+                cell = line[col:col + 6].strip() if col < len(line) else ""
+                if cell.lower() in _truthy:
+                    roles.append(role)
+            nodes.append({"hostname": hostname, "roles": roles})
 
     return jsonify({"ok": True, "raw": raw, "nodes": nodes})
 
