@@ -2490,7 +2490,7 @@
           <div class="panel-body">
             <div class="form-group">
               <label class="form-label">spectrumscale Binary Path</label>
-              <input type="text" class="form-input" id="settings-toolkit-path" value="/usr/lpp/mmfs/5.x/installer/spectrumscale" oninput="syncToolkitPath()">
+              <input type="text" class="form-input" id="settings-toolkit-path" value="/tmp/scale-pkg/ansible-toolkit/spectrumscale" oninput="syncToolkitPath()">
               <div class="form-help">Full path to the spectrumscale installation toolkit command</div>
             </div>
             <div class="form-group">
@@ -2592,7 +2592,7 @@ const state = {
   filesystem: { name: '', mount: '/gpfs/data', blocksize: '256K', replication: 2 },
   protocols: { nfs: false, smb: false, object: false },
   clusterName: '',
-  toolkitPath: '/usr/lpp/mmfs/5.x/installer/spectrumscale',
+  toolkitPath: '/tmp/scale-pkg/ansible-toolkit/spectrumscale',
   dryRun: true
 };
 
