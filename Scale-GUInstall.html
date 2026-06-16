@@ -3001,8 +3001,8 @@ function updateClusterCmdPreview() {
   if (gplbinDir) cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs --gplbin_dir ${gplbinDir}</div>`);
   cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs --list</div>`);
 
-  // Call Home
-  cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} callhome ${callhomeOn ? 'enable' : 'disable'}</div>`);
+  // Call Home — always emitted so disable is enforced on every apply, not just on change
+  cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} callhome ${callhomeOn ? 'enable' : 'disable'}${callhomeOn ? '' : '  <span style="color:var(--cds-text-disabled)"># always enforced when disabled</span>'}</div>`);
 
   // Perfmon
   cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config perfmon -r ${perfmonOn ? 'on' : 'off'}</div>`);
