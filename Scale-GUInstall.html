@@ -2999,8 +2999,6 @@ function updateClusterCmdPreview() {
   if (rcp  !== '/usr/bin/scp') cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -rc ${rcp}</div>`);
   if (ports !== '60000-61000') cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -e ${ports}</div>`);
   if (gplbinDir) cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs --gplbin_dir ${gplbinDir}</div>`);
-  cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs --list</div>`);
-
   // Call Home — always emitted so disable is enforced on every apply, not just on change
   cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} callhome ${callhomeOn ? 'enable' : 'disable'}${callhomeOn ? '' : '  <span style="color:var(--cds-text-disabled)"># always enforced when disabled</span>'}</div>`);
 
@@ -3086,7 +3084,6 @@ async function applyClusterConfig(btn) {
   for (const p of gpfsParams) {
     await streamToTerminal(termId, `${getBackendUrl()}/api/stream/config-gpfs?toolkit=${encodeURIComponent(tp)}&flag=${encodeURIComponent(p.flag)}&value=${encodeURIComponent(p.value)}`);
   }
-  await streamToTerminal(termId, `${getBackendUrl()}/api/stream/config-gpfs?toolkit=${encodeURIComponent(tp)}&flag=--list&value=`);
 
   // callhome
   await streamToTerminal(termId, `${getBackendUrl()}/api/stream/callhome?toolkit=${encodeURIComponent(tp)}&enable=${callhomeOn}`);
