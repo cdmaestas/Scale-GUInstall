@@ -652,19 +652,27 @@ def list_nodes():
     if rc != 0:
         return jsonify({"ok": False, "error": raw.strip(), "raw": raw})
 
-    rows = _parse_table(raw)
+    # Strip [ INFO ] / [ WARN ] prefixes so _parse_table sees clean column-aligned text
+    _INFO_RE = __import__("re").compile(r"^\[\s*\w+\s*\]\s?")
+    stripped_lines = []
+    for line in raw.splitlines():
+        stripped_lines.append(_INFO_RE.sub("", line))
+    stripped = "\n".join(stripped_lines)
+
+    rows = _parse_table(stripped)
     nodes = []
     role_col_map = {
         "quorum": "quorum", "manager": "manager", "nsd": "nsd",
         "protocol": "protocol", "gui": "gui", "ems": "ems",
         "admin": "admin", "callhome": "callhome",
     }
+    _truthy = {"yes", "true", "1", "x"}
     for row in rows:
         hostname = row.get("node", "").strip()
-        if not hostname:
+        if not hostname or hostname.startswith("-"):
             continue
         roles = [r for r, col in role_col_map.items()
-                 if row.get(col, "").lower() in ("yes", "true", "1")]
+                 if row.get(col, "").lower() in _truthy]
         nodes.append({"hostname": hostname, "roles": roles})
 
     return jsonify({"ok": True, "raw": raw, "nodes": nodes})
