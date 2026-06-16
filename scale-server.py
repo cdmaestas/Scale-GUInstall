@@ -607,17 +607,18 @@ def _parse_kv(output):
     """
     Parse spectrumscale config output into a dict.
 
-    Handles two formats emitted by the installer toolkit:
-      [I] GPFS cluster name: gpfscluster01           <- colon-separated
-      [I] GPFS cluster name set to gpfscluster01     <- "set to" phrase
-      [I] GPFS cluster name is set to gpfscluster01  <- "is set to" phrase
-    Lines without a colon or recognised phrase are skipped.
-    Bracket prefixes like [I], [W], [E] are stripped before processing.
+    Handles formats emitted by the installer toolkit:
+      [INFO] GPFS cluster name: gpfscluster01          <- colon-separated
+      [INFO] GPFS cluster name is zima.                <- "is <value>."
+      [INFO] GPFS cluster name set to gpfscluster01    <- "set to" phrase
+      [INFO] GPFS cluster name is set to gpfscluster01 <- "is set to" phrase
+    Bracket prefixes like [INFO], [WARN] are stripped. Trailing periods removed.
     """
     import re
     result = {}
     bracket_prefix = re.compile(r'^\s*\[[\w\s]+\]\s*', re.IGNORECASE)
-    set_to_phrase  = re.compile(r'\s+(?:is\s+)?set\s+to\s+', re.IGNORECASE)
+    # Matches "is set to", "set to", or bare "is" followed by a value
+    value_phrase = re.compile(r'\s+(?:(?:is\s+)?set\s+to|is)\s+', re.IGNORECASE)
 
     for line in output.splitlines():
         line = bracket_prefix.sub('', line).strip()
@@ -627,12 +628,12 @@ def _parse_kv(output):
         if ':' in line:
             k, _, v = line.partition(':')
             key = k.strip().lower().replace(' ', '_')
-            result[key] = v.strip()
+            result[key] = v.strip().rstrip('.')
         else:
-            m = set_to_phrase.search(line)
+            m = value_phrase.search(line)
             if m:
                 k = line[:m.start()].strip().lower().replace(' ', '_')
-                v = line[m.end():].strip()
+                v = line[m.end():].strip().rstrip('.')
                 result[k] = v
 
     return result
@@ -759,7 +760,7 @@ def list_config():
     def _first(*keys, default=""):
         for k in keys:
             v = kv.get(k, "")
-            if v:
+            if v and v.lower() != "none":
                 return v
         return default
 
@@ -778,11 +779,14 @@ def list_config():
             default="/usr/bin/scp",
         ),
         "port_range": _first(
+            "gpfs_daemon_communication_port_range",
             "ephemeral_port_range", "port_range",
             "tcp_port_range", "communication_port_range",
             default="60000-61000",
         ),
-        "profile": _first("profile", "gpfs_profile", "profile_name"),
+        "profile": _first(
+            "gpfs_profile", "profile", "profile_name",
+        ),
     }
 
     # Include the raw parsed keys for diagnostics
