@@ -41,7 +41,19 @@ Open `Scale-GUInstall.html` in a browser on the same machine. On most Linux syst
 xdg-open Scale-GUInstall.html
 ```
 
-Or transfer the HTML file to your workstation and point the Backend URL field at `http://<installer-node-ip>:5001` if your browser is running remotely.
+Or open `Scale-GUInstall.html` on your local workstation and connect to the installer node remotely via an SSH tunnel (recommended):
+
+```bash
+ssh -L 5001:127.0.0.1:5001 user@installer-node
+```
+
+Leave the Backend URL in the GUI as `http://127.0.0.1:5001` — SSH forwards it transparently. To tunnel in the background without keeping a shell open:
+
+```bash
+ssh -fNL 5001:127.0.0.1:5001 user@installer-node
+```
+
+> **Why a tunnel?** The backend server has no authentication and executes privileged commands. Binding it to `0.0.0.0` would expose those endpoints to anyone on the network. The tunnel keeps the server loopback-only while still allowing remote access over an encrypted channel.
 
 > **Dry Run mode is on by default.** Every button shows the command it would run without executing anything. Disable it in Settings only when you're ready to apply changes to the cluster.
 
