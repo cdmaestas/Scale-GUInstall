@@ -2791,7 +2791,10 @@ async function listPartitions(btn) {
     const ping = await fetch(getBackendUrl() + '/api/ping', { signal: AbortSignal.timeout(2000) });
     if (!ping.ok) throw new Error();
   } catch {
-    term.innerHTML += '<div class="terminal-line error">[ERROR] Backend not reachable</div>';
+    const errDiv = document.createElement('div');
+    errDiv.className = 'terminal-line error';
+    errDiv.textContent = '[ERROR] Backend not reachable';
+    term.appendChild(errDiv);
     return;
   }
 
@@ -3597,11 +3600,8 @@ async function applyNodeConfig(btn) {
     toolkit_path: tp,
     nodes: state.nodes.map(n => ({ hostname: n.hostname, roles: n.roles }))
   };
-  const url = `${getBackendUrl()}/api/stream/nodes?` + new URLSearchParams({
-    toolkit: tp,
-    nodes: JSON.stringify(state.nodes.map(n => ({ hostname: n.hostname, roles: n.roles })))
-  });
-  streamToTerminal(termId, url, () => { btn.disabled = false; });
+  const url = `${getBackendUrl()}/api/stream/nodes`;
+  streamToTerminalPost(termId, url, { toolkit: tp, nodes: state.nodes.map(n => ({ hostname: n.hostname, roles: n.roles })) }, () => { btn.disabled = false; });
 }
 
 async function runPhase(phase, btn) {

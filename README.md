@@ -15,7 +15,7 @@ The GUI has two components: the HTML file (runs in your browser) and a lightweig
 On the installer node (the machine that will run `spectrumscale`):
 
 ```bash
-pip install flask
+pip install "flask>=3.0,<4"
 ```
 
 ### 2. Start the backend server
@@ -80,7 +80,7 @@ Prepare Software → Node Configuration → Cluster Settings → NSD Storage →
 - **IBM Storage Scale** — Developer Edition (free, up to 12 TB) or licensed. [Download →](https://www.ibm.com/products/storage-scale)
 - **`spectrumscale` toolkit** — installed and accessible (produced by the Prepare Software steps)
 - **Python 3.10+** — required for the setup service and the backend server
-- **Flask** — `pip install flask` (backend server only)
+- **Flask 3.x** — `pip install "flask>=3.0,<4"` (backend server only)
 - **SSH key-based auth** — from the installer node to all target nodes before running setup
 - **`unzip`** — needed for package extraction (`sudo apt install unzip` / `sudo yum install unzip`)
 - **Ansible compatibility** — ansible-core **2.23 or earlier** is required; ansible-core 2.24+ is incompatible with the toolkit
@@ -141,6 +141,9 @@ Dry Run is enabled by default. In this mode every button generates and displays 
 - CORS restricted to `localhost`, `127.0.0.1`, and `file://` origins
 - Credentials (GUI user passwords, S3 secret keys) are sent in POST request bodies, never in URLs or query strings
 - All executed commands are explicit and allowlisted — no generic shell execution endpoint
+- All user-supplied filesystem paths are validated against an allowlist of safe roots (`/tmp`, `/opt`, `/usr`, `/home`, etc.) to prevent path traversal
+- `binpath` inputs for profile.d setup are restricted to safe characters via regex before use in any file operation
+- SSH host key checking uses `accept-new` (new hosts accepted once; changed keys rejected) rather than disabling verification entirely
 
 **The server is only needed for live execution.** In Dry Run mode the GUI generates command previews entirely in the browser with no server required.
 
