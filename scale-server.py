@@ -832,6 +832,47 @@ def list_config():
 
 
 # ---------------------------------------------------------------------------
+# Config populate
+# ---------------------------------------------------------------------------
+
+@app.route("/api/stream/populate", methods=["POST", "OPTIONS"])
+def stream_populate():
+    if request.method == "OPTIONS":
+        return "", 204
+    body     = request.get_json(silent=True) or {}
+    toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
+    node     = body.get("node", "").strip()
+    skip_ssh = body.get("skip_ssh", True)
+    skip_nsd = body.get("skip_nsd", False)
+
+    def generate():
+        try:
+            if _tk_err or not os.path.isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
+                return
+            if not node:
+                yield sse("error", "[ERROR] Node is required.")
+                return
+            cmd = ["sudo", toolkit, "config", "populate", "-N", node]
+            if skip_ssh:
+                cmd += ["--skip", "ssh"]
+            if skip_nsd:
+                cmd += ["--skip", "nsd"]
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd)
+            if rc == 0:
+                yield sse("success", "[OK] Cluster definition populated successfully.")
+            else:
+                yield sse("error", f"[ERROR] config populate exited with code {rc}.")
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+        finally:
+            yield sse("done", "")
+
+    return sse_response(generate())
+
+
+# ---------------------------------------------------------------------------
 # Call Home enable / disable
 # ---------------------------------------------------------------------------
 
