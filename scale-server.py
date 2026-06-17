@@ -480,10 +480,16 @@ def stream_nodes():
                 roles = node.get("roles", [])
                 if not hostname:
                     continue
+
+                # Delete first so role changes take effect cleanly
+                del_cmd = ["sudo", toolkit, "node", "delete", hostname]
+                yield sse("info", f"$ {' '.join(del_cmd)}")
+                yield from stream_process(del_cmd)  # ignore rc — node may not exist yet
+
                 role_flags = [role_flag_map[r] for r in roles if r in role_flag_map]
-                cmd = ["sudo", toolkit, "node", "add", hostname] + role_flags
-                yield sse("info", f"$ {' '.join(cmd)}")
-                rc = yield from stream_process(cmd)
+                add_cmd = ["sudo", toolkit, "node", "add", hostname] + role_flags
+                yield sse("info", f"$ {' '.join(add_cmd)}")
+                rc = yield from stream_process(add_cmd)
                 if rc == 0:
                     yield sse("success", f"[OK] Node {hostname} added.")
                 else:
