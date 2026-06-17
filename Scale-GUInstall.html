@@ -2838,7 +2838,7 @@ async function listPartitions(btn) {
 
   const term = document.getElementById('partition-terminal');
   term.style.display = 'block';
-  term.innerHTML = `<div class="terminal-line info"><span class="cmd-prompt">$ </span>ssh ${node} cat /proc/partitions</div>`;
+  term.innerHTML = `<div class="terminal-line info"><span class="cmd-prompt">$ </span>ssh ${h(node)} cat /proc/partitions</div>`;
 
   try {
     const ping = await fetch(getBackendUrl() + '/api/ping', { signal: AbortSignal.timeout(2000) });
@@ -2978,10 +2978,10 @@ function updateFSPreview() {
   
   document.getElementById('stat-fs').textContent = name ? 1 : 0;
   el.innerHTML = `
-<div><span class="cmd-prompt">$ </span>${tp} config filesystem -f ${name} --mount-point ${mount||'/gpfs/data'} --block-size ${bs}</div>
-<div><span class="cmd-prompt">$ </span>${tp} config filesystem -f ${name} --replication ${rep} --metadata-replication ${metarep}</div>
-${document.getElementById('fs-quota').checked ? `<div><span class="cmd-prompt">$ </span>${tp} config filesystem -f ${name} --quota</div>` : ''}
-${document.getElementById('fs-encrypt').checked ? `<div><span class="cmd-prompt">$ </span>${tp} config filesystem -f ${name} --encryption</div>` : ''}
+<div><span class="cmd-prompt">$ </span>${tp} config filesystem -f ${h(name)} --mount-point ${h(mount)||'/gpfs/data'} --block-size ${h(bs)}</div>
+<div><span class="cmd-prompt">$ </span>${tp} config filesystem -f ${h(name)} --replication ${h(rep)} --metadata-replication ${h(metarep)}</div>
+${document.getElementById('fs-quota').checked ? `<div><span class="cmd-prompt">$ </span>${tp} config filesystem -f ${h(name)} --quota</div>` : ''}
+${document.getElementById('fs-encrypt').checked ? `<div><span class="cmd-prompt">$ </span>${tp} config filesystem -f ${h(name)} --encryption</div>` : ''}
   `.trim();
 }
 
@@ -3019,12 +3019,12 @@ function updateClusterCmdPreview() {
   if (faLabel) faLabel.textContent = fileauditOn ? 'Enabled' : 'Disabled';
 
   const cmds = [];
-  if (name)  cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -c ${name}</div>`);
-  if (prof)  cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -p ${prof}</div>`);
-  if (rsh  !== '/usr/bin/ssh') cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -r ${rsh}</div>`);
-  if (rcp  !== '/usr/bin/scp') cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -rc ${rcp}</div>`);
-  if (ports) cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -e ${ports}</div>`);
-  if (gplbinDir) cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs --gplbin_dir ${gplbinDir}</div>`);
+  if (name)  cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -c ${h(name)}</div>`);
+  if (prof)  cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -p ${h(prof)}</div>`);
+  if (rsh)   cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -r ${h(rsh)}</div>`);
+  if (rcp)   cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -rc ${h(rcp)}</div>`);
+  if (ports) cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -e ${h(ports)}</div>`);
+  if (gplbinDir) cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs --gplbin_dir ${h(gplbinDir)}</div>`);
   // Call Home — always emitted so disable is enforced on every apply, not just on change
   cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} callhome ${callhomeOn ? 'enable' : 'disable'}${callhomeOn ? '' : '  <span style="color:var(--cds-text-disabled)"># always enforced when disabled</span>'}</div>`);
 
@@ -3076,8 +3076,8 @@ async function applyClusterConfig(btn) {
   if (state.dryRun) {
     if (name)  appendToTerminal(termId, `$ sudo ${tp} config gpfs -c ${name}  # (dry run)`, 'info');
     if (prof)  appendToTerminal(termId, `$ sudo ${tp} config gpfs -p ${prof}  # (dry run)`, 'info');
-    if (rsh !== '/usr/bin/ssh')  appendToTerminal(termId, `$ sudo ${tp} config gpfs -r ${rsh}  # (dry run)`, 'info');
-    if (rcp !== '/usr/bin/scp')  appendToTerminal(termId, `$ sudo ${tp} config gpfs -rc ${rcp}  # (dry run)`, 'info');
+    if (rsh)  appendToTerminal(termId, `$ sudo ${tp} config gpfs -r ${rsh}  # (dry run)`, 'info');
+    if (rcp)  appendToTerminal(termId, `$ sudo ${tp} config gpfs -rc ${rcp}  # (dry run)`, 'info');
     if (ports) appendToTerminal(termId, `$ sudo ${tp} config gpfs -e ${ports}  # (dry run)`, 'info');
     if (gplbinDirLive) appendToTerminal(termId, `$ sudo ${tp} config gpfs --gplbin_dir ${gplbinDirLive}  # (dry run)`, 'info');
     appendToTerminal(termId, `$ sudo ${tp} callhome ${callhomeOn ? 'enable' : 'disable'}  # (dry run)`, 'info');
@@ -3102,8 +3102,8 @@ async function applyClusterConfig(btn) {
   const gpfsFlags = [];
   if (name)  gpfsFlags.push({ flag: '-c', value: name });
   if (prof)  gpfsFlags.push({ flag: '-p', value: prof });
-  if (rsh  !== '/usr/bin/ssh')  gpfsFlags.push({ flag: '-r',  value: rsh });
-  if (rcp  !== '/usr/bin/scp')  gpfsFlags.push({ flag: '-rc', value: rcp });
+  if (rsh)  gpfsFlags.push({ flag: '-r',  value: rsh });
+  if (rcp)  gpfsFlags.push({ flag: '-rc', value: rcp });
   if (ports)                    gpfsFlags.push({ flag: '-e',  value: ports });
   if (gplbinDirLive)            gpfsFlags.push({ flag: '--gplbin_dir', value: gplbinDirLive });
 
