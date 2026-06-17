@@ -1823,6 +1823,17 @@
         </div>
       </div>
 
+      <div class="panel" style="margin-bottom:var(--spacing-05)">
+        <div class="panel-body" style="padding:var(--spacing-04) var(--spacing-05)">
+          <div class="checkbox-group" style="margin:0">
+            <label class="checkbox-item" style="margin:0">
+              <input type="checkbox" id="install-skip-ssh" checked>
+              <div><span>Skip SSH check <code>--skip ssh</code></span><span class="label-desc">Bypasses SSH connectivity precheck on install, deploy, and their pre/post-checks. Safe when SSH is already verified.</span></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--spacing-06)">
         <div>
           <div class="panel" style="margin-bottom:var(--spacing-05)">
@@ -3643,6 +3654,8 @@ async function applyNodeConfig(btn) {
 async function runPhase(phase, btn) {
   const tp = state.toolkitPath;
   const termId = 'main-terminal';
+  const skipSsh = document.getElementById('install-skip-ssh')?.checked;
+  const skipFlag = skipSsh && ['precheck-install','install','postcheck-install','precheck-deploy','deploy','postcheck-deploy'].includes(phase) ? ' --skip ssh' : '';
 
   if (state.dryRun) {
     const cmdMap = {
@@ -3655,7 +3668,7 @@ async function runPhase(phase, btn) {
       deploy:              `sudo ${tp} deploy`,
       'postcheck-deploy':  `sudo ${tp} deploy --postcheck`,
     };
-    appendToTerminal(termId, `$ ${cmdMap[phase] || 'sudo ' + tp + ' ' + phase}  # (dry run)`, 'info');
+    appendToTerminal(termId, `$ ${cmdMap[phase] || 'sudo ' + tp + ' ' + phase}${skipFlag}  # (dry run)`, 'info');
     appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
     return;
   }
@@ -3669,8 +3682,9 @@ async function runPhase(phase, btn) {
     return;
   }
 
+  const skipSsh = document.getElementById('install-skip-ssh')?.checked;
   if (btn) btn.disabled = true;
-  const params = new URLSearchParams({ toolkit: tp, phase });
+  const params = new URLSearchParams({ toolkit: tp, phase, skip_ssh: skipSsh });
   await streamToTerminal(termId, `${getBackendUrl()}/api/stream/phase?${params}`);
 
   // Mark step complete in progress indicator

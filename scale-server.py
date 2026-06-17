@@ -1287,10 +1287,14 @@ PHASE_CMDS = {
     "postcheck-deploy":  ["deploy", "--postcheck"],
 }
 
+_SKIP_SSH_PHASES = {"precheck-install", "install", "postcheck-install",
+                    "precheck-deploy", "deploy", "postcheck-deploy"}
+
 @app.route("/api/stream/phase")
 def stream_phase():
-    toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
-    phase   = request.args.get("phase", "").strip()
+    toolkit,  _tk_err  = resolve_path(request.args.get("toolkit", "").strip())
+    phase    = request.args.get("phase", "").strip()
+    skip_ssh = request.args.get("skip_ssh", "false").lower() in ("true", "1", "yes")
 
     def generate():
         try:
@@ -1302,6 +1306,8 @@ def stream_phase():
                 yield sse("error", f"[ERROR] Unknown phase: {phase}")
                 return
             cmd = ["sudo", toolkit] + args
+            if skip_ssh and phase in _SKIP_SSH_PHASES:
+                cmd += ["--skip", "ssh"]
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd)
             if rc == 0:
