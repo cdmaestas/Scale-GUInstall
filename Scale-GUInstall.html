@@ -2188,7 +2188,7 @@
           <div class="panel-body">
             <div class="form-group">
               <label class="form-label">Existing Cluster Node <span class="required">*</span></label>
-              <input type="text" class="form-input" id="pop-node" placeholder="e.g. gpfs-node01 or 192.168.1.10">
+              <input type="text" class="form-input" id="pop-node" placeholder="e.g. gpfs-node01 or 192.168.1.10" oninput="updatePopulatePreview()">
               <div class="form-help">Any node in the existing cluster with GPFS running</div>
             </div>
             <div class="form-group">
@@ -2199,22 +2199,35 @@
               <label class="form-label">SSH Port</label>
               <input type="number" class="form-input" id="pop-port" value="22" placeholder="22">
             </div>
-            <div class="checkbox-group" style="margin-bottom:var(--spacing-06)">
+            <div class="checkbox-group" style="margin-bottom:var(--spacing-05)">
               <label class="checkbox-item">
                 <input type="checkbox" id="pop-overwrite">
                 <div><span>Overwrite existing cluster definition</span><span class="label-desc">Replaces any existing configuration in the toolkit</span></div>
               </label>
             </div>
+            <div style="margin-bottom:var(--spacing-05)">
+              <label class="form-label">Skip Checks <code>--skip</code></label>
+              <div class="checkbox-group">
+                <label class="checkbox-item">
+                  <input type="checkbox" id="pop-skip-ssh" checked onchange="updatePopulatePreview()">
+                  <div><span>Skip SSH check <code>--skip ssh</code></span><span class="label-desc">Bypasses SSH connectivity precheck. Safe when SSH is already verified from the admin node.</span></div>
+                </label>
+                <label class="checkbox-item">
+                  <input type="checkbox" id="pop-skip-nsd" onchange="updatePopulatePreview()">
+                  <div><span>Skip NSD population <code>--skip nsd</code></span><span class="label-desc">Does not populate NSD disk definitions from the cluster.</span></div>
+                </label>
+              </div>
+            </div>
             <div class="btn-group">
-              <button class="btn btn-primary" onclick="populateCluster()">
+              <button class="btn btn-primary" onclick="populateCluster(this)">
                 <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M22 16h-2v-5a1 1 0 00-1-1h-5V8h5a3 3 0 013 3z"/></svg>
                 Populate Configuration
               </button>
               <button class="btn btn-secondary" onclick="testConnection()">Test Connection</button>
             </div>
 
-            <div class="cmd-preview" style="margin-top:var(--spacing-06)">
-              <div><span class="cmd-prompt">$ </span>sudo <span id="pop-path-display">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> config populate -N <span id="pop-node-display" style="color:#f1c21b">&lt;node&gt;</span></div>
+            <div class="cmd-preview" style="margin-top:var(--spacing-06)" id="pop-cmd-preview">
+              <div><span class="cmd-prompt">$ </span>sudo <span id="pop-path-display">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> config populate -N <span id="pop-node-display" style="color:#f1c21b">&lt;node&gt;</span><span id="pop-skip-display" style="color:var(--cds-text-disabled)"> --skip ssh</span></div>
             </div>
           </div>
         </div>
@@ -3938,22 +3951,52 @@ function testConnection() {
   appendToTerminal(termId, '[OK] GPFS is running on target node', 'success', 1600);
 }
 
-function populateCluster() {
-  const node = document.getElementById('pop-node').value;
+function updatePopulatePreview() {
+  const node    = document.getElementById('pop-node')?.value.trim() || '<node>';
+  const skipSsh = document.getElementById('pop-skip-ssh')?.checked;
+  const skipNsd = document.getElementById('pop-skip-nsd')?.checked;
+  const nodeEl  = document.getElementById('pop-node-display');
+  const skipEl  = document.getElementById('pop-skip-display');
+  if (nodeEl) nodeEl.textContent = node;
+  const skips = [];
+  if (skipSsh) skips.push('--skip ssh');
+  if (skipNsd) skips.push('--skip nsd');
+  if (skipEl)  skipEl.textContent = skips.length ? ' ' + skips.join(' ') : '';
+}
+
+async function populateCluster(btn) {
+  const node = document.getElementById('pop-node')?.value.trim();
   if (!node) { alert('Enter a cluster node first'); return; }
-  const termId = 'pop-terminal';
-  document.getElementById('pop-node-display') && (document.getElementById('pop-node-display').textContent = node);
-  appendToTerminal(termId, `$ ${state.toolkitPath} config populate -N ${node}`, 'info');
-  appendToTerminal(termId, '[INFO] Connecting to cluster...', 'normal', 300);
-  appendToTerminal(termId, '[INFO] Reading cluster configuration...', 'normal', 900);
-  appendToTerminal(termId, '[INFO] Populating node definitions...', 'normal', 1600);
-  appendToTerminal(termId, '[INFO] Populating NSD definitions...', 'normal', 2300);
-  appendToTerminal(termId, '[INFO] Populating filesystem definitions...', 'normal', 3000);
-  appendToTerminal(termId, '[OK] Cluster definition file populated successfully', 'success', 3800);
-  setTimeout(() => {
-    document.getElementById('pop-results').style.display = 'block';
-    document.getElementById('current-version').value = '5.1.8.0';
-  }, 4000);
+  const skipSsh = document.getElementById('pop-skip-ssh')?.checked;
+  const skipNsd = document.getElementById('pop-skip-nsd')?.checked;
+  const termId  = 'pop-terminal';
+  updatePopulatePreview();
+
+  if (state.dryRun) {
+    const tp    = state.toolkitPath;
+    const skips = [skipSsh && '--skip ssh', skipNsd && '--skip nsd'].filter(Boolean);
+    appendToTerminal(termId, `$ sudo ${tp} config populate -N ${node}${skips.length ? ' ' + skips.join(' ') : ''}  # (dry run)`, 'info');
+    appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
+    return;
+  }
+
+  try {
+    const ping = await fetch(getBackendUrl() + '/api/ping', { signal: AbortSignal.timeout(2000) });
+    if (!ping.ok) throw new Error();
+  } catch {
+    appendToTerminal(termId, `[ERROR] Backend not reachable at ${getBackendUrl()}`, 'error');
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  await streamToTerminalPost(termId, `${getBackendUrl()}/api/stream/populate`, {
+    toolkit:   state.toolkitPath,
+    node,
+    skip_ssh:  skipSsh,
+    skip_nsd:  skipNsd,
+  });
+  if (btn) btn.disabled = false;
+  document.getElementById('pop-results').style.display = 'block';
 }
 
 // ===== CHECKS =====
