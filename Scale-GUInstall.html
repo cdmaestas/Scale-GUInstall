@@ -3023,7 +3023,7 @@ function updateClusterCmdPreview() {
   if (prof)  cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -p ${prof}</div>`);
   if (rsh  !== '/usr/bin/ssh') cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -r ${rsh}</div>`);
   if (rcp  !== '/usr/bin/scp') cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -rc ${rcp}</div>`);
-  if (ports !== '60000-61000') cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -e ${ports}</div>`);
+  if (ports) cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -e ${ports}</div>`);
   if (gplbinDir) cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs --gplbin_dir ${gplbinDir}</div>`);
   // Call Home — always emitted so disable is enforced on every apply, not just on change
   cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} callhome ${callhomeOn ? 'enable' : 'disable'}${callhomeOn ? '' : '  <span style="color:var(--cds-text-disabled)"># always enforced when disabled</span>'}</div>`);
@@ -3078,7 +3078,7 @@ async function applyClusterConfig(btn) {
     if (prof)  appendToTerminal(termId, `$ sudo ${tp} config gpfs -p ${prof}  # (dry run)`, 'info');
     if (rsh !== '/usr/bin/ssh')  appendToTerminal(termId, `$ sudo ${tp} config gpfs -r ${rsh}  # (dry run)`, 'info');
     if (rcp !== '/usr/bin/scp')  appendToTerminal(termId, `$ sudo ${tp} config gpfs -rc ${rcp}  # (dry run)`, 'info');
-    if (ports !== '60000-61000') appendToTerminal(termId, `$ sudo ${tp} config gpfs -e ${ports}  # (dry run)`, 'info');
+    if (ports) appendToTerminal(termId, `$ sudo ${tp} config gpfs -e ${ports}  # (dry run)`, 'info');
     if (gplbinDirLive) appendToTerminal(termId, `$ sudo ${tp} config gpfs --gplbin_dir ${gplbinDirLive}  # (dry run)`, 'info');
     appendToTerminal(termId, `$ sudo ${tp} callhome ${callhomeOn ? 'enable' : 'disable'}  # (dry run)`, 'info');
     appendToTerminal(termId, `$ sudo ${tp} config perfmon -r ${perfmonOn ? 'on' : 'off'}  # (dry run)`, 'info');
@@ -3104,7 +3104,7 @@ async function applyClusterConfig(btn) {
   if (prof)  gpfsFlags.push({ flag: '-p', value: prof });
   if (rsh  !== '/usr/bin/ssh')  gpfsFlags.push({ flag: '-r',  value: rsh });
   if (rcp  !== '/usr/bin/scp')  gpfsFlags.push({ flag: '-rc', value: rcp });
-  if (ports !== '60000-61000')  gpfsFlags.push({ flag: '-e',  value: ports });
+  if (ports)                    gpfsFlags.push({ flag: '-e',  value: ports });
   if (gplbinDirLive)            gpfsFlags.push({ flag: '--gplbin_dir', value: gplbinDirLive });
 
   const perfmonNode = document.getElementById('perfmon-querynode')?.value.trim() || '';
