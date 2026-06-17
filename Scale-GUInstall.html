@@ -3682,7 +3682,6 @@ async function runPhase(phase, btn) {
     return;
   }
 
-  const skipSsh = document.getElementById('install-skip-ssh')?.checked;
   if (btn) btn.disabled = true;
   const params = new URLSearchParams({ toolkit: tp, phase, skip_ssh: skipSsh });
   await streamToTerminal(termId, `${getBackendUrl()}/api/stream/phase?${params}`);
