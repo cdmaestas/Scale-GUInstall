@@ -3623,6 +3623,7 @@ async function applyNodeConfig(btn) {
   const roleFlagMap = { nsd:'-n', manager:'-m', quorum:'-q', admin:'-a', protocol:'-p', gui:'-g', ems:'-e', callhome:'-c' };
   if (state.dryRun) {
     state.nodes.forEach(n => {
+      appendToTerminal(termId, `$ sudo ${tp} node delete ${n.hostname}  # (dry run)`, 'info');
       const coreRoles = n.roles.filter(r => r !== 'archive-ee');
       const flags = coreRoles.map(r => roleFlagMap[r]).filter(Boolean).join(' ');
       const archiveNote = n.roles.includes('archive-ee') ? '  # Archive EE: requires separate install workflow' : '';
