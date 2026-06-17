@@ -1362,24 +1362,6 @@
       </div>
 
       <div class="panel" style="margin-top:var(--spacing-06)">
-        <div class="panel-header"><div><h3>Enable Admin Daemon &amp; Node Identity</h3><p>Required after install — run once to enable cluster management in IBM Storage Scale 6.0.1+</p></div></div>
-        <div class="panel-body">
-          <p style="color:var(--cds-text-secondary); margin-bottom:var(--spacing-05); font-size:13px">Enable the Scale Admin Daemon on all nodes and define node identity mappings. Run these after <code>spectrumscale install</code> completes.</p>
-          <div class="btn-group">
-            <button class="btn btn-primary" onclick="runPhase('enable-daemon', this)">
-              <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm0 26A12 12 0 1128 16 12 12 0 0116 28z"/><path d="M11 21l10-5-10-5v10z"/></svg>
-              Enable Daemon
-            </button>
-            <button class="btn btn-secondary" onclick="runPhase('nodeid-define', this)">Node ID Define</button>
-          </div>
-          <div class="cmd-preview" style="margin-top:var(--spacing-05)">
-            <div><span class="cmd-prompt">$ </span>sudo <span class="toolkit-path-display-inline">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> scaleadmd enable</div>
-            <div><span class="cmd-prompt">$ </span>sudo <span class="toolkit-path-display-inline">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> nodeid define</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel" style="margin-top:var(--spacing-06)">
         <div class="panel-header">
           <div><h3>Apply Cluster Configuration</h3><p>Run <code>spectrumscale config gpfs</code> with the settings above</p></div>
           <div style="display:flex; gap:var(--spacing-03)">
@@ -1827,12 +1809,16 @@
           <div class="step-circle">3</div>
           <div class="step-label">Post-check</div>
         </div>
-        <div class="progress-step" id="ps-deploy">
+        <div class="progress-step" id="ps-enable-daemon">
           <div class="step-circle">4</div>
+          <div class="step-label">Enable Daemon</div>
+        </div>
+        <div class="progress-step" id="ps-deploy">
+          <div class="step-circle">5</div>
           <div class="step-label">Deploy</div>
         </div>
         <div class="progress-step" id="ps-postcheck-deploy">
-          <div class="step-circle">5</div>
+          <div class="step-circle">6</div>
           <div class="step-label">Verify</div>
         </div>
       </div>
@@ -1870,8 +1856,26 @@
             </div>
           </div>
 
+          <div class="panel" style="margin-bottom:var(--spacing-05)">
+            <div class="panel-header"><div><h3>Step 2: Enable Admin Daemon &amp; Node Identity</h3></div></div>
+            <div class="panel-body">
+              <p style="color:var(--cds-text-secondary); margin-bottom:var(--spacing-05); font-size:13px">After install, enable the Scale Admin Daemon on all nodes and define node identity mappings. Required for cluster management in IBM Storage Scale 6.0.1+.</p>
+              <div class="btn-group">
+                <button class="btn btn-primary" onclick="runPhase('enable-daemon', this)">
+                  <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm0 26A12 12 0 1128 16 12 12 0 0116 28z"/><path d="M11 21l10-5-10-5v10z"/></svg>
+                  Enable Daemon
+                </button>
+                <button class="btn btn-secondary" onclick="runPhase('nodeid-define', this)">Node ID Define</button>
+              </div>
+              <div class="cmd-preview" style="margin-top:var(--spacing-05)">
+                <div><span class="cmd-prompt">$ </span>sudo <span class="toolkit-path-display-inline">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> scaleadmd enable</div>
+                <div><span class="cmd-prompt">$ </span>sudo <span class="toolkit-path-display-inline">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> nodeid define</div>
+              </div>
+            </div>
+          </div>
+
           <div class="panel">
-            <div class="panel-header"><div><h3>Step 2: Deploy Protocol Services</h3></div></div>
+            <div class="panel-header"><div><h3>Step 3: Deploy Protocol Services</h3></div></div>
             <div class="panel-body">
               <p style="color:var(--cds-text-secondary); margin-bottom:var(--spacing-05); font-size:13px">Validates deploy prerequisites, then deploys and starts enabled protocol services (NFS, SMB, Object) on designated protocol nodes.</p>
               <div class="btn-group">
@@ -3715,7 +3719,7 @@ async function runPhase(phase, btn) {
   await streamToTerminal(termId, `${getBackendUrl()}/api/stream/phase?${params}`);
 
   // Mark step complete in progress indicator
-  const phaseSteps = ['precheck-install','install','postcheck-install','precheck-deploy','deploy','postcheck-deploy'];
+  const phaseSteps = ['precheck-install','install','postcheck-install','enable-daemon','precheck-deploy','deploy','postcheck-deploy'];
   const idx = phaseSteps.indexOf(phase);
   if (idx >= 0) {
     const stepEl = document.getElementById('ps-' + phase);
