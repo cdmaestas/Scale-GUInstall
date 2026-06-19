@@ -12,7 +12,7 @@ jobs:
     name: Python syntax
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Compile scale-server.py
         run: python3 -m py_compile scale-server.py
@@ -48,7 +48,7 @@ jobs:
     name: ShellCheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Install shellcheck
         run: sudo apt-get install -y shellcheck
@@ -65,7 +65,7 @@ jobs:
     name: HTML sanity
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Check HTML markers
         run: |
@@ -95,7 +95,7 @@ jobs:
     name: Build DEB
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Install dpkg-dev
         run: sudo apt-get install -y dpkg-dev
@@ -111,7 +111,7 @@ jobs:
           dpkg-deb --contents "$deb"
 
       - name: Upload DEB artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: scale-guinstall-deb
           path: dist/*.deb
@@ -121,7 +121,7 @@ jobs:
     name: Build RPM
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Install rpm-build
         run: sudo apt-get install -y rpm
@@ -137,7 +137,7 @@ jobs:
           rpm -qlp "$rpm"
 
       - name: Upload RPM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: scale-guinstall-rpm
           path: dist/*.rpm
