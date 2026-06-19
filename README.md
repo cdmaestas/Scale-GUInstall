@@ -161,13 +161,69 @@ Dry Run is enabled by default. In this mode every button generates and displays 
 
 ---
 
+## Installing via Package (RPM / DEB)
+
+For production installer nodes, use the pre-built packages instead of running from source. The package installs Flask into a self-contained virtual environment — no pip, no cloning, no Python version hunting.
+
+**RHEL / CentOS / Fedora:**
+```bash
+sudo dnf install scale-guinstall-1.0.0-1.noarch.rpm
+```
+
+**Debian / Ubuntu:**
+```bash
+sudo apt install ./scale-guinstall_1.0.0-1_all.deb
+```
+
+After install:
+```bash
+scale-guinstall          # run in foreground
+
+# Or as a persistent service:
+sudo systemctl enable --now scale-guinstall
+```
+
+**Build the packages yourself:**
+```bash
+cd packaging
+./build-pkg.sh           # builds both RPM and DEB into dist/
+./build-pkg.sh --rpm     # RPM only (requires rpmbuild)
+./build-pkg.sh --deb     # DEB only (requires dpkg-deb)
+```
+
+Prerequisites: `sudo dnf install rpm-build` (RPM) or `sudo apt install dpkg-dev` (DEB).
+
+---
+
+## Connecting Remotely (SSH Tunnel)
+
+The backend server binds to `127.0.0.1` only. To use the GUI from your workstation, forward the port over SSH:
+
+```bash
+# Interactive (tunnel closes when terminal closes)
+ssh -L 5001:127.0.0.1:5001 user@installer-node
+
+# Background (stays open)
+ssh -fNL 5001:127.0.0.1:5001 user@installer-node
+```
+
+Then open `Scale-GUInstall.html` locally and leave the Backend URL as `http://127.0.0.1:5001`. The **Settings** page has a tunnel helper that generates the command for you and tests the connection.
+
+---
+
 ## File Structure
 
 ```
 Scale-GUInstall/
-├── Scale-GUInstall.html   # Self-contained single-file app (HTML + CSS + JS)
-├── scale-server.py        # Local backend server (Flask) for live command execution
-└── start.sh               # Convenience script: installs Flask and starts the server
+├── Scale-GUInstall.html        # Self-contained single-file app (HTML + CSS + JS)
+├── scale-server.py             # Backend server (Flask) for live command execution
+├── start.sh                    # Convenience script: finds Python, installs Flask, starts server
+└── packaging/
+    ├── build-pkg.sh            # Builds RPM and DEB packages into dist/
+    ├── scale-guinstall.spec    # RPM spec
+    ├── scale-guinstall.service # systemd unit (installed but not enabled by default)
+    ├── scale-guinstall-wrapper # /usr/bin/scale-guinstall installed by package
+    └── debian/                 # DEB control files (control, postinst, prerm, postrm)
 ```
 
 ---

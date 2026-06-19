@@ -1,0 +1,17 @@
+[Unit]
+Description=Scale GUInstall — IBM Storage Scale Toolkit GUI backend
+Documentation=https://github.com/cdmaestas/Scale-GUInstall
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/scale-guinstall
+Restart=on-failure
+RestartSec=5
+# Bind to loopback only — access via SSH tunnel from your workstation
+Environment=PORT=5001
+# Run as root so sudo spectrumscale commands work without a password prompt.
+# If your spectrumscale sudoers config allows a specific user, set User= here.
+
+[Install]
+WantedBy=multi-user.target

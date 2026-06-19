@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+if [ "$1" = "remove" ]; then
+    systemctl stop scale-guinstall 2>/dev/null || true
+    systemctl disable scale-guinstall 2>/dev/null || true
+fi
