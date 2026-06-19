@@ -1,0 +1,143 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  # ── Python syntax + import check ──────────────────────────────────────────
+  python-check:
+    name: Python syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile scale-server.py
+        run: python3 -m py_compile scale-server.py
+
+      - name: Import check (Flask required)
+        run: |
+          pip install --quiet "flask>=3.0,<4"
+          python3 - <<'EOF'
+          import ast, sys
+          with open("scale-server.py") as f:
+              tree = ast.parse(f.read())
+          # Verify key routes are present
+          routes = [
+              d.args[0].s
+              for node in ast.walk(tree)
+              if isinstance(node, ast.Call)
+              and isinstance(node.func, ast.Attribute)
+              and node.func.attr == "route"
+              and node.args
+              and isinstance(node.args[0], ast.Constant)
+              for d in [node]
+          ]
+          required = ["/api/ping", "/api/stream/phase", "/api/stream/check-ansible"]
+          missing = [r for r in required if r not in routes]
+          if missing:
+              print(f"FAIL: missing routes: {missing}", file=sys.stderr)
+              sys.exit(1)
+          print(f"OK: {len(routes)} routes found")
+          EOF
+
+  # ── Shell script linting ──────────────────────────────────────────────────
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Lint shell scripts
+        run: |
+          shellcheck --severity=warning \
+            start.sh \
+            packaging/build-pkg.sh \
+            packaging/scale-guinstall-wrapper
+
+  # ── HTML sanity check ─────────────────────────────────────────────────────
+  html-check:
+    name: HTML sanity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check HTML markers
+        run: |
+          python3 - <<'EOF'
+          import sys
+          with open("Scale-GUInstall.html") as f:
+              html = f.read()
+          checks = {
+              "h() escape helper": "function h(str)",
+              "streamToTerminalPost": "async function streamToTerminalPost",
+              "127.0.0.1 backend default": "127.0.0.1:5001",
+              "dry run toggle": "dry-run-toggle",
+              "install page": 'id="page-install"',
+              "settings page": 'id="page-settings"',
+          }
+          failed = [name for name, marker in checks.items() if marker not in html]
+          if failed:
+              print(f"FAIL: missing markers: {failed}", file=sys.stderr)
+              sys.exit(1)
+          print(f"OK: all {len(checks)} markers present")
+          size_kb = len(html.encode()) // 1024
+          print(f"OK: file size {size_kb} KB")
+          EOF
+
+  # ── Build DEB ─────────────────────────────────────────────────────────────
+  build-deb:
+    name: Build DEB
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dpkg-dev
+        run: sudo apt-get install -y dpkg-dev
+
+      - name: Build DEB package
+        run: ./packaging/build-pkg.sh --deb
+
+      - name: Verify DEB
+        run: |
+          deb=$(ls dist/*.deb | head -1)
+          echo "Package: $deb"
+          dpkg-deb --info "$deb"
+          dpkg-deb --contents "$deb"
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scale-guinstall-deb
+          path: dist/*.deb
+
+  # ── Build RPM ─────────────────────────────────────────────────────────────
+  build-rpm:
+    name: Build RPM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install rpm-build
+        run: sudo apt-get install -y rpm
+
+      - name: Build RPM package
+        run: ./packaging/build-pkg.sh --rpm
+
+      - name: Verify RPM
+        run: |
+          rpm=$(ls dist/*.rpm | head -1)
+          echo "Package: $rpm"
+          rpm -qip "$rpm"
+          rpm -qlp "$rpm"
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scale-guinstall-rpm
+          path: dist/*.rpm

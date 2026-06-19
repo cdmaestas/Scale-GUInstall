@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-packages:
+    name: Build packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: sudo apt-get install -y dpkg-dev rpm
+
+      - name: Set version from tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"   # strip leading v
+          echo "VERSION=$TAG" >> "$GITHUB_ENV"
+          # Patch the version into the spec and debian control
+          sed -i "s/^Version:.*/Version:        $TAG/" packaging/scale-guinstall.spec
+          sed -i "s/^Version:.*/Version: $TAG/"        packaging/debian/control
+          # Update changelog date/version
+          sed -i "1s/.*/scale-guinstall ($TAG-1) unstable; urgency=low/" packaging/debian/changelog
+          # Patch build-pkg.sh VERSION variable
+          sed -i "s/^VERSION=.*/VERSION=\"$TAG\"/" packaging/build-pkg.sh
+
+      - name: Build RPM and DEB
+        run: ./packaging/build-pkg.sh
+
+      - name: List artifacts
+        run: ls -lh dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Scale GUInstall ${{ env.VERSION }}"
+          body: |
+            ## Scale GUInstall ${{ env.VERSION }}
+
+            ### Install on the IBM Storage Scale installer node
+
+            **RHEL / CentOS / Fedora:**
+            ```bash
+            sudo dnf install scale-guinstall-${{ env.VERSION }}-1.noarch.rpm
+            ```
+
+            **Debian / Ubuntu:**
+            ```bash
+            sudo apt install ./scale-guinstall_${{ env.VERSION }}-1_all.deb
+            ```
+
+            Then start the server:
+            ```bash
+            scale-guinstall
+            # or as a service:
+            sudo systemctl enable --now scale-guinstall
+            ```
+
+            ### Connect from your workstation
+            ```bash
+            ssh -L 5001:127.0.0.1:5001 user@installer-node
+            ```
+            Open `Scale-GUInstall.html` in your browser — the SSH tunnel connects it to the installer node automatically.
+
+            ---
+            See [README](https://github.com/${{ github.repository }}/blob/main/README.md) for full documentation.
+          files: |
+            dist/*.rpm
+            dist/*.deb
+            Scale-GUInstall.html
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
