@@ -13,7 +13,7 @@ jobs:
     name: Build packages
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Install build tools
         run: sudo apt-get install -y dpkg-dev rpm
@@ -37,7 +37,7 @@ jobs:
         run: ls -lh dist/
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.3.2
         with:
           name: "Scale GUInstall ${{ env.VERSION }}"
           body: |
