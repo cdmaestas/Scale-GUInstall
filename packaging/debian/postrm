@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    rm -rf /usr/lib/scale-guinstall/venv
+fi
+if [ "$1" = "purge" ]; then
+    rm -rf /usr/lib/scale-guinstall
+fi

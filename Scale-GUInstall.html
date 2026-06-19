@@ -2509,6 +2509,37 @@
         <p>Configure the web frontend and toolkit connection settings.</p>
       </div>
 
+      <!-- SSH Tunnel Helper -->
+      <div class="panel" style="margin-bottom:var(--spacing-06)">
+        <div class="panel-header"><div><h3>Remote Connection (SSH Tunnel)</h3><p>Connect your browser to the backend server running on the installer node</p></div></div>
+        <div class="panel-body">
+          <p style="color:var(--cds-text-secondary); font-size:13px; margin-bottom:var(--spacing-05)">The backend server binds to <code>127.0.0.1:5001</code> on the installer node and is not reachable directly. Use an SSH tunnel to forward the port to your local machine, then leave the Backend URL as <code>http://127.0.0.1:5001</code>.</p>
+          <div class="form-row" style="align-items:flex-end">
+            <div class="form-group" style="flex:1">
+              <label class="form-label">Installer Node</label>
+              <input type="text" class="form-input" id="tunnel-host" placeholder="user@installer-node" oninput="updateTunnelCmd()">
+              <div class="form-help">SSH login for the node running scale-guinstall</div>
+            </div>
+            <div class="form-group" style="width:100px">
+              <label class="form-label">Port</label>
+              <input type="number" class="form-input" id="tunnel-port" value="5001" oninput="updateTunnelCmd()">
+            </div>
+          </div>
+          <div class="cmd-preview" id="tunnel-cmd-preview" style="margin-bottom:var(--spacing-05)">
+            <div style="color:var(--cds-text-secondary)">Enter installer node above to generate tunnel command</div>
+          </div>
+          <div style="display:flex; gap:var(--spacing-04); flex-wrap:wrap; align-items:center">
+            <button class="btn btn-secondary btn-sm" onclick="copyTunnelCmd(this)">Copy Command</button>
+            <button class="btn btn-secondary btn-sm" onclick="testBackendConnection(this)">Test Connection</button>
+            <span id="tunnel-status" style="font-size:13px"></span>
+          </div>
+          <div style="margin-top:var(--spacing-05); padding:var(--spacing-04); background:rgba(69,137,255,0.07); border:1px solid rgba(69,137,255,0.3); font-size:12px; color:var(--cds-text-secondary)">
+            <strong>Background tunnel</strong> (stays open after closing the terminal):<br>
+            <span id="tunnel-bg-preview" style="font-family:var(--font-mono); color:var(--cds-text-primary)">ssh -fNL 5001:127.0.0.1:5001 user@installer-node</span>
+          </div>
+        </div>
+      </div>
+
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--spacing-06)">
         <div class="panel">
           <div class="panel-header"><div><h3>Toolkit Configuration</h3></div></div>
@@ -4064,6 +4095,57 @@ function runChecks(type) {
 // ===== MISC =====
 function copyStanza() { navigator.clipboard?.writeText(document.getElementById('nsd-stanza-preview').innerText); }
 function copyFSCmd() { navigator.clipboard?.writeText(document.getElementById('fs-cmd-preview').innerText); }
+
+// ===== SSH TUNNEL HELPER =====
+function updateTunnelCmd() {
+  const host = document.getElementById('tunnel-host').value.trim();
+  const port = document.getElementById('tunnel-port').value.trim() || '5001';
+  const preview = document.getElementById('tunnel-cmd-preview');
+  const bgPreview = document.getElementById('tunnel-bg-preview');
+  if (!host) {
+    preview.innerHTML = '<div style="color:var(--cds-text-secondary)">Enter installer node above to generate tunnel command</div>';
+    bgPreview.textContent = `ssh -fNL ${port}:127.0.0.1:${port} user@installer-node`;
+    return;
+  }
+  const fwd = `${h(port)}:127.0.0.1:${h(port)}`;
+  preview.innerHTML = `<div><span class="cmd-prompt">$ </span>ssh -L ${fwd} ${h(host)}</div>`;
+  bgPreview.textContent = `ssh -fNL ${port}:127.0.0.1:${port} ${host}`;
+
+  // Keep backend URL field in sync with the port
+  const backendInput = document.getElementById('prepare-backend-url');
+  if (backendInput) backendInput.value = `http://127.0.0.1:${port}`;
+}
+
+function copyTunnelCmd(btn) {
+  const host = document.getElementById('tunnel-host').value.trim();
+  const port = document.getElementById('tunnel-port').value.trim() || '5001';
+  const cmd = `ssh -L ${port}:127.0.0.1:${port} ${host || 'user@installer-node'}`;
+  navigator.clipboard.writeText(cmd).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+}
+
+async function testBackendConnection(btn) {
+  const status = document.getElementById('tunnel-status');
+  if (btn) btn.disabled = true;
+  status.textContent = 'Testing…';
+  status.style.color = 'var(--cds-text-secondary)';
+  try {
+    const res = await fetch(getBackendUrl() + '/api/ping', { signal: AbortSignal.timeout(3000) });
+    if (res.ok) {
+      status.textContent = '✓ Connected';
+      status.style.color = 'var(--cds-support-success)';
+    } else {
+      throw new Error(`HTTP ${res.status}`);
+    }
+  } catch {
+    status.textContent = '✗ Not reachable — is the tunnel open and scale-guinstall running?';
+    status.style.color = 'var(--cds-support-error)';
+  }
+  if (btn) btn.disabled = false;
+}
 
 function exportConfig() {
   const json = JSON.stringify(state, null, 2);
