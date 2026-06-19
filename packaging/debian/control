@@ -1,0 +1,20 @@
+Package: scale-guinstall
+Version: 1.0.0
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3 (>= 3.10) | python3.11 | python3.12 | python3.13, python3-venv
+Recommends: python3-pip
+Maintainer: cdmaestas <cdmaestas@gmail.com>
+Homepage: https://github.com/cdmaestas/Scale-GUInstall
+Description: IBM Storage Scale Installation Toolkit GUI backend
+ Scale GUInstall provides a web-based GUI for the IBM Storage Scale
+ Installation Toolkit (spectrumscale). This package installs the Flask
+ backend server that the GUI connects to for live command execution.
+ .
+ Open Scale-GUInstall.html in a browser on your workstation, establish
+ an SSH tunnel to this node (ssh -L 5001:127.0.0.1:5001 user@this-node),
+ and the GUI will connect automatically.
+ .
+ The server binds to 127.0.0.1 only and is not accessible from the network
+ without an SSH tunnel.
