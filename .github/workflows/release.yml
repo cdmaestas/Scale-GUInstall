@@ -21,7 +21,7 @@ jobs:
       - name: Set version from tag
         run: |
           TAG="${GITHUB_REF_NAME#v}"          # strip leading v  (e.g. 0.1.0-beta.1)
-          RPM_VER="${TAG//-/~}"               # RPM forbids '-'; use '~' for pre-release
+          RPM_VER="${TAG//-/.}"               # RPM forbids '-'; replace with '.' (safe, no shell expansion)
           echo "VERSION=$TAG" >> "$GITHUB_ENV"
           # Patch the version into the spec (RPM-safe: hyphens → tildes)
           # Use awk so the replacement value is never interpreted by sed/shell
