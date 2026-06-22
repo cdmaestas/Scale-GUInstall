@@ -20,15 +20,17 @@ jobs:
 
       - name: Set version from tag
         run: |
-          TAG="${GITHUB_REF_NAME#v}"   # strip leading v
+          TAG="${GITHUB_REF_NAME#v}"          # strip leading v  (e.g. 0.1.0-beta.1)
+          RPM_VER="${TAG//-/~}"               # RPM forbids '-'; use '~' for pre-release
           echo "VERSION=$TAG" >> "$GITHUB_ENV"
-          # Patch the version into the spec and debian control
-          sed -i "s/^Version:.*/Version:        $TAG/" packaging/scale-guinstall.spec
+          # Patch the version into the spec (RPM-safe: hyphens → tildes)
+          sed -i "s/^Version:.*/Version:        $RPM_VER/" packaging/scale-guinstall.spec
+          # Patch debian control and changelog (Debian allows hyphens in upstream version)
           sed -i "s/^Version:.*/Version: $TAG/"        packaging/debian/control
           # Update changelog date/version
           sed -i "1s/.*/scale-guinstall ($TAG-1) unstable; urgency=low/" packaging/debian/changelog
-          # Patch build-pkg.sh VERSION variable
-          sed -i "s/^VERSION=.*/VERSION=\"$TAG\"/" packaging/build-pkg.sh
+          # Patch build-pkg.sh VERSION variable (used for both RPM and DEB filenames)
+          sed -i "s/^VERSION=.*/VERSION=\"$RPM_VER\"/" packaging/build-pkg.sh
 
       - name: Build RPM and DEB
         run: ./packaging/build-pkg.sh
