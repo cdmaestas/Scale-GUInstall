@@ -34,9 +34,9 @@ jobs:
           awk -v v="scale-guinstall ($TAG-1) unstable; urgency=low" \
             'NR==1{print v; next} 1' \
             packaging/debian/changelog > /tmp/_cl && mv /tmp/_cl packaging/debian/changelog
-          # Patch build-pkg.sh VERSION variable
+          # Patch build-pkg.sh VERSION variable (preserve executable bit)
           awk -v v="VERSION=\"$RPM_VER\"" '/^VERSION=/{print v; next} 1' \
-            packaging/build-pkg.sh > /tmp/_bpkg && mv /tmp/_bpkg packaging/build-pkg.sh
+            packaging/build-pkg.sh > /tmp/_bpkg && chmod +x /tmp/_bpkg && mv /tmp/_bpkg packaging/build-pkg.sh
 
       - name: Build RPM and DEB
         run: ./packaging/build-pkg.sh
