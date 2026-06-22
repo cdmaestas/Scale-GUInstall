@@ -30,7 +30,7 @@ jobs:
           # Update changelog date/version
           sed -i "1s/.*/scale-guinstall ($TAG-1) unstable; urgency=low/" packaging/debian/changelog
           # Patch build-pkg.sh VERSION variable (used for both RPM and DEB filenames)
-          sed -i "s/^VERSION=.*/VERSION=\"$RPM_VER\"/" packaging/build-pkg.sh
+          sed -i "s|^VERSION=.*|VERSION=\"$RPM_VER\"|" packaging/build-pkg.sh
 
       - name: Build RPM and DEB
         run: ./packaging/build-pkg.sh
