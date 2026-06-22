@@ -24,13 +24,19 @@ jobs:
           RPM_VER="${TAG//-/~}"               # RPM forbids '-'; use '~' for pre-release
           echo "VERSION=$TAG" >> "$GITHUB_ENV"
           # Patch the version into the spec (RPM-safe: hyphens → tildes)
-          sed -i "s|^Version:.*|Version:        $RPM_VER|" packaging/scale-guinstall.spec
+          # Use awk so the replacement value is never interpreted by sed/shell
+          awk -v v="Version:        $RPM_VER" '/^Version:/{print v; next} 1' \
+            packaging/scale-guinstall.spec > /tmp/_spec && mv /tmp/_spec packaging/scale-guinstall.spec
           # Patch debian control and changelog (Debian allows hyphens in upstream version)
-          sed -i "s|^Version:.*|Version: $TAG|"        packaging/debian/control
+          awk -v v="Version: $TAG" '/^Version:/{print v; next} 1' \
+            packaging/debian/control > /tmp/_ctrl && mv /tmp/_ctrl packaging/debian/control
           # Update changelog date/version
-          sed -i "1s|.*|scale-guinstall ($TAG-1) unstable; urgency=low|" packaging/debian/changelog
-          # Patch build-pkg.sh VERSION variable (used for both RPM and DEB filenames)
-          sed -i "s|^VERSION=.*|VERSION=\"$RPM_VER\"|" packaging/build-pkg.sh
+          awk -v v="scale-guinstall ($TAG-1) unstable; urgency=low" \
+            'NR==1{print v; next} 1' \
+            packaging/debian/changelog > /tmp/_cl && mv /tmp/_cl packaging/debian/changelog
+          # Patch build-pkg.sh VERSION variable
+          awk -v v="VERSION=\"$RPM_VER\"" '/^VERSION=/{print v; next} 1' \
+            packaging/build-pkg.sh > /tmp/_bpkg && mv /tmp/_bpkg packaging/build-pkg.sh
 
       - name: Build RPM and DEB
         run: ./packaging/build-pkg.sh
