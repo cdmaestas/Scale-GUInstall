@@ -1859,17 +1859,97 @@
           <div class="panel" style="margin-bottom:var(--spacing-05)">
             <div class="panel-header"><div><h3>Step 2: Enable Admin Daemon &amp; Node Identity</h3></div></div>
             <div class="panel-body">
-              <p style="color:var(--cds-text-secondary); margin-bottom:var(--spacing-05); font-size:13px">After install, enable the Scale Admin Daemon on all nodes and define node identity mappings. Required for cluster management in IBM Storage Scale 6.0.1+.</p>
-              <div class="btn-group">
-                <button class="btn btn-primary" onclick="runPhase('enable-daemon', this)">
-                  <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm0 26A12 12 0 1128 16 12 12 0 0116 28z"/><path d="M11 21l10-5-10-5v10z"/></svg>
-                  Enable Daemon
-                </button>
-                <button class="btn btn-secondary" onclick="runPhase('nodeid-define', this)">Node ID Define</button>
+              <p style="color:var(--cds-text-secondary); margin-bottom:var(--spacing-05); font-size:13px">After install, enable the Scale Admin Daemon on all nodes, then set up TLS-based node identities using X.509 certificates. Required for cluster management in IBM Storage Scale 6.0.1+.</p>
+
+              <!-- Enable Daemon -->
+              <div style="border-bottom:1px solid var(--cds-border-subtle); padding-bottom:var(--spacing-05); margin-bottom:var(--spacing-05)">
+                <h4 style="margin-bottom:var(--spacing-03); font-size:13px; text-transform:uppercase; color:var(--cds-text-secondary); letter-spacing:.5px">2a — Enable Admin Daemon</h4>
+                <div class="btn-group">
+                  <button class="btn btn-primary" onclick="runPhase('enable-daemon', this)">
+                    <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm0 26A12 12 0 1128 16 12 12 0 0116 28z"/><path d="M11 21l10-5-10-5v10z"/></svg>
+                    Enable Daemon
+                  </button>
+                </div>
+                <div class="cmd-preview" style="margin-top:var(--spacing-04)">
+                  <div><span class="cmd-prompt">$ </span>sudo <span class="toolkit-path-display-inline">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> scaleadmd enable</div>
+                </div>
               </div>
-              <div class="cmd-preview" style="margin-top:var(--spacing-05)">
-                <div><span class="cmd-prompt">$ </span>sudo <span class="toolkit-path-display-inline">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> scaleadmd enable</div>
-                <div><span class="cmd-prompt">$ </span>sudo <span class="toolkit-path-display-inline">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> nodeid define</div>
+
+              <!-- Node Identity TLS Setup -->
+              <div>
+                <h4 style="margin-bottom:var(--spacing-04); font-size:13px; text-transform:uppercase; color:var(--cds-text-secondary); letter-spacing:.5px">2b — Node Identity (TLS Certificates)</h4>
+                <p style="color:var(--cds-text-secondary); font-size:12px; margin-bottom:var(--spacing-04)">Generates a self-signed CA and per-node X.509 certificates using EC keys, then imports them via <code>scalectl node config set</code>. Follows IBM Storage Scale 6.0.1 node identity documentation.</p>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--spacing-04); margin-bottom:var(--spacing-04)">
+                  <div class="form-group" style="margin:0">
+                    <label class="form-label">TLS Directory</label>
+                    <input type="text" class="form-input" id="ni-tls-dir" value="~/tls" oninput="updateNodeIdentityPreview()">
+                  </div>
+                  <div class="form-group" style="margin:0">
+                    <label class="form-label">Organization Name</label>
+                    <input type="text" class="form-input" id="ni-org" value="IBM" oninput="updateNodeIdentityPreview()">
+                  </div>
+                  <div class="form-group" style="margin:0">
+                    <label class="form-label">CA Common Name</label>
+                    <input type="text" class="form-input" id="ni-ca-cn" value="ScaleCA" oninput="updateNodeIdentityPreview()">
+                  </div>
+                  <div class="form-group" style="margin:0">
+                    <label class="form-label">Cluster Name (Node Cert CN)</label>
+                    <input type="text" class="form-input" id="ni-cluster-name" placeholder="scale.cluster" oninput="updateNodeIdentityPreview()">
+                  </div>
+                  <div class="form-group" style="margin:0">
+                    <label class="form-label">Validity (days)</label>
+                    <input type="number" class="form-input" id="ni-days" value="10000" min="1" oninput="updateNodeIdentityPreview()">
+                  </div>
+                  <div class="form-group" style="margin:0">
+                    <label class="form-label">SSH User (for remote import)</label>
+                    <input type="text" class="form-input" id="ni-ssh-user" value="root" oninput="updateNodeIdentityPreview()">
+                  </div>
+                </div>
+
+                <div style="display:flex; gap:var(--spacing-05); margin-bottom:var(--spacing-04); flex-wrap:wrap">
+                  <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer">
+                    <input type="checkbox" id="ni-import-ssh" onchange="updateNodeIdentityPreview()">
+                    Import identities via SSH (<code>scalectl node config set</code>)
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer">
+                    <input type="checkbox" id="ni-add-trust" onchange="updateNodeIdentityPreview()">
+                    Add CA to system trust store (<code>update-ca-trust</code>)
+                  </label>
+                </div>
+
+                <!-- Node FQDN Table -->
+                <div style="margin-bottom:var(--spacing-04)">
+                  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:var(--spacing-03)">
+                    <label class="form-label" style="margin:0">Nodes &amp; FQDNs</label>
+                    <button class="btn btn-ghost" style="font-size:11px; padding:2px 10px" onclick="populateNodeIdentityNodes()">Refresh from Nodes</button>
+                  </div>
+                  <div id="ni-node-table-wrap">
+                    <table style="width:100%; border-collapse:collapse; font-size:12px">
+                      <thead>
+                        <tr style="color:var(--cds-text-secondary)">
+                          <th style="text-align:left; padding:4px 8px; border-bottom:1px solid var(--cds-border-subtle)">Hostname</th>
+                          <th style="text-align:left; padding:4px 8px; border-bottom:1px solid var(--cds-border-subtle)">FQDN <span style="font-weight:normal;color:var(--cds-text-placeholder)">(optional — defaults to hostname)</span></th>
+                        </tr>
+                      </thead>
+                      <tbody id="ni-node-tbody">
+                        <tr><td colspan="2" style="padding:8px; color:var(--cds-text-placeholder); font-style:italic">No nodes — add nodes in Node Configuration, then click Refresh.</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Command Preview -->
+                <div class="cmd-preview" id="ni-cmd-preview" style="margin-bottom:var(--spacing-04); max-height:200px; overflow-y:auto">
+                  <div style="color:var(--cds-text-placeholder);"># Configure fields above to see command preview</div>
+                </div>
+
+                <div class="btn-group">
+                  <button class="btn btn-primary" onclick="runNodeIdentity(this)">
+                    <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M26 6H6a2 2 0 00-2 2v16a2 2 0 002 2h20a2 2 0 002-2V8a2 2 0 00-2-2zm0 18H6V8h20z"/><path d="M10 14h12v2H10zm0 4h8v2h-8z"/></svg>
+                    Generate &amp; Setup Identities
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2696,6 +2776,12 @@ function navigateTo(page) {
   closeSidebar();
   updateAllPreviews();
   if (page === 'prepare') checkPrepareBackend();
+  if (page === 'install') {
+    // Auto-fill cluster name in Node Identity panel from cluster settings
+    const niCn = document.getElementById('ni-cluster-name');
+    if (niCn && !niCn.value && state.clusterName) niCn.value = state.clusterName;
+    populateNodeIdentityNodes();
+  }
 }
 
 // ===== TOOLKIT PATH SYNC =====
@@ -3314,6 +3400,7 @@ function updateAllPreviews() {
 
   updateNSDStanza();
   updateFSPreview();
+  updateNodeIdentityPreview();
 }
 
 // ===== TAB SWITCHING =====
@@ -3681,6 +3768,151 @@ async function applyNodeConfig(btn) {
   };
   const url = `${getBackendUrl()}/api/stream/nodes`;
   streamToTerminalPost(termId, url, { toolkit: tp, nodes: state.nodes.map(n => ({ hostname: n.hostname, roles: n.roles })) }, () => { btn.disabled = false; });
+}
+
+// ===== NODE IDENTITY (TLS) =====
+
+function populateNodeIdentityNodes() {
+  const tbody = document.getElementById('ni-node-tbody');
+  if (!tbody) return;
+  if (state.nodes.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="2" style="padding:8px; color:var(--cds-text-placeholder); font-style:italic">No nodes — add nodes in Node Configuration, then click Refresh.</td></tr>';
+    updateNodeIdentityPreview();
+    return;
+  }
+  tbody.innerHTML = state.nodes.map(n => `
+    <tr>
+      <td style="padding:4px 8px; font-family:monospace; font-size:12px">${h(n.hostname)}</td>
+      <td style="padding:4px 8px">
+        <input type="text" class="form-input" style="height:28px; font-size:12px; padding:2px 8px"
+          data-ni-host="${h(n.hostname)}" data-ni-fqdn
+          placeholder="${h(n.hostname)}"
+          oninput="updateNodeIdentityPreview()">
+      </td>
+    </tr>
+  `).join('');
+  updateNodeIdentityPreview();
+}
+
+function _niGetNodes() {
+  return Array.from(document.querySelectorAll('[data-ni-fqdn]')).map(el => ({
+    hostname: el.dataset.niHost,
+    fqdn: el.value.trim() || el.dataset.niHost,
+  }));
+}
+
+function updateNodeIdentityPreview() {
+  const el = document.getElementById('ni-cmd-preview');
+  if (!el) return;
+  const tlsDir    = document.getElementById('ni-tls-dir')?.value.trim() || '~/tls';
+  const org       = document.getElementById('ni-org')?.value.trim() || 'IBM';
+  const caCn      = document.getElementById('ni-ca-cn')?.value.trim() || 'ScaleCA';
+  const cn        = document.getElementById('ni-cluster-name')?.value.trim();
+  const days      = document.getElementById('ni-days')?.value || '10000';
+  const sshUser   = document.getElementById('ni-ssh-user')?.value.trim() || 'root';
+  const importSsh = document.getElementById('ni-import-ssh')?.checked;
+  const addTrust  = document.getElementById('ni-add-trust')?.checked;
+  const nodes     = _niGetNodes();
+
+  if (!cn) {
+    el.innerHTML = '<div style="color:var(--cds-text-placeholder)"># Enter Cluster Name above to see preview</div>';
+    return;
+  }
+
+  const lines = [];
+  const $ = s => `<span class="cmd-prompt">$ </span>${h(s)}`;
+  const comment = s => `<div style="color:var(--cds-text-secondary)">${h(s)}</div>`;
+
+  lines.push(`<div>${$(`mkdir -p ${tlsDir}`)}</div>`);
+  lines.push(`<div>${$(`openssl ecparam -name prime256v1 -genkey -noout -out ${tlsDir}/ca.key`)}</div>`);
+  lines.push(`<div>${$(`openssl req -new -x509 -sha256 -key ${tlsDir}/ca.key -out ${tlsDir}/ca.crt -subj "/O=${org}/CN=${caCn}" -days ${days}`)}</div>`);
+
+  const preview = nodes.length > 0 ? nodes : [{ hostname: 'node1', fqdn: 'node1.example.com' }];
+  const showAll = nodes.length <= 3;
+  const previewNodes = showAll ? preview : preview.slice(0, 2);
+
+  for (const nd of previewNodes) {
+    const short = nd.hostname.split('.')[0];
+    lines.push(comment(`# ── ${nd.hostname} ──`));
+    lines.push(`<div>${$(`openssl ecparam -name prime256v1 -genkey -noout -out ${tlsDir}/${nd.hostname}.key`)}</div>`);
+    lines.push(`<div>${$(`openssl req -new -sha256 -key ${tlsDir}/${nd.hostname}.key -out ${tlsDir}/${nd.hostname}.csr -subj "/O=${org}/CN=${cn}"`)}</div>`);
+    lines.push(comment(`# (SAN conf: DNS.1=${short}, DNS.2=${nd.fqdn})`));
+    lines.push(`<div>${$(`openssl x509 -req -in ${tlsDir}/${nd.hostname}.csr -CA ${tlsDir}/ca.crt -CAkey ${tlsDir}/ca.key -CAcreateserial -out ${tlsDir}/${nd.hostname}.pem -days ${days} -sha256 -extensions v3_req -extfile ${tlsDir}/${nd.hostname}-san.conf`)}</div>`);
+    lines.push(`<div>${$(`openssl verify -CAfile ${tlsDir}/ca.crt ${tlsDir}/${nd.hostname}.pem`)}</div>`);
+    if (importSsh) {
+      lines.push(`<div>${$(`scp ${tlsDir}/${nd.hostname}.pem ${tlsDir}/${nd.hostname}.key ${tlsDir}/ca.crt ${sshUser}@${nd.hostname}:${tlsDir}/`)}</div>`);
+      lines.push(`<div>${$(`ssh ${sshUser}@${nd.hostname} 'scalectl node config set --cert ${tlsDir}/${nd.hostname}.pem --key ${tlsDir}/${nd.hostname}.key --chain ${tlsDir}/ca.crt'`)}</div>`);
+    } else {
+      lines.push(comment(`# manual: scp + ssh ${sshUser}@${nd.hostname} 'scalectl node config set ...'`));
+    }
+  }
+  if (!showAll) {
+    lines.push(comment(`# ... (${nodes.length - 2} more nodes)`));
+  }
+  if (addTrust) {
+    lines.push(`<div>${$(`cp ${tlsDir}/ca.crt /etc/pki/ca-trust/source/anchors/scale-ca.crt`)}</div>`);
+    lines.push(`<div>${$(`update-ca-trust`)}</div>`);
+  }
+  el.innerHTML = lines.join('');
+}
+
+async function runNodeIdentity(btn) {
+  const termId = 'main-terminal';
+  const nodes  = _niGetNodes();
+  const tlsDir = document.getElementById('ni-tls-dir')?.value.trim() || '~/tls';
+  const org    = document.getElementById('ni-org')?.value.trim() || 'IBM';
+  const caCn   = document.getElementById('ni-ca-cn')?.value.trim() || 'ScaleCA';
+  const cn     = document.getElementById('ni-cluster-name')?.value.trim();
+  const days   = parseInt(document.getElementById('ni-days')?.value || '10000', 10);
+  const sshUser    = document.getElementById('ni-ssh-user')?.value.trim() || 'root';
+  const importSsh  = document.getElementById('ni-import-ssh')?.checked;
+  const addTrust   = document.getElementById('ni-add-trust')?.checked;
+
+  if (!cn) {
+    appendToTerminal(termId, '[ERROR] Cluster name is required for node identity setup.', 'error');
+    return;
+  }
+  if (nodes.length === 0) {
+    appendToTerminal(termId, '[ERROR] No nodes configured. Refresh node list from Node Configuration.', 'error');
+    return;
+  }
+
+  if (state.dryRun) {
+    appendToTerminal(termId, `$ mkdir -p ${tlsDir}`, 'info');
+    appendToTerminal(termId, `$ openssl ecparam -name prime256v1 -genkey -noout -out ${tlsDir}/ca.key`, 'info');
+    appendToTerminal(termId, `$ openssl req -new -x509 -sha256 -key ${tlsDir}/ca.key -out ${tlsDir}/ca.crt -subj "/O=${org}/CN=${caCn}" -days ${days}`, 'info');
+    for (const nd of nodes) {
+      appendToTerminal(termId, `# ── ${nd.hostname} ──`, 'muted');
+      appendToTerminal(termId, `$ openssl ecparam -name prime256v1 -genkey -noout -out ${tlsDir}/${nd.hostname}.key`, 'info');
+      appendToTerminal(termId, `$ openssl req -new -sha256 -key ${tlsDir}/${nd.hostname}.key -out ${tlsDir}/${nd.hostname}.csr -subj "/O=${org}/CN=${cn}"`, 'info');
+      appendToTerminal(termId, `$ openssl x509 -req ... -out ${tlsDir}/${nd.hostname}.pem -days ${days} -sha256 -extensions v3_req -extfile ${tlsDir}/${nd.hostname}-san.conf`, 'info');
+      appendToTerminal(termId, `$ openssl verify -CAfile ${tlsDir}/ca.crt ${tlsDir}/${nd.hostname}.pem`, 'info');
+      if (importSsh) {
+        appendToTerminal(termId, `$ scp ${tlsDir}/${nd.hostname}.pem ... ${sshUser}@${nd.hostname}:${tlsDir}/`, 'info');
+        appendToTerminal(termId, `$ ssh ${sshUser}@${nd.hostname} 'scalectl node config set --cert ... --key ... --chain ...'`, 'info');
+      }
+    }
+    if (addTrust) appendToTerminal(termId, `$ cp ${tlsDir}/ca.crt /etc/pki/ca-trust/source/anchors/scale-ca.crt && update-ca-trust`, 'info');
+    appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
+    return;
+  }
+
+  try {
+    const ping = await fetch(getBackendUrl() + '/api/ping', { signal: AbortSignal.timeout(2000) });
+    if (!ping.ok) throw new Error();
+  } catch {
+    appendToTerminal(termId, `[ERROR] Backend not reachable at ${getBackendUrl()}`, 'error');
+    appendToTerminal(termId, '[ERROR] Start it with: python3 scale-server.py', 'muted');
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  await streamToTerminalPost(termId, `${getBackendUrl()}/api/stream/node-identity`, {
+    tls_dir: tlsDir, org_name: org, ca_cn: caCn,
+    cluster_name: cn, days, nodes,
+    ssh_user: sshUser, import_via_ssh: importSsh, add_trust: addTrust,
+  });
+  if (btn) btn.disabled = false;
 }
 
 async function runPhase(phase, btn) {

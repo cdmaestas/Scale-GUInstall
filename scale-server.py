@@ -34,7 +34,7 @@ def cors(response):
 app.after_request(cors)
 
 
-_ALLOWED_ROOTS = ("/tmp", "/opt", "/usr", "/home", "/var", "/srv", "/mnt", "/data", "/ibm")
+_ALLOWED_ROOTS = ("/tmp", "/opt", "/usr", "/home", "/root", "/var", "/srv", "/mnt", "/data", "/ibm")
 
 
 def resolve_path(path):
@@ -1464,6 +1464,198 @@ def stream_nfs_core_dump():
             yield sse("error", f"[ERROR] {exc}")
         finally:
             yield sse("done", "")
+    return sse_response(generate())
+
+
+# ---------------------------------------------------------------------------
+
+@app.route("/api/stream/node-identity", methods=["POST", "OPTIONS"])
+def stream_node_identity():
+    if request.method == "OPTIONS":
+        return "", 204
+    body         = request.get_json(silent=True) or {}
+    tls_dir_raw  = body.get("tls_dir", "~/tls").strip()
+    org_name     = body.get("org_name", "IBM").strip() or "IBM"
+    cluster_name = body.get("cluster_name", "").strip()
+    ca_cn        = body.get("ca_cn", "ScaleCA").strip() or "ScaleCA"
+    days         = max(1, int(body.get("days", 10000)))
+    nodes        = body.get("nodes", [])
+    ssh_user     = body.get("ssh_user", "root").strip() or "root"
+    import_ssh   = bool(body.get("import_via_ssh", False))
+    add_trust    = bool(body.get("add_trust", False))
+
+    def generate():
+        try:
+            tls_dir = os.path.expanduser(tls_dir_raw)
+            resolved = os.path.abspath(tls_dir)
+            if not any(resolved.startswith(r) for r in _ALLOWED_ROOTS):
+                yield sse("error", f"[ERROR] TLS directory not in an allowed path: {resolved}")
+                return
+            if not cluster_name:
+                yield sse("error", "[ERROR] Cluster name is required for certificate CN.")
+                return
+            if not nodes:
+                yield sse("error", "[ERROR] No nodes configured.")
+                return
+
+            # 1. Create TLS directory
+            cmd = ["mkdir", "-p", tls_dir]
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd)
+            if rc != 0:
+                yield sse("error", "[ERROR] Could not create TLS directory.")
+                return
+
+            ca_key = os.path.join(tls_dir, "ca.key")
+            ca_crt = os.path.join(tls_dir, "ca.crt")
+
+            # 2. Generate CA private key (skip if already exists)
+            if not os.path.exists(ca_key):
+                cmd = ["openssl", "ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", ca_key]
+                yield sse("info", f"$ {' '.join(cmd)}")
+                rc = yield from stream_process(cmd)
+                if rc != 0:
+                    yield sse("error", "[ERROR] CA key generation failed.")
+                    return
+            else:
+                yield sse("info", f"# CA key already exists: {ca_key} (reusing)")
+
+            # 3. Generate self-signed CA certificate (skip if already exists)
+            if not os.path.exists(ca_crt):
+                subj = f"/O={org_name}/CN={ca_cn}"
+                cmd = ["openssl", "req", "-new", "-x509", "-sha256",
+                       "-key", ca_key, "-out", ca_crt,
+                       "-subj", subj, "-days", str(days)]
+                yield sse("info", f"$ {' '.join(cmd)}")
+                rc = yield from stream_process(cmd)
+                if rc != 0:
+                    yield sse("error", "[ERROR] CA cert generation failed.")
+                    return
+            else:
+                yield sse("info", f"# CA cert already exists: {ca_crt} (reusing)")
+
+            yield sse("success", "[OK] CA ready.")
+
+            # 4. Per-node certificate generation
+            for node_info in nodes:
+                hostname = (node_info.get("hostname") or "").strip()
+                fqdn     = (node_info.get("fqdn") or "").strip() or hostname
+                if not hostname:
+                    continue
+
+                short_name = hostname.split(".")[0]
+                node_key  = os.path.join(tls_dir, f"{hostname}.key")
+                node_csr  = os.path.join(tls_dir, f"{hostname}.csr")
+                node_pem  = os.path.join(tls_dir, f"{hostname}.pem")
+                san_conf  = os.path.join(tls_dir, f"{hostname}-san.conf")
+
+                yield sse("info", f"# ── Node: {hostname} ──")
+
+                # Generate node private key
+                cmd = ["openssl", "ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", node_key]
+                yield sse("info", f"$ {' '.join(cmd)}")
+                rc = yield from stream_process(cmd)
+                if rc != 0:
+                    yield sse("error", f"[ERROR] Key generation failed for {hostname}.")
+                    continue
+
+                # Generate CSR with cluster name as CN
+                subj = f"/O={org_name}/CN={cluster_name}"
+                cmd = ["openssl", "req", "-new", "-sha256",
+                       "-key", node_key, "-out", node_csr, "-subj", subj]
+                yield sse("info", f"$ {' '.join(cmd)}")
+                rc = yield from stream_process(cmd)
+                if rc != 0:
+                    yield sse("error", f"[ERROR] CSR generation failed for {hostname}.")
+                    continue
+
+                # Write SAN config file
+                san_content = (
+                    "[req]\nreq_extensions = v3_req\n"
+                    "[v3_req]\nsubjectAltName = @alt_names\n"
+                    "[alt_names]\n"
+                    f"DNS.1 = {short_name}\n"
+                    f"DNS.2 = {fqdn}\n"
+                )
+                try:
+                    with open(san_conf, "w") as f:
+                        f.write(san_content)
+                    yield sse("info", f"# SAN config written: {san_conf}")
+                except OSError as exc:
+                    yield sse("error", f"[ERROR] Could not write SAN config: {exc}")
+                    continue
+
+                # Sign node certificate with CA
+                cmd = ["openssl", "x509", "-req",
+                       "-in", node_csr, "-CA", ca_crt, "-CAkey", ca_key,
+                       "-CAcreateserial", "-out", node_pem,
+                       "-days", str(days), "-sha256",
+                       "-extensions", "v3_req", "-extfile", san_conf]
+                yield sse("info", f"$ {' '.join(cmd)}")
+                rc = yield from stream_process(cmd)
+                if rc != 0:
+                    yield sse("error", f"[ERROR] Cert signing failed for {hostname}.")
+                    continue
+
+                # Verify certificate chain
+                cmd = ["openssl", "verify", "-CAfile", ca_crt, node_pem]
+                yield sse("info", f"$ {' '.join(cmd)}")
+                rc = yield from stream_process(cmd)
+                if rc != 0:
+                    yield sse("error", f"[ERROR] Cert verification failed for {hostname}.")
+                    continue
+
+                yield sse("success", f"[OK] Certificate ready for {hostname}.")
+
+                # Import via SSH (distribute + scalectl)
+                if import_ssh:
+                    for fname in [f"{hostname}.pem", f"{hostname}.key", "ca.crt"]:
+                        src = os.path.join(tls_dir, fname)
+                        dst = f"{ssh_user}@{hostname}:{tls_dir}/"
+                        cmd = ["scp", src, dst]
+                        yield sse("info", f"$ {' '.join(cmd)}")
+                        rc = yield from stream_process(cmd)
+                        if rc != 0:
+                            yield sse("error", f"[ERROR] SCP failed for {fname} to {hostname}.")
+                    remote_cmd = (
+                        f"mkdir -p {tls_dir} && "
+                        f"scalectl node config set "
+                        f"--cert {tls_dir}/{hostname}.pem "
+                        f"--key {tls_dir}/{hostname}.key "
+                        f"--chain {tls_dir}/ca.crt"
+                    )
+                    cmd = ["ssh", f"{ssh_user}@{hostname}", remote_cmd]
+                    yield sse("info", f"$ {' '.join(cmd)}")
+                    rc = yield from stream_process(cmd)
+                    if rc != 0:
+                        yield sse("error", f"[ERROR] scalectl import failed on {hostname}.")
+                    else:
+                        yield sse("success", f"[OK] Identity imported on {hostname}.")
+                else:
+                    yield sse("info", f"# Manual import for {hostname}:")
+                    yield sse("info", f"#   scp {tls_dir}/{hostname}.pem {tls_dir}/{hostname}.key {tls_dir}/ca.crt {ssh_user}@{hostname}:{tls_dir}/")
+                    yield sse("info", f"#   ssh {ssh_user}@{hostname} 'scalectl node config set --cert {tls_dir}/{hostname}.pem --key {tls_dir}/{hostname}.key --chain {tls_dir}/ca.crt'")
+
+            # 5. Add CA cert to local system trust store
+            if add_trust:
+                trust_path = "/etc/pki/ca-trust/source/anchors/scale-ca.crt"
+                cmd = ["cp", ca_crt, trust_path]
+                yield sse("info", f"$ {' '.join(cmd)}")
+                rc = yield from stream_process(cmd)
+                if rc == 0:
+                    cmd = ["update-ca-trust"]
+                    yield sse("info", f"$ {' '.join(cmd)}")
+                    yield from stream_process(cmd)
+                    yield sse("success", "[OK] CA added to system trust store.")
+                else:
+                    yield sse("error", "[ERROR] Could not copy CA to trust store (check permissions).")
+
+            yield sse("success", "[DONE] Node identity setup complete.")
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+        finally:
+            yield sse("done", "")
+
     return sse_response(generate())
 
 
