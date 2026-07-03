@@ -163,21 +163,30 @@ Dry Run is enabled by default. In this mode every button generates and displays 
 
 ## Installing via Package (RPM / DEB)
 
-For production installer nodes, use the pre-built packages instead of running from source. The package installs Flask into a self-contained virtual environment — no pip, no cloning, no Python version hunting.
+For production installer nodes, use the pre-built packages instead of running from source. The package installs Flask into a self-contained virtual environment — no manual pip, no cloning, no Python version hunting.
+
+Download the package from the [GitHub Releases page](https://github.com/cdmaestas/Scale-GUInstall/releases) and install it on the installer node:
 
 **RHEL / CentOS / Fedora:**
 ```bash
-sudo dnf install scale-guinstall-1.0.0-1.noarch.rpm
+sudo dnf install ./scale-guinstall-<version>-1.noarch.rpm
 ```
+
+> **RHEL 8/9 note:** Python 3.10+ may need to come from AppStream before installing:
+> ```bash
+> sudo dnf install python3.11
+> ```
 
 **Debian / Ubuntu:**
 ```bash
-sudo apt install ./scale-guinstall_1.0.0-1_all.deb
+sudo apt install ./scale-guinstall_<version>-1_all.deb
 ```
+
+The post-install script automatically creates a virtual environment at `/usr/lib/scale-guinstall/venv` and installs Flask into it — no additional steps needed.
 
 After install:
 ```bash
-scale-guinstall          # run in foreground
+scale-guinstall          # run in foreground (prints the SSH tunnel command)
 
 # Or as a persistent service:
 sudo systemctl enable --now scale-guinstall
@@ -185,10 +194,9 @@ sudo systemctl enable --now scale-guinstall
 
 **Build the packages yourself:**
 ```bash
-cd packaging
-./build-pkg.sh           # builds both RPM and DEB into dist/
-./build-pkg.sh --rpm     # RPM only (requires rpmbuild)
-./build-pkg.sh --deb     # DEB only (requires dpkg-deb)
+./packaging/build-pkg.sh        # builds both RPM and DEB into dist/
+./packaging/build-pkg.sh --rpm  # RPM only (requires rpmbuild)
+./packaging/build-pkg.sh --deb  # DEB only (requires dpkg-deb)
 ```
 
 Prerequisites: `sudo dnf install rpm-build` (RPM) or `sudo apt install dpkg-dev` (DEB).
