@@ -34,6 +34,7 @@ install -m 0755 %{_sourcedir}/scale-guinstall   %{buildroot}/usr/bin/scale-guins
 install -m 0644 %{_sourcedir}/scale-guinstall.service %{buildroot}/usr/lib/systemd/system/scale-guinstall.service
 
 %post
+#!/bin/bash
 # Create a virtual environment and install Flask into it
 VENV=/usr/lib/scale-guinstall/venv
 
@@ -45,13 +46,13 @@ for candidate in python3.14 python3.13 python3.12 python3.11 python3.10; do
         break
     fi
 done
-if [[ -z "$PYTHON" ]]; then
+if [ -z "$PYTHON" ]; then
     # Fall back to python3 if it meets the requirement
     if python3 -c "import sys; exit(0 if sys.version_info >= (3,10) else 1)" 2>/dev/null; then
         PYTHON="python3"
     else
         echo "WARNING: Python 3.10+ not found — Flask will not be installed."
-        echo "         Install python3.11 and re-run: %post"
+        echo "         Install python3.11 and re-run: sudo rpm -e --justdb scale-guinstall && sudo rpm -i scale-guinstall-*.rpm"
         exit 0
     fi
 fi
