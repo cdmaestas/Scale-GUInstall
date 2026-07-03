@@ -6,7 +6,49 @@ A single-file web frontend for the IBM Storage Scale Installation Toolkit (`spec
 
 ---
 
-## Getting Started
+## Installing via Package (RPM / DEB)
+
+For production installer nodes, use the pre-built packages instead of running from source. The package installs Flask into a self-contained virtual environment — no manual pip, no cloning, no Python version hunting.
+
+Download the package from the [GitHub Releases page](https://github.com/cdmaestas/Scale-GUInstall/releases) and install it on the installer node:
+
+**RHEL / CentOS / Fedora:**
+```bash
+sudo dnf install ./scale-guinstall-<version>-1.noarch.rpm
+```
+
+> **RHEL 8/9 note:** Python 3.10+ may need to come from AppStream before installing:
+> ```bash
+> sudo dnf install python3.11
+> ```
+
+**Debian / Ubuntu:**
+```bash
+sudo apt install ./scale-guinstall_<version>-1_all.deb
+```
+
+The post-install script automatically creates a virtual environment at `/usr/lib/scale-guinstall/venv` and installs Flask into it — no additional steps needed.
+
+After install:
+```bash
+scale-guinstall          # run in foreground (prints the SSH tunnel command)
+
+# Or as a persistent service:
+sudo systemctl enable --now scale-guinstall
+```
+
+**Build the packages yourself:**
+```bash
+./packaging/build-pkg.sh        # builds both RPM and DEB into dist/
+./packaging/build-pkg.sh --rpm  # RPM only (requires rpmbuild)
+./packaging/build-pkg.sh --deb  # DEB only (requires dpkg-deb)
+```
+
+Prerequisites: `sudo dnf install rpm-build` (RPM) or `sudo apt install dpkg-dev` (DEB).
+
+---
+
+## Getting Started (from source)
 
 The GUI has two components: the HTML file (runs in your browser) and a lightweight backend server (`scale-server.py`) that executes commands on the installer node. The HTML alone works as a command generator in dry-run mode — you only need the server when you're ready to run real commands.
 
@@ -158,48 +200,6 @@ Dry Run is enabled by default. In this mode every button generates and displays 
 - SSH host key checking uses `accept-new` (new hosts accepted once; changed keys rejected) rather than disabling verification entirely
 
 **The server is only needed for live execution.** In Dry Run mode the GUI generates command previews entirely in the browser with no server required.
-
----
-
-## Installing via Package (RPM / DEB)
-
-For production installer nodes, use the pre-built packages instead of running from source. The package installs Flask into a self-contained virtual environment — no manual pip, no cloning, no Python version hunting.
-
-Download the package from the [GitHub Releases page](https://github.com/cdmaestas/Scale-GUInstall/releases) and install it on the installer node:
-
-**RHEL / CentOS / Fedora:**
-```bash
-sudo dnf install ./scale-guinstall-<version>-1.noarch.rpm
-```
-
-> **RHEL 8/9 note:** Python 3.10+ may need to come from AppStream before installing:
-> ```bash
-> sudo dnf install python3.11
-> ```
-
-**Debian / Ubuntu:**
-```bash
-sudo apt install ./scale-guinstall_<version>-1_all.deb
-```
-
-The post-install script automatically creates a virtual environment at `/usr/lib/scale-guinstall/venv` and installs Flask into it — no additional steps needed.
-
-After install:
-```bash
-scale-guinstall          # run in foreground (prints the SSH tunnel command)
-
-# Or as a persistent service:
-sudo systemctl enable --now scale-guinstall
-```
-
-**Build the packages yourself:**
-```bash
-./packaging/build-pkg.sh        # builds both RPM and DEB into dist/
-./packaging/build-pkg.sh --rpm  # RPM only (requires rpmbuild)
-./packaging/build-pkg.sh --deb  # DEB only (requires dpkg-deb)
-```
-
-Prerequisites: `sudo dnf install rpm-build` (RPM) or `sudo apt install dpkg-dev` (DEB).
 
 ---
 
