@@ -229,6 +229,7 @@ Scale-GUInstall/
 ├── Scale-GUInstall.html        # Self-contained single-file app (HTML + CSS + JS)
 ├── scale-server.py             # Backend server (Flask) for live command execution
 ├── start.sh                    # Convenience script: finds Python, installs Flask, starts server
+├── CHANGELOG.md                # Release history (Keep a Changelog format)
 └── packaging/
     ├── build-pkg.sh            # Builds RPM and DEB packages into dist/
     ├── scale-guinstall.spec    # RPM spec
