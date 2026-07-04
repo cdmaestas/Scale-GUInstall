@@ -235,6 +235,7 @@ Scale-GUInstall/
     ├── scale-guinstall.spec    # RPM spec
     ├── scale-guinstall.service # systemd unit (installed but not enabled by default)
     ├── scale-guinstall-wrapper # /usr/bin/scale-guinstall installed by package
+    ├── scale-guinstall.1       # man page source (troff)
     └── debian/                 # DEB control files (control, postinst, prerm, postrm)
 ```
 
