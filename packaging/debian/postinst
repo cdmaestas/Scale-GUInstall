@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 VENV=/usr/lib/scale-guinstall/venv
 
