@@ -1,0 +1,113 @@
+.TH SCALE\-GUINSTALL 1 "2026-07-03" "1.0.1" "Scale GUInstall"
+.SH NAME
+scale\-guinstall \- IBM Storage Scale Installation Toolkit GUI backend server
+.SH SYNOPSIS
+.B scale\-guinstall
+.SH DESCRIPTION
+.B scale\-guinstall
+starts the Flask backend server for Scale GUInstall, a web-based GUI
+for the IBM Storage Scale Installation Toolkit
+.RB ( spectrumscale ).
+.PP
+The server listens on
+.B http://127.0.0.1:5001
+(loopback only) and provides Server-Sent Event (SSE) streaming endpoints
+that the GUI calls to execute
+.B spectrumscale
+commands and stream output back to the browser.
+.PP
+Open
+.B Scale\-GUInstall.html
+in a browser on the same machine, or tunnel the port from a remote
+workstation using SSH (see
+.B EXAMPLES
+below).
+.SH OPTIONS
+.B scale\-guinstall
+takes no command-line options.
+The listening port can be overridden with the
+.B PORT
+environment variable.
+.SH ENVIRONMENT
+.TP
+.B PORT
+Override the listening port (default:
+.BR 5001 ).
+.SH FILES
+.TP
+.B /usr/lib/scale\-guinstall/scale\-server.py
+The Flask application.
+.TP
+.B /usr/lib/scale\-guinstall/Scale\-GUInstall.html
+The single-file web application. Open this in your browser.
+.TP
+.B /usr/lib/scale\-guinstall/venv/
+Python virtual environment containing Flask, created during package
+installation.
+.TP
+.B /usr/lib/systemd/system/scale\-guinstall.service
+systemd unit file. The service is installed but not enabled by default.
+.TP
+.B /usr/share/doc/scale\-guinstall/README.md
+Full documentation.
+.TP
+.B /usr/share/doc/scale\-guinstall/CHANGELOG.md
+Release history.
+.SH EXAMPLES
+.SS Run in the foreground
+.EX
+scale\-guinstall
+.EE
+.SS Run as a persistent systemd service
+.EX
+sudo systemctl enable \-\-now scale\-guinstall
+.EE
+.SS Connect from a remote workstation via SSH tunnel
+Forward the server port over SSH, then open
+.B Scale\-GUInstall.html
+locally:
+.EX
+# Interactive (tunnel closes when the terminal closes)
+ssh \-L 5001:127.0.0.1:5001 user@installer\-node
+
+# Background (stays open after the terminal exits)
+ssh \-fNL 5001:127.0.0.1:5001 user@installer\-node
+.EE
+Leave the Backend URL in the GUI at
+.BR http://127.0.0.1:5001 ;
+the SSH tunnel forwards it transparently.
+.SS Override the port
+.EX
+PORT=8080 scale\-guinstall
+.EE
+.SH SECURITY
+The server binds to
+.B 127.0.0.1
+only and is not reachable from the network.
+CORS is restricted to
+.BR localhost ,
+.BR 127.0.0.1 ,
+and
+.B file://
+origins.
+All executed commands are explicitly allowlisted; there is no generic
+shell execution endpoint.
+Credentials are transmitted via POST request bodies and never appear in
+URLs or query strings.
+.PP
+Because the server executes privileged commands (via
+.BR sudo ),
+do not expose it to untrusted networks.
+Use the SSH tunnel approach for remote access.
+.SH SEE ALSO
+.BR spectrumscale (1),
+.BR ssh (1),
+.BR systemctl (1)
+.PP
+IBM Storage Scale documentation:
+.I https://www.ibm.com/docs/en/storage-scale/6.0.1
+.PP
+Scale GUInstall source and releases:
+.I https://github.com/cdmaestas/Scale-GUInstall
+.SH AUTHORS
+Scale GUInstall is an unofficial community tool and is not an IBM product.

@@ -37,10 +37,13 @@ STAGE="$PKG_DIR/.stage"
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
 
-cp "$ROOT/scale-server.py"       "$STAGE/scale-server.py"
-cp "$ROOT/Scale-GUInstall.html"  "$STAGE/Scale-GUInstall.html"
+cp "$ROOT/scale-server.py"        "$STAGE/scale-server.py"
+cp "$ROOT/Scale-GUInstall.html"   "$STAGE/Scale-GUInstall.html"
+cp "$ROOT/README.md"              "$STAGE/README.md"
+cp "$ROOT/CHANGELOG.md"           "$STAGE/CHANGELOG.md"
 cp "$PKG_DIR/scale-guinstall-wrapper" "$STAGE/scale-guinstall"
 cp "$PKG_DIR/scale-guinstall.service" "$STAGE/scale-guinstall.service"
+gzip -9 -c "$PKG_DIR/scale-guinstall.1" > "$STAGE/scale-guinstall.1.gz"
 
 # ── RPM ───────────────────────────────────────────────────────────────────────
 build_rpm() {
@@ -82,18 +85,26 @@ build_deb() {
     mkdir -p "$deb_root/$deb_name/usr/lib/scale-guinstall"
     mkdir -p "$deb_root/$deb_name/usr/bin"
     mkdir -p "$deb_root/$deb_name/usr/lib/systemd/system"
+    mkdir -p "$deb_root/$deb_name/usr/share/doc/scale-guinstall"
+    mkdir -p "$deb_root/$deb_name/usr/share/man/man1"
 
     # Copy files
-    cp "$STAGE/scale-server.py"       "$deb_root/$deb_name/usr/lib/scale-guinstall/"
-    cp "$STAGE/Scale-GUInstall.html"  "$deb_root/$deb_name/usr/lib/scale-guinstall/"
-    cp "$STAGE/scale-guinstall"       "$deb_root/$deb_name/usr/bin/scale-guinstall"
+    cp "$STAGE/scale-server.py"         "$deb_root/$deb_name/usr/lib/scale-guinstall/"
+    cp "$STAGE/Scale-GUInstall.html"    "$deb_root/$deb_name/usr/lib/scale-guinstall/"
+    cp "$STAGE/scale-guinstall"         "$deb_root/$deb_name/usr/bin/scale-guinstall"
     cp "$STAGE/scale-guinstall.service" "$deb_root/$deb_name/usr/lib/systemd/system/"
+    cp "$STAGE/README.md"               "$deb_root/$deb_name/usr/share/doc/scale-guinstall/"
+    cp "$STAGE/CHANGELOG.md"            "$deb_root/$deb_name/usr/share/doc/scale-guinstall/"
+    cp "$STAGE/scale-guinstall.1.gz"    "$deb_root/$deb_name/usr/share/man/man1/"
 
     # Set permissions
     chmod 0755 "$deb_root/$deb_name/usr/bin/scale-guinstall"
     chmod 0644 "$deb_root/$deb_name/usr/lib/scale-guinstall/scale-server.py"
     chmod 0644 "$deb_root/$deb_name/usr/lib/scale-guinstall/Scale-GUInstall.html"
     chmod 0644 "$deb_root/$deb_name/usr/lib/systemd/system/scale-guinstall.service"
+    chmod 0644 "$deb_root/$deb_name/usr/share/doc/scale-guinstall/README.md"
+    chmod 0644 "$deb_root/$deb_name/usr/share/doc/scale-guinstall/CHANGELOG.md"
+    chmod 0644 "$deb_root/$deb_name/usr/share/man/man1/scale-guinstall.1.gz"
 
     # DEBIAN control files
     cp "$PKG_DIR/debian/control"    "$deb_root/$deb_name/DEBIAN/"
