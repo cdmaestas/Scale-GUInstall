@@ -44,40 +44,62 @@ jobs:
       - name: List artifacts
         run: ls -lh dist/
 
+      - name: Extract changelog section
+        run: |
+          # Pull the block between the tag's ## [x.y.z] heading and the next ## heading
+          python3 - <<'EOF'
+          import re, sys
+          tag = "${{ env.VERSION }}"
+          with open("CHANGELOG.md") as f:
+              text = f.read()
+          pattern = rf"## \[{re.escape(tag)}\][^\n]*\n(.*?)(?=\n## \[|\Z)"
+          m = re.search(pattern, text, re.DOTALL)
+          if not m:
+              print(f"No changelog entry found for {tag}", file=sys.stderr)
+              body = f"See [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details."
+          else:
+              body = m.group(1).strip()
+          # Append install instructions
+          body += f"""
+
+---
+
+### Install on the IBM Storage Scale installer node
+
+**RHEL / CentOS / Fedora:**
+```bash
+sudo dnf install ./scale-guinstall-{tag}-1.noarch.rpm
+```
+
+**Debian / Ubuntu:**
+```bash
+sudo apt install ./scale-guinstall_{tag}-1_all.deb
+```
+
+Then start the server:
+```bash
+scale-guinstall
+# or as a service:
+sudo systemctl enable --now scale-guinstall
+```
+
+### Connect from your workstation
+```bash
+ssh -L 5001:127.0.0.1:5001 user@installer-node
+```
+Open `Scale-GUInstall.html` in your browser — the SSH tunnel connects it to the installer node automatically.
+
+---
+See [README](https://github.com/${{ github.repository }}/blob/main/README.md) for full documentation."""
+          with open("/tmp/release_body.md", "w") as f:
+              f.write(body)
+          EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2.3.2
         with:
           name: "Scale GUInstall ${{ env.VERSION }}"
-          body: |
-            ## Scale GUInstall ${{ env.VERSION }}
-
-            ### Install on the IBM Storage Scale installer node
-
-            **RHEL / CentOS / Fedora:**
-            ```bash
-            sudo dnf install scale-guinstall-${{ env.VERSION }}-1.noarch.rpm
-            ```
-
-            **Debian / Ubuntu:**
-            ```bash
-            sudo apt install ./scale-guinstall_${{ env.VERSION }}-1_all.deb
-            ```
-
-            Then start the server:
-            ```bash
-            scale-guinstall
-            # or as a service:
-            sudo systemctl enable --now scale-guinstall
-            ```
-
-            ### Connect from your workstation
-            ```bash
-            ssh -L 5001:127.0.0.1:5001 user@installer-node
-            ```
-            Open `Scale-GUInstall.html` in your browser — the SSH tunnel connects it to the installer node automatically.
-
-            ---
-            See [README](https://github.com/${{ github.repository }}/blob/main/README.md) for full documentation.
+          body_path: /tmp/release_body.md
           files: |
             dist/*.rpm
             dist/*.deb
