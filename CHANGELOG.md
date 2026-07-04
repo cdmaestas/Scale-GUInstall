@@ -11,6 +11,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.2] — 2026-07-03
+
+### Added
+- Man page (`scale-guinstall(1)`) covering synopsis, options, environment, files, examples, and security notes
+- README.md and CHANGELOG.md installed to `/usr/share/doc/scale-guinstall/` in both RPM and DEB packages
+- Release workflow now extracts the matching changelog section automatically as the GitHub Release body
+
+---
+
 ## [1.0.1] — 2026-07-03
 
 ### Security
@@ -73,6 +82,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - `start.sh` Python detection when system `python3` is below 3.10
 - RPM version field: hyphens replaced with `.` to satisfy RPM version format rules
 
-[Unreleased]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/cdmaestas/Scale-GUInstall/releases/tag/v1.0.0
