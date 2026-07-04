@@ -195,6 +195,9 @@ Dry Run is enabled by default. In this mode every button generates and displays 
 - CORS restricted to `localhost`, `127.0.0.1`, and `file://` origins
 - Credentials (GUI user passwords, S3 secret keys) are sent in POST request bodies, never in URLs or query strings
 - All executed commands are explicit and allowlisted — no generic shell execution endpoint
+- `config gpfs` flags are validated against an explicit allowlist — unrecognised flags are rejected before reaching the subprocess
+- Node hostnames are validated against a strict regex (`[a-zA-Z0-9._-]`) before use in subprocess arguments or file paths
+- `mmchconfig` values are validated to contain only alphanumeric characters and dots
 - All user-supplied filesystem paths are validated against an allowlist of safe roots (`/tmp`, `/opt`, `/usr`, `/home`, etc.) to prevent path traversal
 - `binpath` inputs for profile.d setup are restricted to safe characters via regex before use in any file operation
 - SSH host key checking uses `accept-new` (new hosts accepted once; changed keys rejected) rather than disabling verification entirely
