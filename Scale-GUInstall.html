@@ -2826,10 +2826,10 @@ function bulkImport() {
   const text = document.getElementById('bulk-hosts').value.trim();
   if (!text) return;
   const role = document.getElementById('bulk-role').value;
-  const hosts = text.split('\n').map(h => h.trim()).filter(h => h && !h.startsWith('#'));
-  hosts.forEach(h => {
-    if (!state.nodes.find(n => n.hostname === h)) {
-      state.nodes.push({ hostname: h, roles: [role] });
+  const hosts = text.split('\n').map(host => host.trim()).filter(host => host && !host.startsWith('#'));
+  hosts.forEach(host => {
+    if (!state.nodes.find(n => n.hostname === host)) {
+      state.nodes.push({ hostname: host, roles: [role] });
     }
   });
   document.getElementById('bulk-hosts').value = '';

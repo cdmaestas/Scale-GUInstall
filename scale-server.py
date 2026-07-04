@@ -12,6 +12,7 @@ Listens on http://127.0.0.1:5001 (loopback only — not accessible from the netw
 
 import json
 import os
+import re
 import subprocess
 
 from flask import Flask, Response, jsonify, request, stream_with_context
@@ -22,8 +23,8 @@ app = Flask(__name__)
 def cors(response):
     origin = request.headers.get("Origin", "")
     # Allow file:// (null origin) and localhost only — reject all remote origins
-    if origin in ("null", "") or origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1"):
-        response.headers["Access-Control-Allow-Origin"] = origin or "*"
+    if origin in ("null",) or origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1"):
+        response.headers["Access-Control-Allow-Origin"] = origin
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Cache-Control"] = "no-cache"
@@ -35,6 +36,15 @@ app.after_request(cors)
 
 
 _ALLOWED_ROOTS = ("/tmp", "/opt", "/usr", "/home", "/root", "/var", "/srv", "/mnt", "/data", "/ibm")
+
+_VALID_HOSTNAME_RE = re.compile(r'^[a-zA-Z0-9._-]{1,255}$')
+
+_ALLOWED_GPFS_FLAGS = frozenset({
+    "-c", "-p", "-r", "-rc", "-e", "--gplbin_dir", "--list",
+    "--ccr-enable", "--ccr-disable",
+})
+
+_VALID_MMCHCONFIG_VALUE_RE = re.compile(r'^[A-Za-z0-9.]+$')
 
 
 def resolve_path(path):
@@ -480,6 +490,9 @@ def stream_nodes():
                 roles = node.get("roles", [])
                 if not hostname:
                     continue
+                if not _VALID_HOSTNAME_RE.fullmatch(hostname):
+                    yield sse("error", f"[ERROR] Invalid hostname: {hostname!r}")
+                    return
 
                 # Delete first so role changes take effect cleanly
                 del_cmd = ["sudo", toolkit, "node", "delete", hostname]
@@ -527,6 +540,10 @@ def stream_config_gpfs():
 
             if not flag:
                 yield sse("error", "[ERROR] No flag provided.")
+                return
+
+            if flag not in _ALLOWED_GPFS_FLAGS:
+                yield sse("error", f"[ERROR] Unrecognised flag: {flag}")
                 return
 
             cmd = ["sudo", toolkit, "config", "gpfs", flag]
@@ -620,7 +637,6 @@ def _parse_kv(output):
       [INFO] GPFS cluster name is set to gpfscluster01 <- "is set to" phrase
     Bracket prefixes like [INFO], [WARN] are stripped. Trailing periods removed.
     """
-    import re
     result = {}
     bracket_prefix = re.compile(r'^\s*\[[\w\s]+\]\s*', re.IGNORECASE)
     # Matches "is set to", "set to", or bare "is" followed by a value
@@ -659,8 +675,7 @@ def list_nodes():
     if rc != 0:
         return jsonify({"ok": False, "error": raw.strip(), "raw": raw})
 
-    import re as _re
-    _INFO_RE = _re.compile(r"^\[\s*\w+\s*\]\s?")
+    _INFO_RE = re.compile(r"^\[\s*\w+\s*\]\s?")
 
     # Strip [ INFO ] / [ WARN ] prefixes
     stripped = [_INFO_RE.sub("", ln) for ln in raw.splitlines()]
@@ -1002,6 +1017,9 @@ def stream_apply_cluster_config():
                 value = entry.get("value", "")
                 if not flag:
                     continue
+                if flag not in _ALLOWED_GPFS_FLAGS:
+                    yield sse("error", f"[ERROR] Unrecognised flag: {flag}")
+                    return
                 cmd = ["sudo", toolkit, "config", "gpfs", flag]
                 if value:
                     cmd.append(value)
@@ -1069,6 +1087,9 @@ def stream_list_partitions():
             if not node:
                 yield sse("error", "[ERROR] Node is required.")
                 return
+            if not _VALID_HOSTNAME_RE.fullmatch(node):
+                yield sse("error", f"[ERROR] Invalid node hostname: {node!r}")
+                return
             cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10", node, "cat", "/proc/partitions"]
             yield sse("info", f"$ ssh {node} cat /proc/partitions")
             rc = yield from stream_process(cmd)
@@ -1086,7 +1107,7 @@ def stream_list_partitions():
 # Post-configuration endpoints
 # ---------------------------------------------------------------------------
 
-_SAFE_PATH_RE = __import__("re").compile(r'^[/a-zA-Z0-9_.:-]+$')
+_SAFE_PATH_RE = re.compile(r'^[/a-zA-Z0-9_.:-]+$')
 
 
 @app.route("/api/stream/postconfig/profiled")
@@ -1167,6 +1188,9 @@ def stream_mmchconfig():
                 yield sse("error", "[ERROR] No settings provided.")
                 return
             for key, val in settings.items():
+                if not _VALID_MMCHCONFIG_VALUE_RE.fullmatch(val):
+                    yield sse("error", f"[ERROR] Invalid value for {key}: {val!r}")
+                    return
                 cmd = ["sudo", "mmchconfig", f"{key}={val}", "-i"]
                 yield sse("info", f"$ {' '.join(cmd)}")
                 rc = yield from stream_process(cmd)
@@ -1363,8 +1387,6 @@ def stream_ccr_status():
 
 @app.route("/api/stream/check-ansible")
 def stream_check_ansible():
-    import re as _re
-
     def generate():
         try:
             result = subprocess.run(
@@ -1375,7 +1397,7 @@ def stream_check_ansible():
             first_line = result.stdout.splitlines()[0] if result.stdout.strip() else ""
             yield sse("normal", first_line or "[WARN] No output from ansible --version")
 
-            m = _re.search(r"(\d+)\.(\d+)\.(\d+)", first_line)
+            m = re.search(r"(\d+)\.(\d+)\.(\d+)", first_line)
             if not m:
                 yield sse("warn", "[WARN] Could not parse ansible version — check manually.")
             else:
@@ -1478,7 +1500,10 @@ def stream_node_identity():
     org_name     = body.get("org_name", "IBM").strip() or "IBM"
     cluster_name = body.get("cluster_name", "").strip()
     ca_cn        = body.get("ca_cn", "ScaleCA").strip() or "ScaleCA"
-    days         = max(1, int(body.get("days", 10000)))
+    try:
+        days = max(1, min(int(body.get("days", 10000)), 36525))
+    except (ValueError, TypeError):
+        days = 10000
     nodes        = body.get("nodes", [])
     ssh_user     = body.get("ssh_user", "root").strip() or "root"
     import_ssh   = bool(body.get("import_via_ssh", False))
@@ -1541,6 +1566,12 @@ def stream_node_identity():
                 hostname = (node_info.get("hostname") or "").strip()
                 fqdn     = (node_info.get("fqdn") or "").strip() or hostname
                 if not hostname:
+                    continue
+                if not _VALID_HOSTNAME_RE.fullmatch(hostname):
+                    yield sse("error", f"[ERROR] Invalid hostname: {hostname!r}")
+                    continue
+                if fqdn != hostname and not _VALID_HOSTNAME_RE.fullmatch(fqdn):
+                    yield sse("error", f"[ERROR] Invalid FQDN: {fqdn!r}")
                     continue
 
                 short_name = hostname.split(".")[0]
