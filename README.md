@@ -14,7 +14,7 @@ Download the package from the [GitHub Releases page](https://github.com/cdmaesta
 
 **RHEL / CentOS / Fedora:**
 ```bash
-sudo dnf install ./scale-guinstall-<version>-1.noarch.rpm
+sudo dnf install --nogpgcheck ./scale-guinstall-<version>-1.noarch.rpm
 ```
 
 > **RHEL 8/9 note:** Python 3.10+ may need to come from AppStream before installing:

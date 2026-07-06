@@ -42,7 +42,7 @@ body += f"""
 
 **RHEL / CentOS / Fedora:**
 ```bash
-sudo dnf install ./{rpm_name}
+sudo dnf install --nogpgcheck ./{rpm_name}
 ```
 
 **Debian / Ubuntu:**
