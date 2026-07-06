@@ -11,6 +11,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.6] — 2026-07-06
+
+### Added
+- Probe installer node network interfaces on Prepare page load via `/api/probe/interfaces`
+- Detected IPs shown as clickable chips below the IP input in Step 4; single-IP nodes auto-fill the field
+- Release install instructions clarified: download `RPM-GPG-KEY-scale-guinstall` alongside the RPM before importing (works air-gapped)
+
+---
+
 ## [1.0.5] — 2026-07-06
 
 ### Added
