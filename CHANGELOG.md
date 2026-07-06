@@ -11,6 +11,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.5] — 2026-07-06
+
+### Added
+- Probe /usr/lpp/mmfs on Prepare page load to detect installed IBM Storage Scale versions
+- Detection banner shows a version selector (all detected x.y.z.w directories) and an editable toolkit path override for versions not yet extracted
+- "Apply & skip to Step 4" sets the global toolkit path, updates the Step 4 setup command preview, and scrolls Step 4 into view
+- Steps 1–3 can be skipped when Scale is already installed
+
+---
+
 ## [1.0.4] — 2026-07-06
 
 ### Added
