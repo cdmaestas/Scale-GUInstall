@@ -140,6 +140,32 @@ def ping():
 
 
 # ---------------------------------------------------------------------------
+# Network interface probe
+# ---------------------------------------------------------------------------
+
+@app.route("/api/probe/interfaces")
+def probe_interfaces():
+    """Return non-loopback IPv4 addresses visible on this installer node."""
+    try:
+        result = subprocess.run(
+            ["ip", "-4", "-o", "addr", "show", "scope", "global"],
+            capture_output=True, text=True, timeout=5
+        )
+        addresses = []
+        for line in result.stdout.splitlines():
+            ip_m = re.search(r"inet (\d+\.\d+\.\d+\.\d+)", line)
+            iface_m = re.search(r"^\d+:\s+(\S+)", line)
+            if ip_m:
+                addresses.append({
+                    "ip": ip_m.group(1),
+                    "interface": iface_m.group(1) if iface_m else "?",
+                })
+        return jsonify({"ok": True, "addresses": addresses})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc), "addresses": []})
+
+
+# ---------------------------------------------------------------------------
 # File existence check
 # ---------------------------------------------------------------------------
 
@@ -478,18 +504,27 @@ def stream_checkpython():
 def stream_setup():
     directory, _dir_err = resolve_path(request.args.get("dir", "").strip())
     server_ip  = request.args.get("ip", "").strip()
+    bin_override = request.args.get("bin", "").strip()
 
     def generate():
         try:
-            if _dir_err:
-                yield sse("error", f"[ERROR] Invalid working directory: {_dir_err}")
-                return
-
             if not server_ip:
                 yield sse("error", "[ERROR] No server IP address provided.")
                 return
 
-            spectrumscale_bin = os.path.join(directory, "ansible-toolkit", "spectrumscale")
+            if bin_override:
+                # Caller supplied the full path — validate it directly
+                bin_path, bin_err = resolve_path(bin_override)
+                if bin_err:
+                    yield sse("error", f"[ERROR] Invalid toolkit path: {bin_err}")
+                    return
+                spectrumscale_bin = bin_path
+            else:
+                if _dir_err:
+                    yield sse("error", f"[ERROR] Invalid working directory: {_dir_err}")
+                    return
+                spectrumscale_bin = os.path.join(directory, "ansible-toolkit", "spectrumscale")
+
             if not os.path.isfile(spectrumscale_bin):
                 yield sse("error", f"[ERROR] spectrumscale not found at: {spectrumscale_bin}")
                 yield sse("error", "[ERROR] Make sure Step 3 (installer) completed successfully.")

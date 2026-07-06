@@ -1032,6 +1032,7 @@
               <div style="margin-bottom:var(--spacing-05)">
                 <label style="display:block; font-size:12px; color:var(--cds-text-secondary); margin-bottom:var(--spacing-02)">Installer Node IP Address</label>
                 <input type="text" class="path-input" id="prepare-server-ip" value="" placeholder="e.g. 192.168.1.10" style="width:100%" oninput="updatePreparePreviews()">
+                <div id="prepare-ip-chips" style="display:none; margin-top:var(--spacing-02); display:flex; gap:6px; flex-wrap:wrap; align-items:center"></div>
               </div>
               <div class="btn-group">
                 <button class="btn btn-secondary" onclick="runPrepare('checkpython', this)">
@@ -3557,6 +3558,36 @@ async function probeMmfs() {
   }
 }
 
+async function probeInterfaces() {
+  try {
+    const res = await fetch(getBackendUrl() + '/api/probe/interfaces', { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.ok || !data.addresses?.length) return;
+
+    const chipsEl = document.getElementById('prepare-ip-chips');
+    if (!chipsEl) return;
+
+    // Auto-fill if only one IP and field is empty
+    const ipInput = document.getElementById('prepare-server-ip');
+    if (data.addresses.length === 1 && !ipInput.value.trim()) {
+      ipInput.value = data.addresses[0].ip;
+      updatePreparePreviews();
+    }
+
+    // Render chips for all detected IPs
+    chipsEl.innerHTML = '<span style="font-size:11px; color:var(--cds-text-secondary)">Detected:</span>' +
+      data.addresses.map(a =>
+        `<button type="button" onclick="document.getElementById('prepare-server-ip').value='${h(a.ip)}'; updatePreparePreviews()" ` +
+        `style="font-size:11px; padding:2px 8px; border:1px solid var(--cds-border-subtle-01); border-radius:12px; background:var(--cds-layer-02); color:var(--cds-text-primary); cursor:pointer; font-family:var(--font-mono)"` +
+        `title="${h(a.interface)}">${h(a.ip)}</button>`
+      ).join('');
+    chipsEl.style.display = 'flex';
+  } catch {
+    // silently skip if backend not reachable
+  }
+}
+
 function onMmfsVersionChange() {
   const ver = document.getElementById('mmfs-version-select')?.value;
   if (ver) document.getElementById('mmfs-toolkit-override').value = _mmfsToolkitForVersion(ver);
@@ -3609,6 +3640,7 @@ async function checkPrepareBackend() {
       dot.style.background = 'var(--cds-support-success)';
       label.textContent = `Backend server connected — ready to run real commands (${getBackendUrl()})`;
       probeMmfs();
+      probeInterfaces();
     } else {
       throw new Error('non-ok');
     }
@@ -3739,7 +3771,7 @@ async function runPrepare(phase, btn) {
       checkansible: `$ ansible --version | head -1`,
       checklocale:  `$ locale | grep LC_ALL`,
       checkpython: `$ python3 --version`,
-      setup:       `$ sudo ${dir}/ansible-toolkit/spectrumscale setup -s ${ip || 'SERVER_IP'}`,
+      setup:       `$ sudo ${(document.getElementById('mmfs-toolkit-override')?.value.trim() && _mmfsProbeResult?.found) ? document.getElementById('mmfs-toolkit-override').value.trim() : dir + '/ansible-toolkit/spectrumscale'} setup -s ${ip || 'SERVER_IP'}`,
     };
     appendToTerminal(termId, previews[phase] + '  # (dry run)', 'info');
     appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
@@ -3829,7 +3861,13 @@ async function runPrepare(phase, btn) {
       btn.disabled = false;
       return;
     }
-    const url = `${getBackendUrl()}/api/stream/setup?dir=${encodeURIComponent(dir)}&ip=${encodeURIComponent(ip)}`;
+    const mmfsOverride = document.getElementById('mmfs-toolkit-override')?.value.trim();
+    const toolkitBin = (mmfsOverride && _mmfsProbeResult?.found)
+      ? mmfsOverride
+      : '';
+    const params = new URLSearchParams({ dir, ip });
+    if (toolkitBin) params.set('bin', toolkitBin);
+    const url = `${getBackendUrl()}/api/stream/setup?${params}`;
     streamToTerminal(termId, url, () => { btn.disabled = false; });
   }
 }
