@@ -10,10 +10,13 @@ Usage:
 Listens on http://127.0.0.1:5001 (loopback only — not accessible from the network)
 """
 
+import glob
 import json
 import os
 import re
+import shlex
 import subprocess
+import tempfile
 
 from flask import Flask, Response, jsonify, request, stream_with_context
 
@@ -45,6 +48,19 @@ _ALLOWED_GPFS_FLAGS = frozenset({
 })
 
 _VALID_MMCHCONFIG_VALUE_RE = re.compile(r'^[A-Za-z0-9.]+$')
+
+# GPFS filesystem / fileset names: alphanumeric plus . _ -
+_VALID_GPFS_NAME_RE = re.compile(r'^[A-Za-z0-9._-]{1,255}$')
+
+# openssl subject field: printable ASCII, no slash (field delimiter) or null
+_VALID_SUBJ_FIELD_RE = re.compile(r'^[A-Za-z0-9 ._@-]{1,128}$')
+
+# GUI username
+_VALID_GUI_USERNAME_RE = re.compile(r'^[A-Za-z0-9._-]{1,64}$')
+
+_ALLOWED_GUI_ROLES = frozenset({"SecurityAdmin", "SystemAdmin", "CopyAdmin", "DataAccess", "Monitor"})
+
+_ALLOWED_AFM_MODES = frozenset({"ro", "rw", "sw", "iw", "lg"})
 
 
 def resolve_path(path):
@@ -85,9 +101,8 @@ def probe_mmfs():
     Check /usr/lpp/mmfs for installed IBM Storage Scale versions.
     Returns the latest version found and the path to the spectrumscale binary.
     """
-    import re as _re
     base = "/usr/lpp/mmfs"
-    ver_re = _re.compile(r"^(\d+)\.(\d+)\.(\d+)\.(\d+)$")
+    ver_re = re.compile(r"^(\d+)\.(\d+)\.(\d+)\.(\d+)$")
 
     if not os.path.isdir(base):
         return jsonify({"found": False, "reason": f"{base} does not exist"})
@@ -405,8 +420,6 @@ def find_compliant_python():
 
     Returns (major, minor, version_str, binary_path) or None.
     """
-    import glob
-
     search_dirs = ["/usr/bin", "/usr/local/bin", "/opt/rh/rh-python*/root/usr/bin",
                    "/opt/rh/python*/root/usr/bin"]
     candidates = []
@@ -510,6 +523,9 @@ def stream_setup():
         try:
             if not server_ip:
                 yield sse("error", "[ERROR] No server IP address provided.")
+                return
+            if not _VALID_HOSTNAME_RE.fullmatch(server_ip):
+                yield sse("error", f"[ERROR] Invalid IP/hostname: {server_ip!r}")
                 return
 
             if bin_override:
@@ -979,6 +995,9 @@ def stream_populate():
             if not node:
                 yield sse("error", "[ERROR] Node is required.")
                 return
+            if not _VALID_HOSTNAME_RE.fullmatch(node):
+                yield sse("error", f"[ERROR] Invalid node hostname: {node!r}")
+                return
             cmd = ["sudo", toolkit, "config", "populate", "-N", node]
             if skip_ssh:
                 cmd += ["--skip", "ssh"]
@@ -999,6 +1018,56 @@ def stream_populate():
 
 
 # ---------------------------------------------------------------------------
+# Shared helpers for callhome / perfmon / fileaudit (used by both individual
+# endpoints and apply-cluster-config)
+# ---------------------------------------------------------------------------
+
+def _gen_callhome(toolkit, enable):
+    action = "enable" if enable else "disable"
+    cmd = ["sudo", toolkit, "callhome", action]
+    yield sse("info", f"$ {' '.join(cmd)}")
+    rc = yield from stream_process(cmd)
+    if rc == 0:
+        yield sse("success", f"[OK] Call Home {action}d.")
+    else:
+        yield sse("error", f"[ERROR] callhome {action} exited with code {rc}.")
+
+
+def _gen_perfmon(toolkit, enable, node=""):
+    if node and not (node == "all" or _VALID_HOSTNAME_RE.fullmatch(node)):
+        yield sse("error", f"[ERROR] Invalid perfmon node: {node!r}")
+        return
+    pm_flag = "on" if enable else "off"
+    cmd = ["sudo", toolkit, "config", "perfmon", "-r", pm_flag]
+    if node:
+        cmd += ["-N", node]
+    yield sse("info", f"$ {' '.join(cmd)}")
+    rc = yield from stream_process(cmd)
+    if rc == 0:
+        yield sse("success", f"[OK] Performance monitoring {pm_flag}.")
+    else:
+        yield sse("error", f"[ERROR] config perfmon exited with code {rc}.")
+
+
+def _gen_fileaudit(toolkit, enable, logfs=""):
+    if logfs and not _VALID_GPFS_NAME_RE.fullmatch(logfs):
+        yield sse("error", f"[ERROR] Invalid log filesystem name: {logfs!r}")
+        return
+    if enable:
+        cmd = ["sudo", toolkit, "fileauditlogging", "enable"]
+        if logfs:
+            cmd += ["--log-fileset", logfs]
+    else:
+        cmd = ["sudo", toolkit, "fileauditlogging", "disable"]
+    yield sse("info", f"$ {' '.join(cmd)}")
+    rc = yield from stream_process(cmd)
+    if rc == 0:
+        yield sse("success", f"[OK] File audit logging {'enabled' if enable else 'disabled'}.")
+    else:
+        yield sse("error", f"[ERROR] fileauditlogging exited with code {rc}.")
+
+
+# ---------------------------------------------------------------------------
 # Call Home enable / disable
 # ---------------------------------------------------------------------------
 
@@ -1012,14 +1081,7 @@ def stream_callhome():
             if _tk_err or not os.path.isfile(toolkit):
                 yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
                 return
-            action = "enable" if enable else "disable"
-            cmd = ["sudo", toolkit, "callhome", action]
-            yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd)
-            if rc == 0:
-                yield sse("success", f"[OK] Call Home {action}d.")
-            else:
-                yield sse("error", f"[ERROR] callhome {action} exited with code {rc}.")
+            yield from _gen_callhome(toolkit, enable)
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
         finally:
@@ -1035,20 +1097,14 @@ def stream_callhome():
 @app.route("/api/stream/perfmon")
 def stream_perfmon():
     toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
-    enable    = request.args.get("enable", "false").lower() in ("true", "1", "yes")
+    enable  = request.args.get("enable", "false").lower() in ("true", "1", "yes")
 
     def generate():
         try:
             if _tk_err or not os.path.isfile(toolkit):
                 yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
                 return
-            cmd = ["sudo", toolkit, "config", "perfmon", "-r", "on" if enable else "off"]
-            yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd)
-            if rc == 0:
-                yield sse("success", f"[OK] Performance monitoring {'enabled' if enable else 'disabled'}.")
-            else:
-                yield sse("error", f"[ERROR] config perfmon exited with code {rc}.")
+            yield from _gen_perfmon(toolkit, enable)
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
         finally:
@@ -1072,18 +1128,7 @@ def stream_fileaudit():
             if _tk_err or not os.path.isfile(toolkit):
                 yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
                 return
-            if enable:
-                cmd = ["sudo", toolkit, "fileauditlogging", "enable"]
-                if logfs:
-                    cmd += ["--log-fileset", logfs]
-            else:
-                cmd = ["sudo", toolkit, "fileauditlogging", "disable"]
-            yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd)
-            if rc == 0:
-                yield sse("success", f"[OK] File audit logging {'enabled' if enable else 'disabled'}.")
-            else:
-                yield sse("error", f"[ERROR] fileauditlogging exited with code {rc}.")
+            yield from _gen_fileaudit(toolkit, enable, logfs)
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
         finally:
@@ -1136,40 +1181,13 @@ def stream_apply_cluster_config():
                     yield sse("error", f"[ERROR] config gpfs {flag} exited with code {rc}.")
 
             # callhome
-            ch_action = "enable" if callhome_on else "disable"
-            cmd = ["sudo", toolkit, "callhome", ch_action]
-            yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd)
-            if rc == 0:
-                yield sse("success", f"[OK] Call Home {ch_action}d.")
-            else:
-                yield sse("error", f"[ERROR] callhome {ch_action} exited with code {rc}.")
+            yield from _gen_callhome(toolkit, callhome_on)
 
             # perfmon
-            pm_flag = "on" if perfmon_on else "off"
-            cmd = ["sudo", toolkit, "config", "perfmon", "-r", pm_flag]
-            if perfmon_node:
-                cmd += ["-N", perfmon_node]
-            yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd)
-            if rc == 0:
-                yield sse("success", f"[OK] Performance monitoring {pm_flag}.")
-            else:
-                yield sse("error", f"[ERROR] config perfmon exited with code {rc}.")
+            yield from _gen_perfmon(toolkit, perfmon_on, perfmon_node)
 
             # fileaudit
-            if fileaudit_on:
-                cmd = ["sudo", toolkit, "fileauditlogging", "enable"]
-                if fileaudit_fs:
-                    cmd += ["--log-fileset", fileaudit_fs]
-            else:
-                cmd = ["sudo", toolkit, "fileauditlogging", "disable"]
-            yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd)
-            if rc == 0:
-                yield sse("success", f"[OK] File audit logging {'enabled' if fileaudit_on else 'disabled'}.")
-            else:
-                yield sse("error", f"[ERROR] fileauditlogging exited with code {rc}.")
+            yield from _gen_fileaudit(toolkit, fileaudit_on, fileaudit_fs)
 
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
@@ -1226,7 +1244,6 @@ def stream_profiled():
                 return
 
             profile_content = f"export PATH=$PATH:{binpath}\n"
-            import tempfile, shutil
             with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as tf:
                 tf.write(profile_content)
                 tmp_path = tf.name
@@ -1235,7 +1252,7 @@ def stream_profiled():
             cmd = ["sudo", "cp", tmp_path, dest]
             yield sse("info", f"$ sudo cp <tmpfile> {dest}  # content: export PATH=$PATH:{binpath}")
             rc = yield from stream_process(cmd)
-            __import__("os").unlink(tmp_path)
+            os.unlink(tmp_path)
 
             if rc == 0:
                 chmod_cmd = ["sudo", "chmod", "644", dest]
@@ -1265,6 +1282,12 @@ def stream_guiuser():
         try:
             if not username or not password:
                 yield sse("error", "[ERROR] Username and password are required.")
+                return
+            if not _VALID_GUI_USERNAME_RE.fullmatch(username):
+                yield sse("error", f"[ERROR] Invalid username: {username!r}")
+                return
+            if role not in _ALLOWED_GUI_ROLES:
+                yield sse("error", f"[ERROR] Invalid role '{role}'. Must be one of: {', '.join(sorted(_ALLOWED_GUI_ROLES))}.")
                 return
             gui_cli = "/usr/lpp/mmfs/gui/cli/mkuser"
             cmd = ["sudo", gui_cli, username, "-g", role, "-p", password]
@@ -1322,6 +1345,9 @@ def stream_healthinterval():
             if interval not in valid:
                 yield sse("error", f"[ERROR] Invalid interval '{interval}'. Must be one of: {', '.join(sorted(valid))}.")
                 return
+            if nodes != "all" and not _VALID_HOSTNAME_RE.fullmatch(nodes):
+                yield sse("error", f"[ERROR] Invalid nodes value: {nodes!r}")
+                return
             cmd = ["sudo", "mmhealth", "config", "interval", interval, "-N", nodes]
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd)
@@ -1352,6 +1378,18 @@ def stream_afmgateway():
         try:
             if not fs or not fileset or not node:
                 yield sse("error", "[ERROR] Filesystem, fileset, and gateway node are required.")
+                return
+            if not _VALID_GPFS_NAME_RE.fullmatch(fs):
+                yield sse("error", f"[ERROR] Invalid filesystem name: {fs!r}")
+                return
+            if not _VALID_GPFS_NAME_RE.fullmatch(fileset):
+                yield sse("error", f"[ERROR] Invalid fileset name: {fileset!r}")
+                return
+            if not _VALID_HOSTNAME_RE.fullmatch(node):
+                yield sse("error", f"[ERROR] Invalid gateway node: {node!r}")
+                return
+            if mode not in _ALLOWED_AFM_MODES:
+                yield sse("error", f"[ERROR] Invalid AFM mode '{mode}'. Must be one of: {', '.join(sorted(_ALLOWED_AFM_MODES))}.")
                 return
 
             # Step 1: create the fileset
@@ -1422,8 +1460,7 @@ PHASE_CMDS = {
     "postcheck-deploy":  ["deploy", "--postcheck"],
 }
 
-_SKIP_SSH_PHASES = {"precheck-install", "install", "postcheck-install",
-                    "precheck-deploy", "deploy", "postcheck-deploy"}
+_SKIP_SSH_PHASES = {p for p in PHASE_CMDS if "install" in p or "deploy" in p}
 
 @app.route("/api/stream/phase")
 def stream_phase():
@@ -1611,11 +1648,25 @@ def stream_node_identity():
         days = 10000
     nodes        = body.get("nodes", [])
     ssh_user     = body.get("ssh_user", "root").strip() or "root"
+    # Validate early — before the generator runs
+    _ni_errors = []
+    if not _VALID_SUBJ_FIELD_RE.fullmatch(org_name):
+        _ni_errors.append(f"Invalid org name: {org_name!r}")
+    if not _VALID_SUBJ_FIELD_RE.fullmatch(ca_cn):
+        _ni_errors.append(f"Invalid CA CN: {ca_cn!r}")
+    if cluster_name and not _VALID_SUBJ_FIELD_RE.fullmatch(cluster_name):
+        _ni_errors.append(f"Invalid cluster name: {cluster_name!r}")
+    if not re.fullmatch(r'^[A-Za-z0-9._-]{1,64}$', ssh_user):
+        _ni_errors.append(f"Invalid SSH user: {ssh_user!r}")
     import_ssh   = bool(body.get("import_via_ssh", False))
     add_trust    = bool(body.get("add_trust", False))
 
     def generate():
         try:
+            if _ni_errors:
+                for err in _ni_errors:
+                    yield sse("error", f"[ERROR] {err}")
+                return
             tls_dir = os.path.expanduser(tls_dir_raw)
             resolved = os.path.abspath(tls_dir)
             if not any(resolved.startswith(r) for r in _ALLOWED_ROOTS):
@@ -1753,12 +1804,16 @@ def stream_node_identity():
                         rc = yield from stream_process(cmd)
                         if rc != 0:
                             yield sse("error", f"[ERROR] SCP failed for {fname} to {hostname}.")
+                    q_dir  = shlex.quote(tls_dir)
+                    q_pem  = shlex.quote(f"{tls_dir}/{hostname}.pem")
+                    q_key  = shlex.quote(f"{tls_dir}/{hostname}.key")
+                    q_ca   = shlex.quote(f"{tls_dir}/ca.crt")
                     remote_cmd = (
-                        f"mkdir -p {tls_dir} && "
+                        f"mkdir -p {q_dir} && "
                         f"scalectl node config set "
-                        f"--cert {tls_dir}/{hostname}.pem "
-                        f"--key {tls_dir}/{hostname}.key "
-                        f"--chain {tls_dir}/ca.crt"
+                        f"--cert {q_pem} "
+                        f"--key {q_key} "
+                        f"--chain {q_ca}"
                     )
                     cmd = ["ssh", f"{ssh_user}@{hostname}", remote_cmd]
                     yield sse("info", f"$ {' '.join(cmd)}")
