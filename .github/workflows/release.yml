@@ -47,25 +47,22 @@ jobs:
           KEY_ID=$(gpg --list-secret-keys --keyid-format LONG 2>/dev/null \
             | grep "^sec" | head -1 | awk '{print $2}' | cut -d'/' -f2)
           echo "GPG_KEY_ID=$KEY_ID" >> "$GITHUB_ENV"
-          # Configure rpmmacros so rpmsign knows which key to use
-          cat > ~/.rpmmacros << RPMMACROS
-          %_gpg_name $KEY_ID
-          %_gpg_path $HOME/.gnupg
-          %__gpg /usr/bin/gpg
-          RPMMACROS
+          # Allow loopback pinentry so gpg doesn't prompt in CI
+          mkdir -p ~/.gnupg
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          gpgconf --kill gpg-agent
+          # rpmmacros: use --batch and skip passphrase prompt (key has no passphrase)
+          printf '%%_gpg_name %s\n%%__gpg /usr/bin/gpg\n%%__gpg_sign_cmd %%{__gpg} gpg --batch --no-verbose --no-armor --no-secmem-warning -u "%%{_gpg_name}" -sbo %%{__signature_filename} --digest-algo sha256 %%{__plaintext_filename}\n' "$KEY_ID" > ~/.rpmmacros
 
       - name: Sign RPM
         run: |
-          sudo apt-get install -y rpm-common
           for rpm in dist/*.rpm; do
-            echo "${{ secrets.GPG_PASSPHRASE }}" | \
-              rpmsign --addsign --passphrase-fd 0 "$rpm"
+            rpmsign --addsign "$rpm"
             echo "Signed: $rpm"
           done
 
       - name: Verify RPM signature
         run: |
-          gpg --armor --export "$GPG_KEY_ID" | sudo tee /etc/apt/trusted.gpg.d/scale-guinstall.asc > /dev/null
           rpm --import packaging/RPM-GPG-KEY-scale-guinstall
           for rpm in dist/*.rpm; do
             rpm --checksig "$rpm" && echo "OK: $rpm signature valid"
@@ -91,3 +88,15 @@ jobs:
             packaging/RPM-GPG-KEY-scale-guinstall
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
+
+      - name: Delete old releases (keep newest 3)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # List all releases sorted newest-first, skip the first 3, delete the rest
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[3:] | .[].tagName' \
+          | while read -r tag; do
+              echo "Deleting release $tag"
+              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+            done
