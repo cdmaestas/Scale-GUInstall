@@ -42,7 +42,10 @@ body += f"""
 
 **RHEL / CentOS / Fedora:**
 ```bash
-sudo dnf install --nogpgcheck ./{rpm_name}
+# Import the signing key once
+sudo rpm --import RPM-GPG-KEY-scale-guinstall
+# Install
+sudo dnf install ./{rpm_name}
 ```
 
 **Debian / Ubuntu:**
