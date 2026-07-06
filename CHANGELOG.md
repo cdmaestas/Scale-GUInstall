@@ -11,6 +11,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.3] — 2026-07-06
+
+### Fixed
+- Opening `http://127.0.0.1:5001` over an SSH tunnel now serves the app directly — Flask was returning 404 because no `/` route existed; the HTML had to be opened locally as a `file://` URL
+- Backend URL auto-detects from `window.location.origin` when the page is served over HTTP, so no manual configuration is needed
+
+### Added
+- TLS-based node identity setup panel in Install & Deploy Step 2: generates a self-signed CA and per-node X.509 certificates using EC keys (`openssl ecparam prime256v1`), signs with Subject Alternative Names, and imports via `scalectl node config set --cert --key --chain`; optional SSH distribution and system trust store registration
+
+---
+
 ## [1.0.2] — 2026-07-03
 
 ### Added
