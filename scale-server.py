@@ -107,12 +107,16 @@ def probe_mmfs():
     versions.sort(key=lambda x: x[0], reverse=True)
     latest_tuple, latest_str = versions[0]
 
-    # Look for spectrumscale binary in the version directory
-    candidates = [
-        os.path.join(base, latest_str, "installer", "spectrumscale"),
-        os.path.join(base, latest_str, "ansible-toolkit", "spectrumscale"),
-    ]
-    toolkit_path = next((p for p in candidates if os.path.isfile(p)), None)
+    # Look for spectrumscale binary under ansible-toolkit/
+    toolkit_path = os.path.join(base, latest_str, "ansible-toolkit", "spectrumscale")
+    if not os.path.isfile(toolkit_path):
+        toolkit_path = None
+
+    # Build per-version toolkit map for all detected versions
+    version_map = {}
+    for _, vstr in versions:
+        tp = os.path.join(base, vstr, "ansible-toolkit", "spectrumscale")
+        version_map[vstr] = tp if os.path.isfile(tp) else None
 
     all_versions = [v for _, v in sorted(versions, key=lambda x: x[0], reverse=True)]
 
@@ -120,6 +124,7 @@ def probe_mmfs():
         "found": True,
         "version": latest_str,
         "all_versions": all_versions,
+        "version_map": version_map,
         "toolkit_path": toolkit_path,
         "base": base,
     })
