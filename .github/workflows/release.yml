@@ -41,6 +41,36 @@ jobs:
       - name: Build RPM and DEB
         run: ./packaging/build-pkg.sh
 
+      - name: Import GPG signing key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          KEY_ID=$(gpg --list-secret-keys --keyid-format LONG 2>/dev/null \
+            | grep "^sec" | head -1 | awk '{print $2}' | cut -d'/' -f2)
+          echo "GPG_KEY_ID=$KEY_ID" >> "$GITHUB_ENV"
+          # Configure rpmmacros so rpmsign knows which key to use
+          cat > ~/.rpmmacros << RPMMACROS
+          %_gpg_name $KEY_ID
+          %_gpg_path $HOME/.gnupg
+          %__gpg /usr/bin/gpg
+          RPMMACROS
+
+      - name: Sign RPM
+        run: |
+          sudo apt-get install -y rpm-common
+          for rpm in dist/*.rpm; do
+            echo "${{ secrets.GPG_PASSPHRASE }}" | \
+              rpmsign --addsign --passphrase-fd 0 "$rpm"
+            echo "Signed: $rpm"
+          done
+
+      - name: Verify RPM signature
+        run: |
+          gpg --armor --export "$GPG_KEY_ID" | sudo tee /etc/apt/trusted.gpg.d/scale-guinstall.asc > /dev/null
+          rpm --import packaging/RPM-GPG-KEY-scale-guinstall
+          for rpm in dist/*.rpm; do
+            rpm --checksig "$rpm" && echo "OK: $rpm signature valid"
+          done
+
       - name: List artifacts
         run: ls -lh dist/
 
@@ -58,5 +88,6 @@ jobs:
             dist/*.rpm
             dist/*.deb
             Scale-GUInstall.html
+            packaging/RPM-GPG-KEY-scale-guinstall
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}

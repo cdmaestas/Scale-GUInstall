@@ -14,7 +14,10 @@ Download the package from the [GitHub Releases page](https://github.com/cdmaesta
 
 **RHEL / CentOS / Fedora:**
 ```bash
-sudo dnf install --nogpgcheck ./scale-guinstall-<version>-1.noarch.rpm
+# Import the signing key once
+sudo rpm --import RPM-GPG-KEY-scale-guinstall
+# Install
+sudo dnf install ./scale-guinstall-<version>-1.noarch.rpm
 ```
 
 > **RHEL 8/9 note:** Python 3.10+ may need to come from AppStream before installing:
