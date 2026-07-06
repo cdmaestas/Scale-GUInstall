@@ -11,6 +11,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.4] — 2026-07-06
+
+### Added
+- RPM packages are now GPG-signed (RSA-4096); public key distributed as `RPM-GPG-KEY-scale-guinstall` in each release
+- Install instructions updated to `rpm --import` the signing key — no more `--nogpgcheck` needed
+
+---
+
 ## [1.0.3] — 2026-07-06
 
 ### Fixed
