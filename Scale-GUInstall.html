@@ -3458,7 +3458,13 @@ function clearChecksTerminal() {
 // ===== PREPARE SOFTWARE =====
 function getBackendUrl() {
   const el = document.getElementById('prepare-backend-url');
-  return (el ? el.value.trim().replace(/\/$/, '') : 'http://127.0.0.1:5001');
+  const stored = el ? el.value.trim().replace(/\/$/, '') : '';
+  if (stored) return stored;
+  // When served directly from the Flask server, use the same origin
+  if (location.protocol === 'http:' || location.protocol === 'https:') {
+    return location.origin;
+  }
+  return 'http://127.0.0.1:5001';
 }
 
 function updatePreparePreviews() {
