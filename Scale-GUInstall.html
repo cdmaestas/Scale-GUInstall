@@ -898,6 +898,18 @@
         <button class="btn btn-sm btn-secondary" onclick="checkPrepareBackend()">Connect</button>
       </div>
 
+      <!-- Scale already installed banner (shown by probeMmfs()) -->
+      <div id="mmfs-detected-banner" style="display:none; align-items:flex-start; gap:var(--spacing-04); padding:12px var(--spacing-05); margin-bottom:var(--spacing-05); border:1px solid rgba(66,190,101,0.45); background:rgba(66,190,101,0.08); font-size:13px">
+        <svg width="16" height="16" viewBox="0 0 32 32" fill="var(--cds-support-success)" style="flex-shrink:0; margin-top:1px"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm-1 19.59l-5-5L11.41 15 15 18.59l8.59-8.6L25 11.41z"/></svg>
+        <div style="flex:1">
+          <span id="mmfs-detected-msg" style="font-weight:600; color:var(--cds-support-success)">IBM Storage Scale detected</span>
+          <span id="mmfs-detected-detail" style="color:var(--cds-text-secondary); margin-left:var(--spacing-03)"></span>
+          <div style="margin-top:var(--spacing-03); display:flex; gap:var(--spacing-03); flex-wrap:wrap">
+            <button class="btn btn-sm btn-secondary" onclick="applyMmfsDetected()">Apply detected paths &amp; skip to Step 3</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Shared working directory -->
       <div class="panel" style="margin-bottom:var(--spacing-05)">
         <div class="panel-body" style="display:flex; align-items:center; gap:var(--spacing-05); flex-wrap:wrap">
@@ -978,7 +990,7 @@
           </div>
 
           <!-- Step 3 -->
-          <div class="panel" style="margin-bottom:var(--spacing-05)">
+          <div class="panel" style="margin-bottom:var(--spacing-05)" data-step="3">
             <div class="panel-header"><div><h3>Step 3: Run Installer</h3></div></div>
             <div class="panel-body">
               <p style="color:var(--cds-text-secondary); margin-bottom:var(--spacing-05); font-size:13px">Run the self-extracting installer into the working directory. The installer script is auto-detected after extraction.</p>
@@ -3495,6 +3507,69 @@ function clearPrepareTerminal() {
     '<div class="terminal-line muted"># Terminal cleared</div><div class="terminal-line normal terminal-cursor"></div>';
 }
 
+// ===== MMFS VERSION PROBE =====
+let _mmfsProbeResult = null;
+
+async function probeMmfs() {
+  const banner = document.getElementById('mmfs-detected-banner');
+  if (!banner) return;
+  try {
+    const res = await fetch(getBackendUrl() + '/api/probe/mmfs', { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return;
+    const data = await res.json();
+    _mmfsProbeResult = data;
+    if (!data.found) return;
+
+    const detail = document.getElementById('mmfs-detected-detail');
+    const versions = data.all_versions || [data.version];
+    detail.textContent = versions.length > 1
+      ? `Version ${data.version} (also found: ${versions.slice(1).join(', ')}) — Steps 1–2 can be skipped.`
+      : `Version ${data.version} — Steps 1–2 can be skipped.`;
+    banner.style.display = 'flex';
+  } catch {
+    // backend not up yet — silently skip
+  }
+}
+
+function applyMmfsDetected() {
+  if (!_mmfsProbeResult?.found) return;
+  const { version, toolkit_path, base } = _mmfsProbeResult;
+
+  // Prefill Step 3 installer path — the installer lives next to the toolkit binary
+  const installerDir = toolkit_path
+    ? toolkit_path.replace(/\/spectrumscale$/, '')
+    : `${base}/${version}/installer`;
+  // The installer script is the <version>-install file in the working dir;
+  // but if Scale is already installed, the toolkit IS the spectrumscale binary.
+  // Point the installer path field at the toolkit so Step 3 can be skipped.
+  const installerEl = document.getElementById('prepare-installer-path');
+  if (installerEl && toolkit_path) {
+    installerEl.value = toolkit_path;
+    installerEl.dispatchEvent(new Event('input'));
+  }
+
+  // Update the global toolkit path
+  const tkEl = document.getElementById('toolkit-path');
+  const settingsTkEl = document.getElementById('settings-toolkit-path');
+  if (toolkit_path) {
+    if (tkEl) tkEl.value = toolkit_path;
+    if (settingsTkEl) settingsTkEl.value = toolkit_path;
+    state.toolkitPath = toolkit_path;
+    updateAllPreviews();
+  }
+
+  // Scroll Step 3 into view
+  document.querySelector('[data-step="3"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const banner = document.getElementById('mmfs-detected-banner');
+  if (banner) {
+    banner.style.borderColor = 'rgba(69,137,255,0.45)';
+    banner.style.background = 'rgba(69,137,255,0.08)';
+    const msg = document.getElementById('mmfs-detected-msg');
+    if (msg) { msg.style.color = 'var(--cds-link-primary)'; msg.textContent = `Applied — toolkit path set to ${toolkit_path || installerDir}`; }
+  }
+}
+
 async function checkPrepareBackend() {
   const dot   = document.getElementById('prepare-backend-dot');
   const label = document.getElementById('prepare-backend-label');
@@ -3505,6 +3580,7 @@ async function checkPrepareBackend() {
     if (res.ok) {
       dot.style.background = 'var(--cds-support-success)';
       label.textContent = `Backend server connected — ready to run real commands (${getBackendUrl()})`;
+      probeMmfs();
     } else {
       throw new Error('non-ok');
     }

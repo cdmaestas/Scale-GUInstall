@@ -76,6 +76,56 @@ def index():
 
 
 # ---------------------------------------------------------------------------
+# Probe installed Scale version under /usr/lpp/mmfs
+# ---------------------------------------------------------------------------
+
+@app.route("/api/probe/mmfs")
+def probe_mmfs():
+    """
+    Check /usr/lpp/mmfs for installed IBM Storage Scale versions.
+    Returns the latest version found and the path to the spectrumscale binary.
+    """
+    import re as _re
+    base = "/usr/lpp/mmfs"
+    ver_re = _re.compile(r"^(\d+)\.(\d+)\.(\d+)\.(\d+)$")
+
+    if not os.path.isdir(base):
+        return jsonify({"found": False, "reason": f"{base} does not exist"})
+
+    versions = []
+    try:
+        for entry in os.listdir(base):
+            m = ver_re.match(entry)
+            if m:
+                versions.append((tuple(int(x) for x in m.groups()), entry))
+    except OSError as exc:
+        return jsonify({"found": False, "reason": str(exc)})
+
+    if not versions:
+        return jsonify({"found": False, "reason": f"No version directories found in {base}"})
+
+    versions.sort(key=lambda x: x[0], reverse=True)
+    latest_tuple, latest_str = versions[0]
+
+    # Look for spectrumscale binary in the version directory
+    candidates = [
+        os.path.join(base, latest_str, "installer", "spectrumscale"),
+        os.path.join(base, latest_str, "ansible-toolkit", "spectrumscale"),
+    ]
+    toolkit_path = next((p for p in candidates if os.path.isfile(p)), None)
+
+    all_versions = [v for _, v in sorted(versions, key=lambda x: x[0], reverse=True)]
+
+    return jsonify({
+        "found": True,
+        "version": latest_str,
+        "all_versions": all_versions,
+        "toolkit_path": toolkit_path,
+        "base": base,
+    })
+
+
+# ---------------------------------------------------------------------------
 # Health check
 # ---------------------------------------------------------------------------
 
