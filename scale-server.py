@@ -61,6 +61,21 @@ def resolve_path(path):
 
 
 # ---------------------------------------------------------------------------
+# Serve the frontend HTML
+# ---------------------------------------------------------------------------
+
+@app.route("/")
+def index():
+    """Serve Scale-GUInstall.html from the same directory as this script."""
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Scale-GUInstall.html")
+    if not os.path.isfile(html_path):
+        return "Scale-GUInstall.html not found next to scale-server.py", 404
+    with open(html_path, encoding="utf-8") as f:
+        content = f.read()
+    return content, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+# ---------------------------------------------------------------------------
 # Health check
 # ---------------------------------------------------------------------------
 
