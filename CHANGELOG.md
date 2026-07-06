@@ -11,6 +11,28 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.7] — 2026-07-06
+
+### Security
+- Validate `server_ip` against hostname/IP regex before passing to `spectrumscale setup`
+- Validate `node` in `/api/stream/populate` before passing to `spectrumscale config populate -N`
+- Validate `nodes` in `/api/stream/postconfig/healthinterval` — must be `all` or a valid hostname
+- Validate `org_name`, `ca_cn`, `cluster_name` against a safe character set before interpolation into openssl `-subj` string (prevents X.509 field injection via `/`)
+- Shell-quote `tls_dir` and certificate paths in remote SSH command using `shlex.quote` (prevents remote shell injection)
+- Validate `ssh_user` against `[A-Za-z0-9._-]` before constructing `user@host` SSH targets
+- Validate `perfmon_node` and `fileaudit_fs` in both individual endpoints and `apply-cluster-config`
+- Validate `username` against `[A-Za-z0-9._-]` and `role` against an explicit allowlist in `/api/stream/postconfig/guiuser`
+- Validate AFM gateway `fs`, `fileset`, `node`, and `mode` before GPFS commands; `mode` restricted to `{ro, rw, sw, iw, lg}`
+
+### Changed
+- Extract shared `_gen_callhome`, `_gen_perfmon`, `_gen_fileaudit` generator helpers — individual endpoints and `apply-cluster-config` both delegate to them, eliminating duplicated command construction
+- Move `import glob`, `import tempfile` to module top level; remove unused `import shutil`
+- Replace `__import__("os").unlink(...)` with plain `os.unlink(...)`
+- Remove redundant `import re as _re` inside `probe_mmfs` — module-level `re` already available
+- Derive `_SKIP_SSH_PHASES` from `PHASE_CMDS` keys instead of duplicating them
+
+---
+
 ## [1.0.6] — 2026-07-06
 
 ### Added
