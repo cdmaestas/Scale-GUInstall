@@ -900,12 +900,19 @@
 
       <!-- Scale already installed banner (shown by probeMmfs()) -->
       <div id="mmfs-detected-banner" style="display:none; align-items:flex-start; gap:var(--spacing-04); padding:12px var(--spacing-05); margin-bottom:var(--spacing-05); border:1px solid rgba(66,190,101,0.45); background:rgba(66,190,101,0.08); font-size:13px">
-        <svg width="16" height="16" viewBox="0 0 32 32" fill="var(--cds-support-success)" style="flex-shrink:0; margin-top:1px"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm-1 19.59l-5-5L11.41 15 15 18.59l8.59-8.6L25 11.41z"/></svg>
+        <svg width="16" height="16" viewBox="0 0 32 32" fill="var(--cds-support-success)" style="flex-shrink:0; margin-top:2px"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm-1 19.59l-5-5L11.41 15 15 18.59l8.59-8.6L25 11.41z"/></svg>
         <div style="flex:1">
-          <span id="mmfs-detected-msg" style="font-weight:600; color:var(--cds-support-success)">IBM Storage Scale detected</span>
-          <span id="mmfs-detected-detail" style="color:var(--cds-text-secondary); margin-left:var(--spacing-03)"></span>
-          <div style="margin-top:var(--spacing-03); display:flex; gap:var(--spacing-03); flex-wrap:wrap">
-            <button class="btn btn-sm btn-secondary" onclick="applyMmfsDetected()">Apply detected paths &amp; skip to Step 3</button>
+          <span style="font-weight:600; color:var(--cds-support-success)">IBM Storage Scale detected in /usr/lpp/mmfs</span>
+          <span style="color:var(--cds-text-secondary); margin-left:var(--spacing-03); font-size:12px">Steps 1–3 can be skipped.</span>
+          <div style="margin-top:var(--spacing-04); display:grid; grid-template-columns:auto 1fr; gap:var(--spacing-03) var(--spacing-04); align-items:center; max-width:640px">
+            <label style="font-size:12px; color:var(--cds-text-secondary); white-space:nowrap">Detected version</label>
+            <select id="mmfs-version-select" class="form-select" style="height:32px; font-size:12px; font-family:var(--font-mono)" onchange="onMmfsVersionChange()"></select>
+            <label style="font-size:12px; color:var(--cds-text-secondary); white-space:nowrap">Toolkit path</label>
+            <input type="text" id="mmfs-toolkit-override" class="path-input" style="font-size:12px" placeholder="/usr/lpp/mmfs/<version>/ansible-toolkit/spectrumscale">
+          </div>
+          <div style="margin-top:var(--spacing-04); font-size:12px; color:var(--cds-text-secondary)">Override the toolkit path above if you are working with a version that has not yet been extracted.</div>
+          <div style="margin-top:var(--spacing-04)">
+            <button class="btn btn-sm btn-primary" onclick="applyMmfsDetected()">Apply &amp; skip to Step 4</button>
           </div>
         </div>
       </div>
@@ -1011,7 +1018,7 @@
           </div>
 
           <!-- Step 4 -->
-          <div class="panel">
+          <div class="panel" data-step="4">
             <div class="panel-header"><div><h3>Step 4: Setup Installation Service</h3></div></div>
             <div class="panel-body">
               <div style="display:flex; align-items:flex-start; gap:var(--spacing-03); padding:var(--spacing-03) var(--spacing-04); background:rgba(241,194,27,0.08); border:1px solid rgba(241,194,27,0.3); margin-bottom:var(--spacing-04); font-size:12px; color:var(--cds-support-warning)">
@@ -3484,21 +3491,30 @@ function updatePreparePreviews() {
   const dir       = document.getElementById('prepare-work-dir').value       || '/tmp/scale-pkg';
   const installer = document.getElementById('prepare-installer-path').value || `${dir}/Storage_Scale_Developer-x.x.x.x-x86_64-Linux-install`;
   const ip        = document.getElementById('prepare-server-ip').value.trim() || 'SERVER_IP';
-  document.getElementById('prepare-unzip-preview').innerHTML =
-    `<span class="cmd-prompt">$ </span>unzip -o ${zip} -d ${dir}`;
-  document.getElementById('prepare-checksum-preview').innerHTML =
-    `<span class="cmd-prompt">$ </span>cd ${dir} &amp;&amp; md5sum -c *.md5`;
-  document.getElementById('prepare-install-preview').innerHTML =
-    `<span class="cmd-prompt">$ </span>sh ${installer} --dir ${dir} --silent`;
-  document.getElementById('prepare-setup-preview').innerHTML =
-    `<span class="cmd-prompt">$ </span>sudo ${dir}/ansible-toolkit/spectrumscale setup -s ${ip}`;
 
-  // Derive toolkit path from working directory and sync globally
-  const derivedPath = `${dir}/ansible-toolkit/spectrumscale`;
-  state.toolkitPath = derivedPath;
-  document.getElementById('toolkit-path').value = derivedPath;
-  const settingsEl = document.getElementById('settings-toolkit-path');
-  if (settingsEl) settingsEl.value = derivedPath;
+  document.getElementById('prepare-unzip-preview').innerHTML =
+    `<span class="cmd-prompt">$ </span>unzip -o ${h(zip)} -d ${h(dir)}`;
+  document.getElementById('prepare-checksum-preview').innerHTML =
+    `<span class="cmd-prompt">$ </span>cd ${h(dir)} &amp;&amp; md5sum -c *.md5`;
+  document.getElementById('prepare-install-preview').innerHTML =
+    `<span class="cmd-prompt">$ </span>sh ${h(installer)} --dir ${h(dir)} --silent`;
+
+  // Step 4 setup: use the mmfs-detected toolkit if applied, otherwise derive from working dir
+  const mmfsOverride = document.getElementById('mmfs-toolkit-override')?.value.trim();
+  const setupToolkit = (mmfsOverride && _mmfsProbeResult?.found)
+    ? mmfsOverride
+    : `${dir}/ansible-toolkit/spectrumscale`;
+  document.getElementById('prepare-setup-preview').innerHTML =
+    `<div><span class="cmd-prompt">$ </span>sudo ${h(setupToolkit)} setup -s ${h(ip)}</div>`;
+
+  // Only sync toolkit path from working dir when mmfs probe hasn't been applied
+  if (!(_mmfsProbeResult?.found && document.querySelector('[data-step="4"]')?.dataset.mmfsApplied)) {
+    const derivedPath = `${dir}/ansible-toolkit/spectrumscale`;
+    state.toolkitPath = derivedPath;
+    document.getElementById('toolkit-path').value = derivedPath;
+    const settingsEl = document.getElementById('settings-toolkit-path');
+    if (settingsEl) settingsEl.value = derivedPath;
+  }
   updateAllPreviews();
 }
 
@@ -3510,9 +3526,14 @@ function clearPrepareTerminal() {
 // ===== MMFS VERSION PROBE =====
 let _mmfsProbeResult = null;
 
+function _mmfsToolkitForVersion(ver) {
+  const map = _mmfsProbeResult?.version_map || {};
+  // Use probe result if available; otherwise derive canonical path
+  return map[ver] ?? `/usr/lpp/mmfs/${ver}/ansible-toolkit/spectrumscale`;
+}
+
 async function probeMmfs() {
-  const banner = document.getElementById('mmfs-detected-banner');
-  if (!banner) return;
+  if (!document.getElementById('mmfs-detected-banner')) return;
   try {
     const res = await fetch(getBackendUrl() + '/api/probe/mmfs', { signal: AbortSignal.timeout(3000) });
     if (!res.ok) return;
@@ -3520,54 +3541,61 @@ async function probeMmfs() {
     _mmfsProbeResult = data;
     if (!data.found) return;
 
-    const detail = document.getElementById('mmfs-detected-detail');
-    const versions = data.all_versions || [data.version];
-    detail.textContent = versions.length > 1
-      ? `Version ${data.version} (also found: ${versions.slice(1).join(', ')}) — Steps 1–2 can be skipped.`
-      : `Version ${data.version} — Steps 1–2 can be skipped.`;
-    banner.style.display = 'flex';
+    // Populate version selector
+    const sel = document.getElementById('mmfs-version-select');
+    sel.innerHTML = (data.all_versions || [data.version]).map(v => {
+      const hasToolkit = data.version_map?.[v] != null;
+      return `<option value="${h(v)}">${h(v)}${hasToolkit ? '' : ' (toolkit not yet extracted)'}</option>`;
+    }).join('');
+
+    // Prefill override input with the toolkit path for the latest version
+    document.getElementById('mmfs-toolkit-override').value = _mmfsToolkitForVersion(data.version);
+
+    document.getElementById('mmfs-detected-banner').style.display = 'flex';
   } catch {
-    // backend not up yet — silently skip
+    // backend not reachable yet — silently skip
   }
 }
 
+function onMmfsVersionChange() {
+  const ver = document.getElementById('mmfs-version-select')?.value;
+  if (ver) document.getElementById('mmfs-toolkit-override').value = _mmfsToolkitForVersion(ver);
+}
+
 function applyMmfsDetected() {
-  if (!_mmfsProbeResult?.found) return;
-  const { version, toolkit_path, base } = _mmfsProbeResult;
+  const toolkitPath = document.getElementById('mmfs-toolkit-override')?.value.trim();
+  if (!toolkitPath) return;
 
-  // Prefill Step 3 installer path — the installer lives next to the toolkit binary
-  const installerDir = toolkit_path
-    ? toolkit_path.replace(/\/spectrumscale$/, '')
-    : `${base}/${version}/installer`;
-  // The installer script is the <version>-install file in the working dir;
-  // but if Scale is already installed, the toolkit IS the spectrumscale binary.
-  // Point the installer path field at the toolkit so Step 3 can be skipped.
-  const installerEl = document.getElementById('prepare-installer-path');
-  if (installerEl && toolkit_path) {
-    installerEl.value = toolkit_path;
-    installerEl.dispatchEvent(new Event('input'));
+  // Set global toolkit path used by all other pages
+  state.toolkitPath = toolkitPath;
+  document.getElementById('toolkit-path').value = toolkitPath;
+  const settingsEl = document.getElementById('settings-toolkit-path');
+  if (settingsEl) settingsEl.value = toolkitPath;
+
+  // Update Step 4 setup preview to use the detected toolkit path directly
+  // (overrides the working-dir-derived path in updatePreparePreviews)
+  const ip = document.getElementById('prepare-server-ip')?.value.trim() || 'SERVER_IP';
+  const setupEl = document.getElementById('prepare-setup-preview');
+  if (setupEl) {
+    setupEl.innerHTML = `<div><span class="cmd-prompt">$ </span>sudo ${h(toolkitPath)} setup -s ${h(ip)}</div>`;
   }
 
-  // Update the global toolkit path
-  const tkEl = document.getElementById('toolkit-path');
-  const settingsTkEl = document.getElementById('settings-toolkit-path');
-  if (toolkit_path) {
-    if (tkEl) tkEl.value = toolkit_path;
-    if (settingsTkEl) settingsTkEl.value = toolkit_path;
-    state.toolkitPath = toolkit_path;
-    updateAllPreviews();
-  }
+  updateAllPreviews();
 
-  // Scroll Step 3 into view
-  document.querySelector('[data-step="3"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Mark Step 4 so updatePreparePreviews won't clobber the toolkit path
+  const step4 = document.querySelector('[data-step="4"]');
+  if (step4) step4.dataset.mmfsApplied = '1';
 
+  // Scroll Step 4 into view
+  step4?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Update banner to confirmed state
   const banner = document.getElementById('mmfs-detected-banner');
-  if (banner) {
-    banner.style.borderColor = 'rgba(69,137,255,0.45)';
-    banner.style.background = 'rgba(69,137,255,0.08)';
-    const msg = document.getElementById('mmfs-detected-msg');
-    if (msg) { msg.style.color = 'var(--cds-link-primary)'; msg.textContent = `Applied — toolkit path set to ${toolkit_path || installerDir}`; }
-  }
+  banner.style.borderColor = 'rgba(69,137,255,0.45)';
+  banner.style.background  = 'rgba(69,137,255,0.08)';
+  banner.querySelector('svg').setAttribute('fill', 'var(--cds-link-primary)');
+  banner.querySelector('span').style.color = 'var(--cds-link-primary)';
+  banner.querySelector('span').textContent  = `Applied — toolkit path set to ${toolkitPath}`;
 }
 
 async function checkPrepareBackend() {
