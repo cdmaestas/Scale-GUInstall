@@ -42,9 +42,8 @@ body += f"""
 
 **RHEL / CentOS / Fedora:**
 ```bash
-# Import the signing key once
+# Download both files from the release assets, then:
 sudo rpm --import RPM-GPG-KEY-scale-guinstall
-# Install
 sudo dnf install ./{rpm_name}
 ```
 
