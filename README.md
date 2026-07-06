@@ -12,12 +12,16 @@ For production installer nodes, use the pre-built packages instead of running fr
 
 Download the package from the [GitHub Releases page](https://github.com/cdmaestas/Scale-GUInstall/releases) and install it on the installer node:
 
-**RHEL / CentOS / Fedora:**
+**RHEL / CentOS / Fedora — with GPG verification (recommended):**
 ```bash
-# Import the signing key once
+# Download both files from the release assets, then:
 sudo rpm --import RPM-GPG-KEY-scale-guinstall
-# Install
 sudo dnf install ./scale-guinstall-<version>-1.noarch.rpm
+```
+
+**RHEL / CentOS / Fedora — skip GPG check (air-gapped or quick install):**
+```bash
+sudo dnf install --nogpgcheck ./scale-guinstall-<version>-1.noarch.rpm
 ```
 
 > **RHEL 8/9 note:** Python 3.10+ may need to come from AppStream before installing:
