@@ -227,7 +227,7 @@ ssh -fNL 5001:127.0.0.1:5001 user@installer-node
 
 Then open `Scale-GUInstall.html` locally and leave the Backend URL as `http://127.0.0.1:5001`. The **Settings** page has a tunnel helper that generates the command for you and tests the connection.
 
-### Firewall requirements
+### Firewall and SSH server requirements
 
 The SSH tunnel only requires **port 22 (SSH)** to be reachable on the installer node — no other ports need to be opened. If the node's firewall blocks SSH from your workstation, allow it:
 
@@ -242,6 +242,29 @@ sudo firewall-cmd --list-all   # verify
 ```bash
 sudo ufw allow ssh
 sudo ufw status
+```
+
+### Enable TCP port forwarding on the SSH server
+
+Hardened servers (common on RHEL/CentOS) often disable TCP forwarding, which silently breaks `ssh -L` tunnels. Check and enable it on the installer node:
+
+```bash
+# Check current setting
+sudo sshd -T | grep allowtcpforwarding
+```
+
+If it shows `allowtcpforwarding no`, enable it:
+
+```bash
+sudo sed -i 's/^#*AllowTcpForwarding.*/AllowTcpForwarding yes/' /etc/ssh/sshd_config
+# Or set to 'local' to allow only local forwards (more restrictive, still works for ssh -L)
+sudo systemctl reload sshd
+```
+
+Verify the tunnel works after reloading:
+
+```bash
+ssh -L 5001:127.0.0.1:5001 user@installer-node echo "tunnel OK"
 ```
 
 > **Direct access without a tunnel (not recommended):** Because Flask binds to `127.0.0.1`, opening port 5001 in the firewall alone does nothing — remote clients still can't reach it. To allow direct access you must also change the host binding in `scale-server.py` to `0.0.0.0`. If you do that, restrict the firewall rule to your workstation's IP only — never open port 5001 to the world, as the server has no authentication.
