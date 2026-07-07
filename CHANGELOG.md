@@ -11,6 +11,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.8] — 2026-07-07
+
+### Documentation
+- Add firewall and SSH server requirements section to README
+- Document `AllowTcpForwarding local` in `sshd_config` as the correct setting for enabling `ssh -L` tunnels on hardened RHEL/CentOS servers
+- Clarify that port 5001 requires no firewall rule for the SSH tunnel — only port 22 (SSH) needs to be reachable
+- Correct direct-access note: opening port 5001 in the firewall has no effect without also rebinding Flask to `0.0.0.0`; if done, restrict to specific workstation IP via `--add-rich-rule`
+
+---
+
 ## [1.0.7] — 2026-07-06
 
 ### Security
