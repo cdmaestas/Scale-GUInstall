@@ -11,6 +11,18 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.9] — 2026-07-07
+
+### Added
+- Client Only checkbox in Add Single Node form — when selected, disables and unchecks incompatible roles (NSD, Protocol, GUI, Gateway, EMS, Call Home, Archive EE); only Admin, Manager, and Quorum remain selectable
+- Inline node table enforces the same restriction: incompatible role checkboxes are dimmed and non-interactive for client-only nodes
+- Toggling Client Only on an existing node strips any incompatible roles already assigned
+
+### Fixed
+- NSD server and backup server dropdowns in Add NSD Disk now populate when navigating to the NSD Storage page, even if nodes were configured before visiting it
+
+---
+
 ## [1.0.8] — 2026-07-07
 
 ### Documentation
