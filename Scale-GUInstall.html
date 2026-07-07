@@ -1115,6 +1115,9 @@
                   <label class="checkbox-item">
                     <input type="checkbox" id="role-archive-ee"> <div><span>Archive EE</span><span class="label-desc">IBM Storage Archive Enterprise Edition node. Requires separate Archive EE installation workflow after cluster setup.</span></div>
                   </label>
+                  <label class="checkbox-item" style="border-top:0.5px solid var(--cds-border-subtle-01); margin-top:var(--spacing-03); padding-top:var(--spacing-03)">
+                    <input type="checkbox" id="role-client" onchange="onClientRoleChange(this.checked)"> <div><span>Client Only</span><span class="label-desc">Mount-only node. Restricts selectable roles to Admin, Manager, and Quorum.</span></div>
+                  </label>
                 </div>
               </div>
               <div class="btn-group">
@@ -2828,18 +2831,30 @@ function addNode() {
   if (document.getElementById('role-ems').checked) roles.push('ems');
   if (document.getElementById('role-callhome').checked) roles.push('callhome');
   if (document.getElementById('role-archive-ee').checked) roles.push('archive-ee');
+  if (document.getElementById('role-client').checked) roles.push('client');
   if (roles.length === 0) { alert('Please select at least one role'); return; }
 
   state.nodes.push({ hostname, roles });
 
   document.getElementById('node-hostname').value = '';
-  ['role-nsd','role-manager','role-quorum','role-admin','role-protocol','role-gui','role-ems','role-callhome','role-archive-ee'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.checked = false;
+  ['role-nsd','role-manager','role-quorum','role-admin','role-protocol','role-gui','role-ems','role-callhome','role-archive-ee','role-client'].forEach(id => {
+    const el = document.getElementById(id); if (el) { el.checked = false; el.disabled = false; }
   });
   
   updateNodeDisplay();
   updateNSDServerList();
   updateAllPreviews();
+}
+
+const _CLIENT_INCOMPATIBLE_ROLES = ['nsd', 'protocol', 'gui', 'gateway', 'ems', 'callhome', 'archive-ee'];
+
+function onClientRoleChange(checked) {
+  _CLIENT_INCOMPATIBLE_ROLES.forEach(role => {
+    const el = document.getElementById('role-' + role);
+    if (!el) return;
+    el.disabled = checked;
+    if (checked) el.checked = false;
+  });
 }
 
 function bulkImport() {
@@ -2863,6 +2878,10 @@ function toggleNodeRole(index, role, enabled) {
   if (!node) return;
   if (enabled) {
     if (!node.roles.includes(role)) node.roles.push(role);
+    if (role === 'client') {
+      node.roles = node.roles.filter(r => !_CLIENT_INCOMPATIBLE_ROLES.includes(r));
+      node.roles.push('client');
+    }
   } else {
     node.roles = node.roles.filter(r => r !== role);
   }
@@ -2921,10 +2940,13 @@ function updateNodeDisplay() {
   const roleTagColors = { nsd:'cyan', client:'teal', manager:'purple', quorum:'gray', protocol:'green', gui:'blue', gateway:'warning', 'archive-ee':'teal', ems:'gray', callhome:'gray' };
   const tableRoles = ['quorum','manager','nsd','protocol','gui','gateway','client'];
 
-  const chk = (idx, role, checked) =>
-    `<input type="checkbox" data-node="${idx}" data-role="${role}" ${checked ? 'checked' : ''}
+  const chk = (idx, role, checked) => {
+    const isClient = state.nodes[idx]?.roles.includes('client');
+    const disabled = isClient && _CLIENT_INCOMPATIBLE_ROLES.includes(role);
+    return `<input type="checkbox" data-node="${idx}" data-role="${role}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}
       onchange="toggleNodeRole(${idx},'${role}',this.checked)"
-      style="width:16px;height:16px;accent-color:var(--cds-button-primary);cursor:pointer">`;
+      style="width:16px;height:16px;accent-color:var(--cds-button-primary);cursor:${disabled ? 'not-allowed' : 'pointer'};opacity:${disabled ? '0.35' : '1'}">`;
+  };
 
   tbody.innerHTML = state.nodes.map((n, i) => `
     <tr>
