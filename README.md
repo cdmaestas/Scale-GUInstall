@@ -244,15 +244,12 @@ sudo ufw allow ssh
 sudo ufw status
 ```
 
-> **Direct access without a tunnel (not recommended):** If you need to reach the server without SSH, you can open port 5001 and start the server bound to `0.0.0.0` — but this exposes an unauthenticated command-execution endpoint to the network. Only do this on an isolated management network with no untrusted access.
+> **Direct access without a tunnel (not recommended):** Because Flask binds to `127.0.0.1`, opening port 5001 in the firewall alone does nothing — remote clients still can't reach it. To allow direct access you must also change the host binding in `scale-server.py` to `0.0.0.0`. If you do that, restrict the firewall rule to your workstation's IP only — never open port 5001 to the world, as the server has no authentication.
 >
 > ```bash
-> # Open port 5001 (firewalld)
-> sudo firewall-cmd --permanent --add-port=5001/tcp
+> # Allow port 5001 from a specific workstation IP only (firewalld)
+> sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="<workstation-ip>" port port="5001" protocol="tcp" accept'
 > sudo firewall-cmd --reload
->
-> # Start server on all interfaces
-> PORT=5001 python3 scale-server.py --host 0.0.0.0   # requires modifying scale-server.py host binding
 > ```
 
 ---
