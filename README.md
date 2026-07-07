@@ -227,6 +227,34 @@ ssh -fNL 5001:127.0.0.1:5001 user@installer-node
 
 Then open `Scale-GUInstall.html` locally and leave the Backend URL as `http://127.0.0.1:5001`. The **Settings** page has a tunnel helper that generates the command for you and tests the connection.
 
+### Firewall requirements
+
+The SSH tunnel only requires **port 22 (SSH)** to be reachable on the installer node — no other ports need to be opened. If the node's firewall blocks SSH from your workstation, allow it:
+
+**RHEL / CentOS / Fedora (firewalld):**
+```bash
+sudo firewall-cmd --permanent --add-service=ssh
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-all   # verify
+```
+
+**Ubuntu / Debian (ufw):**
+```bash
+sudo ufw allow ssh
+sudo ufw status
+```
+
+> **Direct access without a tunnel (not recommended):** If you need to reach the server without SSH, you can open port 5001 and start the server bound to `0.0.0.0` — but this exposes an unauthenticated command-execution endpoint to the network. Only do this on an isolated management network with no untrusted access.
+>
+> ```bash
+> # Open port 5001 (firewalld)
+> sudo firewall-cmd --permanent --add-port=5001/tcp
+> sudo firewall-cmd --reload
+>
+> # Start server on all interfaces
+> PORT=5001 python3 scale-server.py --host 0.0.0.0   # requires modifying scale-server.py host binding
+> ```
+
 ---
 
 ## File Structure
