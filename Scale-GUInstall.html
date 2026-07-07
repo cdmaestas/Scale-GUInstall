@@ -2799,6 +2799,7 @@ function navigateTo(page) {
   closeSidebar();
   updateAllPreviews();
   if (page === 'prepare') checkPrepareBackend();
+  if (page === 'storage') updateNSDServerList();
   if (page === 'install') {
     // Auto-fill cluster name in Node Identity panel from cluster settings
     const niCn = document.getElementById('ni-cluster-name');
