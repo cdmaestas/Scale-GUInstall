@@ -253,13 +253,14 @@ Hardened servers (common on RHEL/CentOS) often disable TCP forwarding, which sil
 sudo sshd -T | grep allowtcpforwarding
 ```
 
-If it shows `allowtcpforwarding no`, enable it:
+If it shows `allowtcpforwarding no`, enable local forwarding:
 
 ```bash
-sudo sed -i 's/^#*AllowTcpForwarding.*/AllowTcpForwarding yes/' /etc/ssh/sshd_config
-# Or set to 'local' to allow only local forwards (more restrictive, still works for ssh -L)
+sudo sed -i 's/^#*AllowTcpForwarding.*/AllowTcpForwarding local/' /etc/ssh/sshd_config
 sudo systemctl reload sshd
 ```
+
+`local` allows `ssh -L` tunnels while blocking remote port forwarding — more restrictive than `yes` and appropriate for hardened environments.
 
 Verify the tunnel works after reloading:
 
