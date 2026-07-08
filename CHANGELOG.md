@@ -11,6 +11,20 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.11] — 2026-07-08
+
+### Added
+- Storage Pool field in Add NSD Disk form — maps to `-t <pool>` CLI flag and `pool=` stanza field; blank defaults to the system pool
+- Filesystem field in Add NSD Disk form — written to the stanza as `filesystem=<name>`
+- Up to 7 backup servers per NSD — dynamic list replaces the single backup dropdown; rows added with "+ Add backup server" and removed individually; all backups passed as `-b nsd2,nsd3,...` and included in `servers=` in the stanza
+- Backups and Pool columns in the Configured NSDs table
+- Backend validates each backup hostname, enforces the 7-backup limit, and validates pool name against GPFS name regex
+
+### Changed
+- `spectrumscale nsd add` command now runs once per disk using CLI flags (`-p`, `-b`, `-u`, `-f`, `-t`, `-s`) instead of a stanza file; stanza preview remains as an informational reference
+
+---
+
 ## [1.0.10] — 2026-07-08
 
 ### Added
