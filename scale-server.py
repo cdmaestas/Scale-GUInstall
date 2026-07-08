@@ -1207,9 +1207,11 @@ _VALID_FILENAME_RE = re.compile(r'^[A-Za-z0-9._-]{1,64}$')
 @app.route("/api/stream/fake-nsd")
 def stream_fake_nsd():
     directory, _dir_err = resolve_path(request.args.get("dir", "/ibm/nsd").strip())
-    name  = request.args.get("name", "nsd0.img").strip()
-    size  = request.args.get("size", "8G").strip()
-    tool  = request.args.get("tool", "truncate").strip()
+    name     = request.args.get("name", "nsd0.img").strip()
+    size     = request.args.get("size", "8G").strip()
+    tool     = request.args.get("tool", "truncate").strip()
+    node     = request.args.get("node", "").strip()
+    ssh_user = request.args.get("ssh_user", "root").strip()
 
     def generate():
         try:
@@ -1225,30 +1227,50 @@ def stream_fake_nsd():
             if tool not in ("truncate", "fallocate"):
                 yield sse("error", f"[ERROR] Unknown tool '{tool}'. Use 'truncate' or 'fallocate'.")
                 return
+            if node and not _VALID_GPFS_NAME_RE.fullmatch(node):
+                yield sse("error", f"[ERROR] Invalid node hostname: {node!r}")
+                return
+            if ssh_user and not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", ssh_user):
+                yield sse("error", f"[ERROR] Invalid SSH user: {ssh_user!r}")
+                return
 
             filepath = os.path.join(directory, name)
 
-            # Create directory
-            cmd = ["sudo", "mkdir", "-p", directory]
-            yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd)
-            if rc != 0:
-                yield sse("error", f"[ERROR] mkdir failed (exit {rc}).")
-                return
-
-            # Create the file
-            if tool == "truncate":
-                cmd = ["sudo", "truncate", "-s", size, filepath]
+            if node:
+                # Run commands remotely via SSH
+                remote_cmd = (
+                    f"sudo mkdir -p {shlex.quote(directory)} && "
+                    + (f"sudo truncate -s {shlex.quote(size)} {shlex.quote(filepath)}"
+                       if tool == "truncate"
+                       else f"sudo fallocate -l {shlex.quote(size)} {shlex.quote(filepath)}")
+                )
+                cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new",
+                       f"{ssh_user}@{node}", remote_cmd]
+                yield sse("info", f"$ ssh {ssh_user}@{node} \"{remote_cmd}\"")
+                rc = yield from stream_process(cmd)
+                if rc != 0:
+                    yield sse("error", f"[ERROR] Remote command failed (exit {rc}).")
+                    return
             else:
-                cmd = ["sudo", "fallocate", "-l", size, filepath]
-            yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd)
-            if rc != 0:
-                yield sse("error", f"[ERROR] {tool} failed (exit {rc}).")
-                return
+                # Run locally on the installer node
+                cmd = ["sudo", "mkdir", "-p", directory]
+                yield sse("info", f"$ {' '.join(cmd)}")
+                rc = yield from stream_process(cmd)
+                if rc != 0:
+                    yield sse("error", f"[ERROR] mkdir failed (exit {rc}).")
+                    return
+
+                if tool == "truncate":
+                    cmd = ["sudo", "truncate", "-s", size, filepath]
+                else:
+                    cmd = ["sudo", "fallocate", "-l", size, filepath]
+                yield sse("info", f"$ {' '.join(cmd)}")
+                rc = yield from stream_process(cmd)
+                if rc != 0:
+                    yield sse("error", f"[ERROR] {tool} failed (exit {rc}).")
+                    return
 
             yield sse("success", f"[OK] Created {filepath}")
-            # Emit the path so the frontend can offer 'Use as disk path'
             yield sse("nsd-path", filepath)
 
         except Exception as exc:
