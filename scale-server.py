@@ -1305,12 +1305,13 @@ def stream_nsd_add():
                 return
 
             for i, nsd in enumerate(nsds):
-                disk         = str(nsd.get("disk", "")).strip()
-                server       = str(nsd.get("server", "")).strip()
-                backup       = str(nsd.get("backup", "")).strip()
-                usage        = str(nsd.get("usage", "dataAndMetadata")).strip()
+                disk          = str(nsd.get("disk", "")).strip()
+                server        = str(nsd.get("server", "")).strip()
+                backups       = [str(b).strip() for b in nsd.get("backups", []) if str(b).strip()]
+                usage         = str(nsd.get("usage", "dataAndMetadata")).strip()
                 failure_group = str(nsd.get("failureGroup", "1")).strip()
-                size         = str(nsd.get("size", "")).strip()
+                size          = str(nsd.get("size", "")).strip()
+                pool          = str(nsd.get("pool", "")).strip()
 
                 if not disk or not _SAFE_PATH_RE.fullmatch(disk):
                     yield sse("error", f"[ERROR] NSD {i+1}: invalid disk path {disk!r}")
@@ -1318,8 +1319,12 @@ def stream_nsd_add():
                 if not server or not _VALID_HOSTNAME_RE.fullmatch(server):
                     yield sse("error", f"[ERROR] NSD {i+1}: invalid server hostname {server!r}")
                     return
-                if backup and not _VALID_HOSTNAME_RE.fullmatch(backup):
-                    yield sse("error", f"[ERROR] NSD {i+1}: invalid backup server hostname {backup!r}")
+                for b in backups:
+                    if not _VALID_HOSTNAME_RE.fullmatch(b):
+                        yield sse("error", f"[ERROR] NSD {i+1}: invalid backup server hostname {b!r}")
+                        return
+                if len(backups) > 7:
+                    yield sse("error", f"[ERROR] NSD {i+1}: maximum 7 backup servers allowed")
                     return
                 if not re.fullmatch(r'\d+', failure_group):
                     yield sse("error", f"[ERROR] NSD {i+1}: invalid failure group {failure_group!r}")
@@ -1327,10 +1332,16 @@ def stream_nsd_add():
                 if size and not _VALID_NSD_SIZE_RE.fullmatch(size):
                     yield sse("error", f"[ERROR] NSD {i+1}: invalid size {size!r}")
                     return
+                if pool and not _VALID_GPFS_NAME_RE.fullmatch(pool):
+                    yield sse("error", f"[ERROR] NSD {i+1}: invalid pool name {pool!r}")
+                    return
 
-                servers_arg = f"{server},{backup}" if backup else server
-                cmd = [toolkit, "nsd", "add", "-p", servers_arg,
-                       "-u", usage, "-f", failure_group]
+                cmd = [toolkit, "nsd", "add", "-p", server]
+                if backups:
+                    cmd += ["-b", ",".join(backups)]
+                cmd += ["-u", usage, "-f", failure_group]
+                if pool:
+                    cmd += ["-t", pool]
                 if size:
                     cmd += ["-s", size]
                 cmd.append(disk)

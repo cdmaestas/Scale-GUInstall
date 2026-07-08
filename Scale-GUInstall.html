@@ -1550,10 +1550,25 @@
               </div>
             </div>
             <div class="form-group">
-              <label class="form-label">Backup Server (optional)</label>
-              <select class="form-select" id="nsd-backup">
-                <option value="">None</option>
-              </select>
+              <label class="form-label">Storage Pool</label>
+              <input type="text" class="form-input" id="nsd-pool" placeholder="system (default)">
+              <div class="form-help">Leave blank for the system pool</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Filesystem (optional)</label>
+              <input type="text" class="form-input" id="nsd-filesystem" placeholder="e.g. gpfs0">
+              <div class="form-help">Associate with a specific filesystem in the stanza</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Backup Servers <span style="font-weight:400; color:#6f6f6f">(up to 7)</span></label>
+              <div id="nsd-backup-list" style="display:flex; flex-direction:column; gap:var(--spacing-03)">
+                <div style="display:flex; gap:var(--spacing-03); align-items:center">
+                  <select class="form-select" data-backup="0" style="flex:1">
+                    <option value="">None</option>
+                  </select>
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm btn-ghost" style="margin-top:var(--spacing-02)" onclick="addBackupRow()">+ Add backup server</button>
             </div>
             <button class="btn btn-primary" onclick="addNSD()">
               <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M17 15V8h-2v7H8v2h7v7h2v-7h7v-2z"/></svg>
@@ -1573,7 +1588,7 @@
           <div style="overflow-x:auto">
             <table class="data-table">
               <thead>
-                <tr><th>Disk Path</th><th>Server</th><th>FG</th><th>Usage</th><th>Size</th><th></th></tr>
+                <tr><th>Disk Path</th><th>Server</th><th>Backups</th><th>FG</th><th>Usage</th><th>Pool</th><th>Size</th><th></th></tr>
               </thead>
               <tbody id="nsd-table-body">
                 <tr><td colspan="6" style="color:var(--cds-text-secondary); text-align:center; padding:var(--spacing-07)">No NSDs configured</td></tr>
@@ -3048,13 +3063,18 @@ function updateNodeDisplay() {
 
 function updateNSDServerList() {
   const servers = state.nodes.filter(n => n.roles.includes('nsd'));
-  ['nsd-server', 'nsd-backup'].forEach(id => {
-    const sel = document.getElementById(id);
+  const serverSel = document.getElementById('nsd-server');
+  if (serverSel) {
+    const curVal = serverSel.value;
+    serverSel.innerHTML = '<option value="">Select NSD server node...</option>';
+    servers.forEach(s => { serverSel.innerHTML += `<option value="${h(s.hostname)}">${h(s.hostname)}</option>`; });
+    if (curVal) serverSel.value = curVal;
+  }
+  // Populate all backup server dropdowns
+  document.querySelectorAll('[data-backup]').forEach(sel => {
     const curVal = sel.value;
-    sel.innerHTML = id === 'nsd-backup' ? '<option value="">None</option>' : '<option value="">Select NSD server node...</option>';
-    servers.forEach(s => {
-      sel.innerHTML += `<option value="${h(s.hostname)}">${h(s.hostname)}</option>`;
-    });
+    sel.innerHTML = '<option value="">None</option>';
+    servers.forEach(s => { sel.innerHTML += `<option value="${h(s.hostname)}">${h(s.hostname)}</option>`; });
     if (curVal) sel.value = curVal;
   });
 
@@ -3217,20 +3237,52 @@ function useFakeNsdPath() {
   }
 }
 
+function getBackupServers() {
+  return [...document.querySelectorAll('[data-backup]')]
+    .map(s => s.value).filter(Boolean);
+}
+
+function addBackupRow() {
+  const list = document.getElementById('nsd-backup-list');
+  if (list.children.length >= 7) return;
+  const idx = list.children.length;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex; gap:var(--spacing-03); align-items:center';
+  row.innerHTML = `<select class="form-select" data-backup="${idx}" style="flex:1"><option value="">None</option></select>
+    <button type="button" class="btn btn-sm btn-ghost" style="padding:4px 8px; color:var(--cds-support-error)" onclick="this.parentElement.remove()">✕</button>`;
+  list.appendChild(row);
+  // Populate the new dropdown
+  const servers = state.nodes.filter(n => n.roles.includes('nsd'));
+  const sel = row.querySelector('select');
+  servers.forEach(s => { sel.innerHTML += `<option value="${h(s.hostname)}">${h(s.hostname)}</option>`; });
+  if (list.children.length >= 7) document.querySelector('[onclick="addBackupRow()"]').style.display = 'none';
+}
+
 function addNSD() {
   const server = document.getElementById('nsd-server').value;
   const disk = document.getElementById('nsd-disk').value.trim();
   if (!server || !disk) { alert('Please select a server and enter a disk path'); return; }
-  
+
   const size = document.getElementById('nsd-size').value;
   const sizeUnit = document.getElementById('nsd-size-unit').value;
   state.nsds.push({
-    server, disk, backup: document.getElementById('nsd-backup').value,
+    server, disk,
+    backups: getBackupServers(),
     failureGroup: document.getElementById('nsd-fg').value || '1',
     usage: document.getElementById('nsd-usage').value,
+    pool: document.getElementById('nsd-pool').value.trim(),
+    filesystem: document.getElementById('nsd-filesystem').value.trim(),
     size: size ? `${size} ${sizeUnit}` : 'Unknown'
   });
   document.getElementById('nsd-disk').value = '';
+  document.getElementById('nsd-pool').value = '';
+  document.getElementById('nsd-filesystem').value = '';
+  // Reset backup list to single empty row
+  const list = document.getElementById('nsd-backup-list');
+  list.innerHTML = `<div style="display:flex; gap:var(--spacing-03); align-items:center">
+    <select class="form-select" data-backup="0" style="flex:1"><option value="">None</option></select></div>`;
+  updateNSDServerList();
+  document.querySelector('[onclick="addBackupRow()"]').style.display = '';
   updateNSDDisplay();
   updateAllPreviews();
 }
@@ -3247,8 +3299,25 @@ function editNSD(i) {
   document.getElementById('nsd-disk').value = n.disk;
   document.getElementById('nsd-fg').value = n.failureGroup;
   document.getElementById('nsd-usage').value = n.usage;
-  document.getElementById('nsd-backup').value = n.backup || '';
-  const sizeMatch = n.size ? n.size.match(/^([\d.]+)\s*(GiB|TiB|MiB)?$/i) : null;
+  document.getElementById('nsd-pool').value = n.pool || '';
+  document.getElementById('nsd-filesystem').value = n.filesystem || '';
+  // Rebuild backup rows
+  const list = document.getElementById('nsd-backup-list');
+  const backups = n.backups || (n.backup ? [n.backup] : []);
+  list.innerHTML = '';
+  const addBtn = document.querySelector('[onclick="addBackupRow()"]');
+  (backups.length ? backups : ['']).forEach((val, idx) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; gap:var(--spacing-03); align-items:center';
+    const removeBtn = idx === 0 ? '' : `<button type="button" class="btn btn-sm btn-ghost" style="padding:4px 8px; color:var(--cds-support-error)" onclick="this.parentElement.remove()">✕</button>`;
+    row.innerHTML = `<select class="form-select" data-backup="${idx}" style="flex:1"><option value="">None</option></select>${removeBtn}`;
+    list.appendChild(row);
+  });
+  updateNSDServerList();
+  // Set saved values after options are populated
+  [...list.querySelectorAll('[data-backup]')].forEach((sel, idx) => { sel.value = backups[idx] || ''; });
+  addBtn.style.display = backups.length >= 7 ? 'none' : '';
+  const sizeMatch = n.size ? n.size.match(/^([\d.]+)\s*([A-Z]+)?$/i) : null;
   if (sizeMatch) {
     document.getElementById('nsd-size').value = sizeMatch[1];
     if (sizeMatch[2]) document.getElementById('nsd-size-unit').value = sizeMatch[2];
@@ -3266,26 +3335,35 @@ function updateNSDDisplay() {
   if (state.nsds.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" style="color:var(--cds-text-secondary); text-align:center; padding:var(--spacing-07)">No NSDs configured</td></tr>';
   } else {
-    tbody.innerHTML = state.nsds.map((n, i) => `
-      <tr>
+    tbody.innerHTML = state.nsds.map((n, i) => {
+      const backups = n.backups || (n.backup ? [n.backup] : []);
+      return `<tr>
         <td class="mono">${h(n.disk)}</td>
         <td class="mono">${h(n.server)}</td>
+        <td class="mono" style="font-size:12px">${backups.length ? h(backups.join(', ')) : '<span style="color:#6f6f6f">—</span>'}</td>
         <td>${h(n.failureGroup)}</td>
         <td><span class="tag tag-blue">${h(n.usage)}</span></td>
+        <td>${n.pool ? h(n.pool) : '<span style="color:#6f6f6f">system</span>'}</td>
         <td>${h(n.size)}</td>
         <td style="display:flex;gap:4px">
           <button class="btn btn-sm btn-secondary" onclick="editNSD(${i})">Edit</button>
           <button class="btn btn-sm btn-danger" onclick="removeNSD(${i})">Remove</button>
         </td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   }
   updateNSDStanza();
 }
 
 function nsdAddCmd(tp, n) {
-  const servers = n.server + (n.backup ? ',' + n.backup : '');
-  const sizeArg = n.size && n.size !== 'Unknown' ? ` -s ${n.size.replace(' ','')}` : '';
-  return `${tp} nsd add -p ${servers} -u ${n.usage} -f ${n.failureGroup}${sizeArg} ${n.disk}`;
+  const backups = n.backups || (n.backup ? [n.backup] : []);
+  const parts = [tp, 'nsd', 'add', '-p', n.server];
+  if (backups.length) parts.push('-b', backups.join(','));
+  parts.push('-u', n.usage, '-f', n.failureGroup);
+  if (n.pool) parts.push('-t', n.pool);
+  if (n.size && n.size !== 'Unknown') parts.push('-s', n.size.replace(' ', ''));
+  parts.push(n.disk);
+  return parts.join(' ');
 }
 
 function updateNsdAddCmdPreview() {
@@ -3305,15 +3383,22 @@ function updateNSDStanza() {
   const el = document.getElementById('nsd-stanza-preview');
   if (state.nsds.length === 0) { el.innerHTML = '<div style="color:#6f6f6f"># No NSDs configured yet</div>'; updateNsdAddCmdPreview(); return; }
 
-  const lines = state.nsds.map(n => [
-    `<div style="color:#4589ff">%nsd:</div>`,
-    `<div>&nbsp; device=${h(n.disk)}</div>`,
-    `<div>&nbsp; nsd=${h(n.disk.replace(/\//g,'_').replace(/^_/,'nsd'))}</div>`,
-    `<div>&nbsp; servers=${h(n.server)}${n.backup ? ',' + h(n.backup) : ''}</div>`,
-    `<div>&nbsp; usage=${h(n.usage)}</div>`,
-    `<div>&nbsp; failureGroup=${h(n.failureGroup)}</div>`,
-    ``
-  ].join(''));
+  const lines = state.nsds.map(n => {
+    const backups = n.backups || (n.backup ? [n.backup] : []);
+    const servers = [n.server, ...backups].join(',');
+    const rows = [
+      `<div style="color:#4589ff">%nsd:</div>`,
+      `<div>&nbsp; device=${h(n.disk)}</div>`,
+      `<div>&nbsp; nsd=${h(n.disk.replace(/\//g,'_').replace(/^_/,'nsd'))}</div>`,
+      `<div>&nbsp; servers=${h(servers)}</div>`,
+      `<div>&nbsp; usage=${h(n.usage)}</div>`,
+      `<div>&nbsp; failureGroup=${h(n.failureGroup)}</div>`,
+    ];
+    if (n.pool) rows.push(`<div>&nbsp; pool=${h(n.pool)}</div>`);
+    if (n.filesystem) rows.push(`<div>&nbsp; filesystem=${h(n.filesystem)}</div>`);
+    rows.push('');
+    return rows.join('');
+  });
   el.innerHTML = lines.join('<br>');
   updateNsdAddCmdPreview();
 }
@@ -3334,8 +3419,10 @@ async function runNsdAdd(btn) {
 
   btn.disabled = true;
   const nsds = state.nsds.map(n => ({
-    disk: n.disk, server: n.server, backup: n.backup || '',
+    disk: n.disk, server: n.server,
+    backups: n.backups || (n.backup ? [n.backup] : []),
     usage: n.usage, failureGroup: n.failureGroup,
+    pool: n.pool || '', filesystem: n.filesystem || '',
     size: n.size && n.size !== 'Unknown' ? n.size.replace(' ', '') : ''
   }));
   await streamToTerminalPost('nsd-add-terminal', `${getBackendUrl()}/api/stream/nsd-add`, { toolkit: tp, nsds }, () => {
