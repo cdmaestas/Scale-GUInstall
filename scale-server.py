@@ -1201,9 +1201,10 @@ def stream_apply_cluster_config():
 # Create a file-backed simulated NSD (truncate or fallocate)
 # ---------------------------------------------------------------------------
 
-_VALID_NSD_SIZE_RE = re.compile(r'^\d+(\.\d+)?[KMGT]B?$', re.IGNORECASE)
-_VALID_FILENAME_RE = re.compile(r'^[A-Za-z0-9._-]{1,64}$')
-_SAFE_PATH_RE = re.compile(r'^[/a-zA-Z0-9_.:-]+$')
+_VALID_NSD_SIZE_RE  = re.compile(r'^\d+(\.\d+)?[KMGT]B?$', re.IGNORECASE)
+_VALID_FILENAME_RE  = re.compile(r'^[A-Za-z0-9._-]{1,64}$')
+_SAFE_PATH_RE       = re.compile(r'^[/a-zA-Z0-9_.:-]+$')
+_VALID_NSD_USAGE    = {"dataAndMetadata", "dataOnly", "metadataOnly", "descOnly", "logOnly"}
 
 @app.route("/api/stream/fake-nsd")
 def stream_fake_nsd():
@@ -1313,6 +1314,9 @@ def stream_nsd_add():
                 size          = str(nsd.get("size", "")).strip()
                 pool          = str(nsd.get("pool", "")).strip()
 
+                if usage not in _VALID_NSD_USAGE:
+                    yield sse("error", f"[ERROR] NSD {i+1}: invalid usage {usage!r}. Must be one of: {', '.join(sorted(_VALID_NSD_USAGE))}")
+                    return
                 if not disk or not _SAFE_PATH_RE.fullmatch(disk):
                     yield sse("error", f"[ERROR] NSD {i+1}: invalid disk path {disk!r}")
                     return

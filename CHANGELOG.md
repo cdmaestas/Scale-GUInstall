@@ -11,6 +11,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.12] — 2026-07-08
+
+### Fixed
+- NSD usage field now validated against the IBM allowlist (`dataAndMetadata`, `dataOnly`, `metadataOnly`, `descOnly`, `logOnly`) before reaching the CLI — previously any string was forwarded to `spectrumscale nsd add -u`, producing a confusing toolkit error instead of a clean backend message
+- "Add backup server" button now reappears after removing a backup row when at the 7-row limit; previously the button stayed hidden even after rows were deleted
+
+---
+
 ## [1.0.11] — 2026-07-08
 
 ### Added
