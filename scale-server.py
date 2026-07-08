@@ -1203,6 +1203,7 @@ def stream_apply_cluster_config():
 
 _VALID_NSD_SIZE_RE = re.compile(r'^\d+(\.\d+)?[KMGT]B?$', re.IGNORECASE)
 _VALID_FILENAME_RE = re.compile(r'^[A-Za-z0-9._-]{1,64}$')
+_SAFE_PATH_RE = re.compile(r'^[/a-zA-Z0-9_.:-]+$')
 
 @app.route("/api/stream/fake-nsd")
 def stream_fake_nsd():
@@ -1282,6 +1283,75 @@ def stream_fake_nsd():
 
 
 # ---------------------------------------------------------------------------
+# Add NSDs via stanza file
+# ---------------------------------------------------------------------------
+
+@app.route("/api/stream/nsd-add", methods=["POST"])
+def stream_nsd_add():
+    data    = request.get_json(force=True, silent=True) or {}
+    toolkit = data.get("toolkit", "").strip()
+    nsds    = data.get("nsds", [])
+
+    def generate():
+        try:
+            if not toolkit:
+                yield sse("error", "[ERROR] Toolkit path is required.")
+                return
+            if not _SAFE_PATH_RE.fullmatch(toolkit):
+                yield sse("error", f"[ERROR] Invalid toolkit path: {toolkit!r}")
+                return
+            if not nsds:
+                yield sse("error", "[ERROR] No NSDs provided.")
+                return
+
+            for i, nsd in enumerate(nsds):
+                disk         = str(nsd.get("disk", "")).strip()
+                server       = str(nsd.get("server", "")).strip()
+                backup       = str(nsd.get("backup", "")).strip()
+                usage        = str(nsd.get("usage", "dataAndMetadata")).strip()
+                failure_group = str(nsd.get("failureGroup", "1")).strip()
+                size         = str(nsd.get("size", "")).strip()
+
+                if not disk or not _SAFE_PATH_RE.fullmatch(disk):
+                    yield sse("error", f"[ERROR] NSD {i+1}: invalid disk path {disk!r}")
+                    return
+                if not server or not _VALID_HOSTNAME_RE.fullmatch(server):
+                    yield sse("error", f"[ERROR] NSD {i+1}: invalid server hostname {server!r}")
+                    return
+                if backup and not _VALID_HOSTNAME_RE.fullmatch(backup):
+                    yield sse("error", f"[ERROR] NSD {i+1}: invalid backup server hostname {backup!r}")
+                    return
+                if not re.fullmatch(r'\d+', failure_group):
+                    yield sse("error", f"[ERROR] NSD {i+1}: invalid failure group {failure_group!r}")
+                    return
+                if size and not _VALID_NSD_SIZE_RE.fullmatch(size):
+                    yield sse("error", f"[ERROR] NSD {i+1}: invalid size {size!r}")
+                    return
+
+                servers_arg = f"{server},{backup}" if backup else server
+                cmd = [toolkit, "nsd", "add", "-p", servers_arg,
+                       "-u", usage, "-f", failure_group]
+                if size:
+                    cmd += ["-s", size]
+                cmd.append(disk)
+
+                yield sse("info", f"$ {' '.join(cmd)}")
+                rc = yield from stream_process(cmd)
+                if rc != 0:
+                    yield sse("error", f"[ERROR] nsd add failed for {disk} (exit {rc}).")
+                    return
+
+            yield sse("success", f"[OK] {len(nsds)} NSD(s) added to cluster definition.")
+
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+        finally:
+            yield sse("done", "")
+
+    return sse_response(generate())
+
+
+# ---------------------------------------------------------------------------
 # List partitions on a remote node via SSH
 # ---------------------------------------------------------------------------
 
@@ -1313,8 +1383,6 @@ def stream_list_partitions():
 # ---------------------------------------------------------------------------
 # Post-configuration endpoints
 # ---------------------------------------------------------------------------
-
-_SAFE_PATH_RE = re.compile(r'^[/a-zA-Z0-9_.:-]+$')
 
 
 @app.route("/api/stream/postconfig/profiled")
