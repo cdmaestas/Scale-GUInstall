@@ -3357,7 +3357,7 @@ function updateNSDDisplay() {
 
 function nsdAddCmd(tp, n) {
   const backups = n.backups || (n.backup ? [n.backup] : []);
-  const parts = [tp, 'nsd', 'add', '-p', n.server];
+  const parts = ['sudo', tp, 'nsd', 'add', '-p', n.server];
   if (backups.length) parts.push('-b', backups.join(','));
   parts.push('-u', n.usage, '-f', n.failureGroup);
   if (n.pool) parts.push('-t', n.pool);
