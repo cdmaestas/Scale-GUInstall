@@ -368,7 +368,7 @@ def stream_install():
                 yield sse("error", "[ERROR] No --dir target directory provided.")
                 return
 
-            cmd = ["sh", installer, "--dir", target_dir, "--silent"]
+            cmd = ["sudo", "sh", installer, "--dir", target_dir, "--silent"]
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd)
 
@@ -1665,8 +1665,8 @@ def stream_phase():
 def stream_ccr_status():
     def generate():
         try:
-            cmd = ["mmlscluster"]
-            yield sse("info", "$ mmlscluster | grep -i Repository")
+            cmd = ["sudo", "mmlscluster"]
+            yield sse("info", "$ sudo mmlscluster | grep -i Repository")
             proc = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0
             )
@@ -1843,7 +1843,7 @@ def stream_node_identity():
                 return
 
             # 1. Create TLS directory
-            cmd = ["mkdir", "-p", tls_dir]
+            cmd = ["sudo", "mkdir", "-p", tls_dir]
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd)
             if rc != 0:
@@ -1993,11 +1993,11 @@ def stream_node_identity():
             # 5. Add CA cert to local system trust store
             if add_trust:
                 trust_path = "/etc/pki/ca-trust/source/anchors/scale-ca.crt"
-                cmd = ["cp", ca_crt, trust_path]
+                cmd = ["sudo", "cp", ca_crt, trust_path]
                 yield sse("info", f"$ {' '.join(cmd)}")
                 rc = yield from stream_process(cmd)
                 if rc == 0:
-                    cmd = ["update-ca-trust"]
+                    cmd = ["sudo", "update-ca-trust"]
                     yield sse("info", f"$ {' '.join(cmd)}")
                     yield from stream_process(cmd)
                     yield sse("success", "[OK] CA added to system trust store.")
