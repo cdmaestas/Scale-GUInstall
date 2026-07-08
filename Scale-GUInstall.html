@@ -1586,12 +1586,24 @@
 
       <div class="panel" style="margin-top:var(--spacing-06)">
         <div class="panel-header">
-          <div><h3>Stanza File Preview</h3><p>Generated NSD stanza that will be passed to spectrumscale</p></div>
+          <div><h3>Stanza File Preview</h3><p>Reference stanza for the NSDs below — run with <code>spectrumscale nsd add</code> flags</p></div>
           <button class="btn btn-sm btn-ghost" onclick="copyStanza()">Copy</button>
         </div>
         <div class="panel-body" style="padding:0">
           <div class="cmd-preview" id="nsd-stanza-preview">
             <div style="color:#6f6f6f"># No NSDs configured yet</div>
+          </div>
+        </div>
+        <div class="panel-body" style="border-top:1px solid var(--border-subtle)">
+          <div class="cmd-preview" style="margin-bottom:var(--spacing-04)">
+            <div id="nsd-add-cmd-preview" style="color:#6f6f6f"># Configure NSDs above to generate the command</div>
+          </div>
+          <button class="btn btn-secondary" id="nsd-add-btn" onclick="runNsdAdd(this)">
+            <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M16 2a14 14 0 1 0 14 14A14 14 0 0 0 16 2zm8 15h-7v7h-2v-7H8v-2h7V8h2v7h7z"/></svg>
+            Add NSDs to Cluster
+          </button>
+          <div class="terminal" id="nsd-add-terminal" style="margin-top:var(--spacing-05); min-height:120px; max-height:300px; overflow-y:auto; display:none">
+            <div class="terminal-line muted"># spectrumscale nsd add output will appear here</div>
           </div>
         </div>
       </div>
@@ -3046,12 +3058,12 @@ function updateNSDServerList() {
     if (curVal) sel.value = curVal;
   });
 
-  // Populate partition node dropdown from all configured nodes
+  // Populate partition node dropdown from NSD-role nodes only
   const partSel = document.getElementById('nsd-partition-node');
   if (partSel) {
     const curVal = partSel.value;
-    partSel.innerHTML = '<option value="">Select node...</option>';
-    state.nodes.forEach(n => {
+    partSel.innerHTML = '<option value="">Select NSD node...</option>';
+    servers.forEach(n => {
       partSel.innerHTML += `<option value="${h(n.hostname)}">${h(n.hostname)}</option>`;
     });
     if (curVal) partSel.value = curVal;
@@ -3130,10 +3142,10 @@ function updateFakeNsdNodeList() {
   if (!sel) return;
   const cur = sel.value;
   sel.innerHTML = '<option value="">Local (installer node)</option>';
-  state.nodes.forEach(n => {
+  state.nodes.filter(n => n.roles.includes('nsd')).forEach(n => {
     const opt = document.createElement('option');
     opt.value = n.hostname;
-    opt.textContent = n.hostname + (n.roles.includes('nsd') ? ' (NSD)' : '');
+    opt.textContent = n.hostname;
     sel.appendChild(opt);
   });
   if (cur) sel.value = cur;
@@ -3270,10 +3282,29 @@ function updateNSDDisplay() {
   updateNSDStanza();
 }
 
+function nsdAddCmd(tp, n) {
+  const servers = n.server + (n.backup ? ',' + n.backup : '');
+  const sizeArg = n.size && n.size !== 'Unknown' ? ` -s ${n.size.replace(' ','')}` : '';
+  return `${tp} nsd add -p ${servers} -u ${n.usage} -f ${n.failureGroup}${sizeArg} ${n.disk}`;
+}
+
+function updateNsdAddCmdPreview() {
+  const el = document.getElementById('nsd-add-cmd-preview');
+  if (!el) return;
+  const tp = state.toolkitPath;
+  if (!tp || state.nsds.length === 0) {
+    el.innerHTML = '<span style="color:#6f6f6f"># Configure NSDs above to generate the command</span>';
+    return;
+  }
+  el.innerHTML = state.nsds.map(n =>
+    `<div><span class="cmd-prompt">$ </span>${h(nsdAddCmd(tp, n))}</div>`
+  ).join('');
+}
+
 function updateNSDStanza() {
   const el = document.getElementById('nsd-stanza-preview');
-  if (state.nsds.length === 0) { el.innerHTML = '<div style="color:#6f6f6f"># No NSDs configured yet</div>'; return; }
-  
+  if (state.nsds.length === 0) { el.innerHTML = '<div style="color:#6f6f6f"># No NSDs configured yet</div>'; updateNsdAddCmdPreview(); return; }
+
   const lines = state.nsds.map(n => [
     `<div style="color:#4589ff">%nsd:</div>`,
     `<div>&nbsp; device=${h(n.disk)}</div>`,
@@ -3284,6 +3315,32 @@ function updateNSDStanza() {
     ``
   ].join(''));
   el.innerHTML = lines.join('<br>');
+  updateNsdAddCmdPreview();
+}
+
+async function runNsdAdd(btn) {
+  const tp = state.toolkitPath;
+  if (!tp) { alert('Toolkit path not set. Configure it in Prepare Software or Settings.'); return; }
+  if (state.nsds.length === 0) { alert('No NSDs configured. Add at least one NSD above.'); return; }
+
+  const term = document.getElementById('nsd-add-terminal');
+  term.style.display = 'block';
+
+  if (state.dryRun) {
+    state.nsds.forEach(n => appendToTerminal('nsd-add-terminal', `$ ${nsdAddCmd(tp, n)}  # (dry run)`, 'info'));
+    appendToTerminal('nsd-add-terminal', '[DRY RUN] Command preview only — nothing executed.', 'muted');
+    return;
+  }
+
+  btn.disabled = true;
+  const nsds = state.nsds.map(n => ({
+    disk: n.disk, server: n.server, backup: n.backup || '',
+    usage: n.usage, failureGroup: n.failureGroup,
+    size: n.size && n.size !== 'Unknown' ? n.size.replace(' ', '') : ''
+  }));
+  await streamToTerminalPost('nsd-add-terminal', `${getBackendUrl()}/api/stream/nsd-add`, { toolkit: tp, nsds }, () => {
+    btn.disabled = false;
+  });
 }
 
 // ===== FILESYSTEM PREVIEW =====
@@ -3581,6 +3638,7 @@ function updateAllPreviews() {
   updateClusterCmdPreview();
   updatePostConfigPreview();
   updateFakeNsdPreview();
+  updateNsdAddCmdPreview();
   const tp = document.getElementById('toolkit-path').value || state.toolkitPath;
   document.querySelectorAll('.toolkit-path-display-inline').forEach(el => el.textContent = tp);
   const el = document.getElementById('toolkit-path-display');
