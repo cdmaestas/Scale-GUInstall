@@ -11,6 +11,20 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.10] — 2026-07-08
+
+### Added
+- Disk Discovery panel on NSD Storage page combines List Partitions and Create Simulated NSD File into a single segmented-button panel, positioned immediately after the destructive-operation warning
+- Create Simulated NSD now runs the command on the selected NSD server node via SSH, eliminating the need to run it locally on the installer node
+- Node selector in Create Simulated NSD is populated from configured nodes; NSD-role nodes are labelled `(NSD)` for clarity
+- SSH User field (default: `root`) controls the remote login user; command preview updates live to show the full `ssh user@node "..."` form
+- Backend validates `node` and `ssh_user` parameters and shell-quotes all path and size arguments in the remote command
+
+### Changed
+- Segmented control buttons use explicit `#0f62fe` blue fill/outline states, visible in both dark and light mode
+
+---
+
 ## [1.0.9] — 2026-07-07
 
 ### Added
