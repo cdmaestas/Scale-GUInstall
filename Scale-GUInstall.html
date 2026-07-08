@@ -3042,6 +3042,7 @@ async function listPartitions(btn) {
   const term = document.getElementById('partition-terminal');
   term.style.display = 'block';
   term.innerHTML = `<div class="terminal-line info"><span class="cmd-prompt">$ </span>ssh ${h(node)} cat /proc/partitions</div>`;
+  term.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
   try {
     const ping = await fetch(getBackendUrl() + '/api/ping', { signal: AbortSignal.timeout(2000) });
@@ -3942,6 +3943,7 @@ async function runPrepare(phase, btn) {
 
   } else if (phase === 'checkansible') {
     // Stream manually so we can read the ansible-compat SSE type for the warning banner
+    document.getElementById(termId)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     try {
       const res = await fetch(`${getBackendUrl()}/api/stream/check-ansible`);
       const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
@@ -4452,6 +4454,7 @@ async function checkCCRStatus(btn) {
   }
 
   if (btn) btn.disabled = true;
+  document.getElementById(termId)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   appendToTerminal(termId, '$ mmlscluster | grep -i Repository', 'info');
 
   try {
