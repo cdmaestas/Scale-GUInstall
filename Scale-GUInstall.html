@@ -3242,6 +3242,11 @@ function getBackupServers() {
     .map(s => s.value).filter(Boolean);
 }
 
+function showAddBackupBtn() {
+  const btn = document.querySelector('[onclick="addBackupRow()"]');
+  if (btn) btn.style.display = '';
+}
+
 function addBackupRow() {
   const list = document.getElementById('nsd-backup-list');
   if (list.children.length >= 7) return;
@@ -3249,7 +3254,7 @@ function addBackupRow() {
   const row = document.createElement('div');
   row.style.cssText = 'display:flex; gap:var(--spacing-03); align-items:center';
   row.innerHTML = `<select class="form-select" data-backup="${idx}" style="flex:1"><option value="">None</option></select>
-    <button type="button" class="btn btn-sm btn-ghost" style="padding:4px 8px; color:var(--cds-support-error)" onclick="this.parentElement.remove()">✕</button>`;
+    <button type="button" class="btn btn-sm btn-ghost" style="padding:4px 8px; color:var(--cds-support-error)" onclick="this.parentElement.remove(); showAddBackupBtn()">✕</button>`;
   list.appendChild(row);
   // Populate the new dropdown
   const servers = state.nodes.filter(n => n.roles.includes('nsd'));
