@@ -1140,6 +1140,7 @@
               <div class="form-group">
                 <label class="form-label">Default Role for Imported Nodes</label>
                 <select class="form-select" id="bulk-role">
+                  <option value="client">Client Only</option>
                   <option value="nsd">NSD Server</option>
                   <option value="manager">Manager</option>
                   <option value="quorum">Quorum</option>
@@ -1351,8 +1352,8 @@
             <div class="form-group">
               <label class="form-label">Enable Performance Monitoring</label>
               <div class="toggle-wrapper">
-                <button class="toggle" id="perfmon-toggle" onclick="this.classList.toggle('on'); updateClusterCmdPreview()"></button>
-                <span class="toggle-label" id="perfmon-toggle-label">Disabled</span>
+                <button class="toggle on" id="perfmon-toggle" onclick="this.classList.toggle('on'); updateClusterCmdPreview()"></button>
+                <span class="toggle-label" id="perfmon-toggle-label">Enabled</span>
               </div>
               <div class="form-help">Deploys the zimon performance monitoring collector. Required for the IBM Storage Scale GUI.</div>
             </div>
@@ -3682,6 +3683,7 @@ function sseTypeToTerminalType(type) {
 }
 
 async function streamToTerminal(termId, url, onDone) {
+  document.getElementById(termId)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   let response;
   try {
     response = await fetch(url);
@@ -3737,6 +3739,7 @@ async function streamToTerminal(termId, url, onDone) {
 }
 
 async function streamToTerminalPost(termId, url, body, onDone) {
+  document.getElementById(termId)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   let response;
   try {
     response = await fetch(url, {
