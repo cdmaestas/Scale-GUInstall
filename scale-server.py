@@ -1198,6 +1198,68 @@ def stream_apply_cluster_config():
 
 
 # ---------------------------------------------------------------------------
+# Create a file-backed simulated NSD (truncate or fallocate)
+# ---------------------------------------------------------------------------
+
+_VALID_NSD_SIZE_RE = re.compile(r'^\d+(\.\d+)?[KMGT]B?$', re.IGNORECASE)
+_VALID_FILENAME_RE = re.compile(r'^[A-Za-z0-9._-]{1,64}$')
+
+@app.route("/api/stream/fake-nsd")
+def stream_fake_nsd():
+    directory, _dir_err = resolve_path(request.args.get("dir", "/ibm/nsd").strip())
+    name  = request.args.get("name", "nsd0.img").strip()
+    size  = request.args.get("size", "8G").strip()
+    tool  = request.args.get("tool", "truncate").strip()
+
+    def generate():
+        try:
+            if _dir_err:
+                yield sse("error", f"[ERROR] Invalid directory: {_dir_err}")
+                return
+            if not _VALID_FILENAME_RE.fullmatch(name):
+                yield sse("error", f"[ERROR] Invalid filename: {name!r}")
+                return
+            if not _VALID_NSD_SIZE_RE.fullmatch(size):
+                yield sse("error", f"[ERROR] Invalid size '{size}'. Use a number with suffix, e.g. 8G, 100M, 1T.")
+                return
+            if tool not in ("truncate", "fallocate"):
+                yield sse("error", f"[ERROR] Unknown tool '{tool}'. Use 'truncate' or 'fallocate'.")
+                return
+
+            filepath = os.path.join(directory, name)
+
+            # Create directory
+            cmd = ["sudo", "mkdir", "-p", directory]
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd)
+            if rc != 0:
+                yield sse("error", f"[ERROR] mkdir failed (exit {rc}).")
+                return
+
+            # Create the file
+            if tool == "truncate":
+                cmd = ["sudo", "truncate", "-s", size, filepath]
+            else:
+                cmd = ["sudo", "fallocate", "-l", size, filepath]
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd)
+            if rc != 0:
+                yield sse("error", f"[ERROR] {tool} failed (exit {rc}).")
+                return
+
+            yield sse("success", f"[OK] Created {filepath}")
+            # Emit the path so the frontend can offer 'Use as disk path'
+            yield sse("nsd-path", filepath)
+
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+        finally:
+            yield sse("done", "")
+
+    return sse_response(generate())
+
+
+# ---------------------------------------------------------------------------
 # List partitions on a remote node via SSH
 # ---------------------------------------------------------------------------
 
