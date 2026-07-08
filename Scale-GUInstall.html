@@ -1422,6 +1422,94 @@
         </div>
       </div>
 
+      <div class="panel" style="margin-top:var(--spacing-06)">
+        <div class="panel-header">
+          <div><h3>Disk Discovery</h3><p>List available block devices on a node or create a file-backed NSD for testing</p></div>
+        </div>
+        <div class="panel-body">
+          <!-- Mode selector -->
+          <div style="display:inline-flex; border-radius:4px; overflow:hidden; margin-bottom:var(--spacing-05)">
+            <button id="disk-mode-list-btn" onclick="setDiskMode('list')"
+              style="border:2px solid #0f62fe; border-right:none; border-radius:4px 0 0 4px; padding:7px 18px; font-size:14px; font-family:inherit; cursor:pointer; background:#0f62fe; color:#fff; font-weight:500; line-height:1.2; white-space:nowrap">
+              List Partitions
+            </button>
+            <button id="disk-mode-create-btn" onclick="setDiskMode('create')"
+              style="border:2px solid #0f62fe; border-left:none; border-radius:0 4px 4px 0; padding:7px 18px; font-size:14px; font-family:inherit; cursor:pointer; background:transparent; color:#0f62fe; font-weight:500; line-height:1.2; white-space:nowrap">
+              Create Simulated NSD
+            </button>
+          </div>
+
+          <!-- List Partitions section -->
+          <div id="disk-mode-list">
+            <div style="display:flex; gap:var(--spacing-04); align-items:flex-end; flex-wrap:wrap">
+              <div class="form-group" style="flex:1; min-width:200px; margin:0">
+                <label class="form-label">Node</label>
+                <select class="form-select" id="nsd-partition-node">
+                  <option value="">Select node...</option>
+                </select>
+              </div>
+              <button class="btn btn-secondary" onclick="listPartitions(this)" style="flex-shrink:0">
+                <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M28 6H4a2 2 0 00-2 2v16a2 2 0 002 2h24a2 2 0 002-2V8a2 2 0 00-2-2zm0 18H4V8h24zM8 14h16v2H8zm0 4h10v2H8z"/></svg>
+                List Partitions
+              </button>
+            </div>
+            <div class="terminal" id="partition-terminal" style="margin-top:var(--spacing-05); min-height:120px; max-height:260px; overflow-y:auto; display:none">
+              <div class="terminal-line muted"># cat /proc/partitions output will appear here</div>
+            </div>
+          </div>
+
+          <!-- Create Simulated NSD section -->
+          <div id="disk-mode-create" style="display:none">
+            <div style="display:grid; grid-template-columns:1fr 140px; gap:var(--spacing-04); margin-bottom:var(--spacing-04)">
+              <div class="form-group" style="margin:0">
+                <label class="form-label">NSD Server Node <span style="font-weight:400; color:#6f6f6f">(command runs here via SSH)</span></label>
+                <select class="form-select" id="fake-nsd-node" onchange="updateFakeNsdPreview()">
+                  <option value="">Local (installer node)</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin:0">
+                <label class="form-label">SSH User</label>
+                <input type="text" class="form-input" id="fake-nsd-ssh-user" value="root" oninput="updateFakeNsdPreview()">
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 120px auto; gap:var(--spacing-04); align-items:flex-end; flex-wrap:wrap">
+              <div class="form-group" style="margin:0">
+                <label class="form-label">Directory</label>
+                <input type="text" class="form-input" id="fake-nsd-dir" value="/ibm/nsd" oninput="updateFakeNsdPreview()">
+              </div>
+              <div class="form-group" style="margin:0">
+                <label class="form-label">Filename</label>
+                <input type="text" class="form-input" id="fake-nsd-name" value="nsd0.img" oninput="updateFakeNsdPreview()">
+              </div>
+              <div class="form-group" style="margin:0">
+                <label class="form-label">Size</label>
+                <input type="text" class="form-input" id="fake-nsd-size" value="8G" placeholder="e.g. 8G" oninput="updateFakeNsdPreview()">
+              </div>
+              <div class="form-group" style="margin:0">
+                <label class="form-label">Tool</label>
+                <select class="form-select" id="fake-nsd-tool" onchange="updateFakeNsdPreview()">
+                  <option value="truncate">truncate (sparse)</option>
+                  <option value="fallocate">fallocate (preallocate)</option>
+                </select>
+              </div>
+            </div>
+            <div class="cmd-preview" style="margin-top:var(--spacing-04)">
+              <div id="fake-nsd-preview"></div>
+            </div>
+            <div style="display:flex; gap:var(--spacing-03); margin-top:var(--spacing-04)">
+              <button class="btn btn-secondary" onclick="runFakeNsd(this)">
+                <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M28 6H4a2 2 0 00-2 2v4h28V8a2 2 0 00-2-2zM2 26a2 2 0 002 2h24a2 2 0 002-2V14H2zm16-6h8v2h-8zm-6 0h4v2h-4z"/></svg>
+                Create File
+              </button>
+              <button class="btn btn-ghost" id="fake-nsd-use-btn" style="display:none" onclick="useFakeNsdPath()">Use as Disk Path ↑</button>
+            </div>
+            <div class="terminal" id="fake-nsd-terminal" style="margin-top:var(--spacing-05); min-height:80px; max-height:200px; overflow-y:auto; display:none">
+              <div class="terminal-line muted"># Output will appear here</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--spacing-06)">
         <div class="panel">
           <div class="panel-header"><div><h3>Add NSD Disk</h3></div></div>
@@ -1493,71 +1581,6 @@
             </table>
           </div>
           <div id="nsds-load-log" class="load-log" style="margin:0 var(--spacing-05) var(--spacing-04)"></div>
-        </div>
-      </div>
-
-      <div class="panel" style="margin-top:var(--spacing-06)">
-        <div class="panel-header">
-          <div><h3>List Partitions on Node</h3><p>Run <code>cat /proc/partitions</code> on a configured node to discover available disks</p></div>
-        </div>
-        <div class="panel-body">
-          <div style="display:flex; gap:var(--spacing-04); align-items:flex-end; flex-wrap:wrap">
-            <div class="form-group" style="flex:1; min-width:200px; margin:0">
-              <label class="form-label">Node</label>
-              <select class="form-select" id="nsd-partition-node">
-                <option value="">Select node...</option>
-              </select>
-            </div>
-            <button class="btn btn-secondary" onclick="listPartitions(this)" style="flex-shrink:0">
-              <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M28 6H4a2 2 0 00-2 2v16a2 2 0 002 2h24a2 2 0 002-2V8a2 2 0 00-2-2zm0 18H4V8h24zM8 14h16v2H8zm0 4h10v2H8z"/></svg>
-              List Partitions
-            </button>
-          </div>
-          <div class="terminal" id="partition-terminal" style="margin-top:var(--spacing-05); min-height:120px; max-height:260px; overflow-y:auto; display:none">
-            <div class="terminal-line muted"># cat /proc/partitions output will appear here</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel" style="margin-top:var(--spacing-06)">
-        <div class="panel-header">
-          <div><h3>Create Simulated NSD File</h3><p>Create a file-backed NSD for testing when no block devices are available</p></div>
-        </div>
-        <div class="panel-body">
-          <div style="display:grid; grid-template-columns:1fr 1fr 120px auto; gap:var(--spacing-04); align-items:flex-end; flex-wrap:wrap">
-            <div class="form-group" style="margin:0">
-              <label class="form-label">Directory</label>
-              <input type="text" class="form-input" id="fake-nsd-dir" value="/ibm/nsd" oninput="updateFakeNsdPreview()">
-            </div>
-            <div class="form-group" style="margin:0">
-              <label class="form-label">Filename</label>
-              <input type="text" class="form-input" id="fake-nsd-name" value="nsd0.img" oninput="updateFakeNsdPreview()">
-            </div>
-            <div class="form-group" style="margin:0">
-              <label class="form-label">Size</label>
-              <input type="text" class="form-input" id="fake-nsd-size" value="8G" placeholder="e.g. 8G" oninput="updateFakeNsdPreview()">
-            </div>
-            <div class="form-group" style="margin:0">
-              <label class="form-label">Tool</label>
-              <select class="form-select" id="fake-nsd-tool" onchange="updateFakeNsdPreview()">
-                <option value="truncate">truncate (sparse)</option>
-                <option value="fallocate">fallocate (preallocate)</option>
-              </select>
-            </div>
-          </div>
-          <div class="cmd-preview" style="margin-top:var(--spacing-04)">
-            <div id="fake-nsd-preview"></div>
-          </div>
-          <div style="display:flex; gap:var(--spacing-03); margin-top:var(--spacing-04)">
-            <button class="btn btn-secondary" onclick="runFakeNsd(this)">
-              <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M28 6H4a2 2 0 00-2 2v4h28V8a2 2 0 00-2-2zM2 26a2 2 0 002 2h24a2 2 0 002-2V14H2zm16-6h8v2h-8zm-6 0h4v2h-4z"/></svg>
-              Create File
-            </button>
-            <button class="btn btn-ghost" id="fake-nsd-use-btn" style="display:none" onclick="useFakeNsdPath()">Use as Disk Path ↑</button>
-          </div>
-          <div class="terminal" id="fake-nsd-terminal" style="margin-top:var(--spacing-05); min-height:80px; max-height:200px; overflow-y:auto; display:none">
-            <div class="terminal-line muted"># Output will appear here</div>
-          </div>
         </div>
       </div>
 
@@ -2842,7 +2865,7 @@ function navigateTo(page) {
   closeSidebar();
   updateAllPreviews();
   if (page === 'prepare') checkPrepareBackend();
-  if (page === 'storage') updateNSDServerList();
+  if (page === 'storage') { updateNSDServerList(); updateFakeNsdNodeList(); }
   if (page === 'install') {
     // Auto-fill cluster name in Node Identity panel from cluster settings
     const niCn = document.getElementById('ni-cluster-name');
@@ -3089,40 +3112,84 @@ async function listPartitions(btn) {
 // ===== NSD MANAGEMENT =====
 let _lastFakeNsdPath = '';
 
+function setDiskMode(mode) {
+  const isCreate = mode === 'create';
+  document.getElementById('disk-mode-list').style.display    = isCreate ? 'none' : '';
+  document.getElementById('disk-mode-create').style.display  = isCreate ? '' : 'none';
+  const listBtn   = document.getElementById('disk-mode-list-btn');
+  const createBtn = document.getElementById('disk-mode-create-btn');
+  listBtn.style.background   = isCreate ? 'transparent' : '#0f62fe';
+  listBtn.style.color        = isCreate ? '#0f62fe' : '#fff';
+  createBtn.style.background = isCreate ? '#0f62fe' : 'transparent';
+  createBtn.style.color      = isCreate ? '#fff' : '#0f62fe';
+  if (isCreate) updateFakeNsdPreview();
+}
+
+function updateFakeNsdNodeList() {
+  const sel = document.getElementById('fake-nsd-node');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Local (installer node)</option>';
+  state.nodes.forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n.hostname;
+    opt.textContent = n.hostname + (n.roles.includes('nsd') ? ' (NSD)' : '');
+    sel.appendChild(opt);
+  });
+  if (cur) sel.value = cur;
+}
+
 function updateFakeNsdPreview() {
-  const dir  = document.getElementById('fake-nsd-dir')?.value.trim() || '/ibm/nsd';
-  const name = document.getElementById('fake-nsd-name')?.value.trim() || 'nsd0.img';
-  const size = document.getElementById('fake-nsd-size')?.value.trim() || '8G';
-  const tool = document.getElementById('fake-nsd-tool')?.value || 'truncate';
+  const dir     = document.getElementById('fake-nsd-dir')?.value.trim() || '/ibm/nsd';
+  const name    = document.getElementById('fake-nsd-name')?.value.trim() || 'nsd0.img';
+  const size    = document.getElementById('fake-nsd-size')?.value.trim() || '8G';
+  const tool    = document.getElementById('fake-nsd-tool')?.value || 'truncate';
+  const node    = document.getElementById('fake-nsd-node')?.value || '';
+  const sshUser = document.getElementById('fake-nsd-ssh-user')?.value.trim() || 'root';
   const path = `${dir}/${name}`;
-  const cmd  = tool === 'truncate'
-    ? `truncate -s ${size} ${path}`
-    : `fallocate -l ${size} ${path}`;
-  document.getElementById('fake-nsd-preview').innerHTML =
-    `<div><span class="cmd-prompt">$ </span>sudo mkdir -p ${h(dir)}</div>` +
-    `<div><span class="cmd-prompt">$ </span>sudo ${h(cmd)}</div>`;
+  const mkdirCmd = `sudo mkdir -p ${dir}`;
+  const fileCmd  = tool === 'truncate'
+    ? `sudo truncate -s ${size} ${path}`
+    : `sudo fallocate -l ${size} ${path}`;
+  let html;
+  if (node) {
+    const remote = `${mkdirCmd} && ${fileCmd}`;
+    html = `<div><span class="cmd-prompt">$ </span>ssh ${h(sshUser)}@${h(node)} "${h(remote)}"</div>`;
+  } else {
+    html = `<div><span class="cmd-prompt">$ </span>${h(mkdirCmd)}</div>` +
+           `<div><span class="cmd-prompt">$ </span>${h(fileCmd)}</div>`;
+  }
+  document.getElementById('fake-nsd-preview').innerHTML = html;
 }
 
 async function runFakeNsd(btn) {
-  const dir  = document.getElementById('fake-nsd-dir')?.value.trim();
-  const name = document.getElementById('fake-nsd-name')?.value.trim();
-  const size = document.getElementById('fake-nsd-size')?.value.trim();
-  const tool = document.getElementById('fake-nsd-tool')?.value;
+  const dir     = document.getElementById('fake-nsd-dir')?.value.trim();
+  const name    = document.getElementById('fake-nsd-name')?.value.trim();
+  const size    = document.getElementById('fake-nsd-size')?.value.trim();
+  const tool    = document.getElementById('fake-nsd-tool')?.value;
+  const node    = document.getElementById('fake-nsd-node')?.value || '';
+  const sshUser = document.getElementById('fake-nsd-ssh-user')?.value.trim() || 'root';
   const term = document.getElementById('fake-nsd-terminal');
   term.style.display = 'block';
   document.getElementById('fake-nsd-use-btn').style.display = 'none';
 
   if (state.dryRun) {
     const path = `${dir}/${name}`;
-    const cmd = tool === 'truncate' ? `truncate -s ${size} ${path}` : `fallocate -l ${size} ${path}`;
-    appendToTerminal('fake-nsd-terminal', `$ sudo mkdir -p ${dir}`, 'info');
-    appendToTerminal('fake-nsd-terminal', `$ sudo ${cmd}  # (dry run)`, 'info');
+    const mkdirCmd = `sudo mkdir -p ${dir}`;
+    const fileCmd = tool === 'truncate' ? `sudo truncate -s ${size} ${path}` : `sudo fallocate -l ${size} ${path}`;
+    if (node) {
+      appendToTerminal('fake-nsd-terminal', `$ ssh ${sshUser}@${node} "${mkdirCmd} && ${fileCmd}"  # (dry run)`, 'info');
+    } else {
+      appendToTerminal('fake-nsd-terminal', `$ ${mkdirCmd}`, 'info');
+      appendToTerminal('fake-nsd-terminal', `$ ${fileCmd}  # (dry run)`, 'info');
+    }
     appendToTerminal('fake-nsd-terminal', '[DRY RUN] Command preview only — nothing executed.', 'muted');
     return;
   }
 
   btn.disabled = true;
   const params = new URLSearchParams({ dir, name, size, tool });
+  if (node) { params.set('node', node); params.set('ssh_user', sshUser); }
   await streamToTerminal('fake-nsd-terminal', `${getBackendUrl()}/api/stream/fake-nsd?${params}`, () => {
     btn.disabled = false;
     if (_lastFakeNsdPath) document.getElementById('fake-nsd-use-btn').style.display = '';
