@@ -1336,7 +1336,7 @@ def stream_nsd_add():
                     yield sse("error", f"[ERROR] NSD {i+1}: invalid pool name {pool!r}")
                     return
 
-                cmd = [toolkit, "nsd", "add", "-p", server]
+                cmd = ["sudo", toolkit, "nsd", "add", "-p", server]
                 if backups:
                     cmd += ["-b", ",".join(backups)]
                 cmd += ["-u", usage, "-f", failure_group]
