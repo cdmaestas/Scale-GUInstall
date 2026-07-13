@@ -1670,7 +1670,7 @@ def stream_ccr_status():
     def generate():
         try:
             cmd = ["sudo", "mmlscluster"]
-            yield sse("info", "$ sudo mmlscluster | grep -i Repository")
+            yield sse("info", "$ sudo mmlscluster")
             proc = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0
             )
@@ -1679,15 +1679,56 @@ def stream_ccr_status():
                 line = raw.decode("utf-8", errors="replace").rstrip()
                 if "repository" in line.lower():
                     found = True
+                    yield sse("success", line)
+                else:
                     yield sse("normal", line)
-            proc.wait()
-            if not found:
-                yield sse("warn", "[WARN] No 'Repository' line found in mmlscluster output.")
+            rc = proc.wait()
+            if rc != 0:
+                yield sse("error", f"[ERROR] mmlscluster exited with code {rc}.")
+            elif not found:
+                yield sse("warn", "[WARN] No 'Repository type' line found — CCR may not be enabled on this cluster.")
+            else:
+                yield sse("success", "[OK] CCR is configured.")
+        except FileNotFoundError:
+            yield sse("error", "[ERROR] mmlscluster not found — is IBM Storage Scale installed and in PATH?")
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
         finally:
             yield sse("done", "")
     return sse_response(generate())
+
+
+@app.route("/api/probe/cluster-nodes")
+def probe_cluster_nodes():
+    """Parse mmlscluster output and return the node list as JSON."""
+    try:
+        result = subprocess.run(
+            ["sudo", "mmlscluster"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=15,
+        )
+        nodes = []
+        in_node_section = False
+        for line in result.stdout.splitlines():
+            stripped = line.strip()
+            # Header line signals start of node table
+            if re.search(r'daemon node name', stripped, re.IGNORECASE):
+                in_node_section = True
+                continue
+            if in_node_section:
+                if not stripped or stripped.startswith('-'):
+                    continue
+                # Columns: number  daemon-name  ip  admin-name  [designation]
+                parts = stripped.split()
+                if len(parts) >= 2 and parts[0].isdigit():
+                    nodes.append(parts[1])  # daemon node name
+        if result.returncode != 0 and not nodes:
+            return jsonify({"error": result.stdout.strip() or f"mmlscluster exited {result.returncode}"}), 500
+        return jsonify({"nodes": nodes})
+    except FileNotFoundError:
+        return jsonify({"error": "mmlscluster not found"}), 500
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 # ---------------------------------------------------------------------------
