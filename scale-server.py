@@ -101,40 +101,53 @@ def index():
 # Probe installed Scale version under /usr/lpp/mmfs
 # ---------------------------------------------------------------------------
 
+def _sudo_isfile(path):
+    """Return True if path is an existing file, using sudo to bypass permission checks."""
+    return subprocess.run(["sudo", "test", "-f", path], capture_output=True).returncode == 0
+
+def _sudo_isdir(path):
+    """Return True if path is an existing directory, using sudo to bypass permission checks."""
+    return subprocess.run(["sudo", "test", "-d", path], capture_output=True).returncode == 0
+
+def _sudo_listdir(path):
+    """Return list of entries in path using sudo, or empty list on failure."""
+    r = subprocess.run(["sudo", "ls", path], capture_output=True, text=True)
+    return r.stdout.split() if r.returncode == 0 else []
+
+
 @app.route("/api/probe/mmfs")
 def probe_mmfs():
     """
     Check /usr/lpp/mmfs for installed IBM Storage Scale versions.
     Returns the latest version found and the path to the spectrumscale binary.
+    Uses sudo for all filesystem checks — /usr/lpp/mmfs is typically root-owned.
     """
     base = "/usr/lpp/mmfs"
     ver_re = re.compile(r"^(\d+)\.(\d+)\.(\d+)\.(\d+)$")
 
-    if not os.path.isdir(base):
+    if not _sudo_isdir(base):
         return jsonify({"found": False, "reason": f"{base} does not exist"})
 
     versions = []
-    try:
-        for entry in os.listdir(base):
-            m = ver_re.match(entry)
-            if m:
-                versions.append((tuple(int(x) for x in m.groups()), entry))
-    except OSError as exc:
-        return jsonify({"found": False, "reason": str(exc)})
+    for entry in _sudo_listdir(base):
+        m = ver_re.match(entry)
+        if m:
+            versions.append((tuple(int(x) for x in m.groups()), entry))
 
     if not versions:
         return jsonify({"found": False, "reason": f"No version directories found in {base}"})
 
     versions.sort(key=lambda x: x[0], reverse=True)
-    latest_tuple, latest_str = versions[0]
+    _, latest_str = versions[0]
 
     # Locations to search for the spectrumscale binary, in preference order
     _TOOLKIT_SUBDIRS = ["ansible-toolkit", "installer", ""]
 
     def find_toolkit(ver_str):
         for sub in _TOOLKIT_SUBDIRS:
-            tp = os.path.join(base, ver_str, sub, "spectrumscale") if sub else os.path.join(base, ver_str, "spectrumscale")
-            if os.path.isfile(tp):
+            tp = (os.path.join(base, ver_str, sub, "spectrumscale") if sub
+                  else os.path.join(base, ver_str, "spectrumscale"))
+            if _sudo_isfile(tp):
                 return tp
         return None
 
@@ -541,26 +554,31 @@ def stream_setup():
                 return
 
             if bin_override:
-                # Caller supplied the full path — validate it directly
+                # Caller supplied the full path — validate and use it directly
                 bin_path, bin_err = resolve_path(bin_override)
                 if bin_err:
                     yield sse("error", f"[ERROR] Invalid toolkit path: {bin_err}")
+                    return
+                if not _sudo_isfile(bin_path):
+                    yield sse("error", f"[ERROR] spectrumscale not found at: {bin_path}")
+                    yield sse("error", "[ERROR] Make sure Step 3 (installer) completed successfully.")
                     return
                 spectrumscale_bin = bin_path
             else:
                 if _dir_err:
                     yield sse("error", f"[ERROR] Invalid working directory: {_dir_err}")
                     return
-                # Check installer/ then ansible-toolkit/ then root of working dir
-                for sub in ("installer", "ansible-toolkit", ""):
-                    candidate = os.path.join(directory, sub, "spectrumscale") if sub else os.path.join(directory, "spectrumscale")
-                    if os.path.isfile(candidate):
+                # Check ansible-toolkit/ then installer/ then root of working dir
+                for sub in ("ansible-toolkit", "installer", ""):
+                    candidate = (os.path.join(directory, sub, "spectrumscale") if sub
+                                 else os.path.join(directory, "spectrumscale"))
+                    if _sudo_isfile(candidate):
                         spectrumscale_bin = candidate
                         break
                 else:
-                    spectrumscale_bin = os.path.join(directory, "installer", "spectrumscale")
+                    spectrumscale_bin = os.path.join(directory, "ansible-toolkit", "spectrumscale")
 
-            if not os.path.isfile(spectrumscale_bin):
+            if not _sudo_isfile(spectrumscale_bin):
                 yield sse("error", f"[ERROR] spectrumscale not found at: {spectrumscale_bin}")
                 yield sse("error", "[ERROR] Make sure Step 3 (installer) completed successfully.")
                 return
