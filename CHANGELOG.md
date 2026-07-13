@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.14] — 2026-07-13
+
 ### Security
 - `_diagnose_path` no longer includes a root-privileged directory listing in error messages for paths outside `/usr/lpp/mmfs` — prevents using the setup endpoint's `bin` parameter to list root-only directories such as `/root`
 - All backend `sudo` invocations now use `sudo -n` (non-interactive) — a missing `NOPASSWD` rule fails immediately with a clear diagnostic instead of hanging the request thread on a hidden password prompt
