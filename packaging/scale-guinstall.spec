@@ -28,11 +28,13 @@ install -d %{buildroot}/usr/bin
 install -d %{buildroot}/usr/lib/systemd/system
 install -d %{buildroot}/usr/share/doc/scale-guinstall
 install -d %{buildroot}/usr/share/man/man1
+install -d %{buildroot}/etc/profile.d
 
 install -m 0755 %{_sourcedir}/scale-server.py      %{buildroot}/usr/lib/scale-guinstall/scale-server.py
 install -m 0644 %{_sourcedir}/Scale-GUInstall.html %{buildroot}/usr/lib/scale-guinstall/Scale-GUInstall.html
 install -m 0755 %{_sourcedir}/scale-guinstall      %{buildroot}/usr/bin/scale-guinstall
 install -m 0644 %{_sourcedir}/scale-guinstall.service %{buildroot}/usr/lib/systemd/system/scale-guinstall.service
+install -m 0644 %{_sourcedir}/scale-guinstall-mmfs.sh %{buildroot}/etc/profile.d/scale-guinstall-mmfs.sh
 install -m 0644 %{_sourcedir}/README.md            %{buildroot}/usr/share/doc/scale-guinstall/README.md
 install -m 0644 %{_sourcedir}/CHANGELOG.md         %{buildroot}/usr/share/doc/scale-guinstall/CHANGELOG.md
 install -m 0644 %{_sourcedir}/scale-guinstall.1.gz %{buildroot}/usr/share/man/man1/scale-guinstall.1.gz
@@ -84,6 +86,7 @@ fi
 /usr/lib/scale-guinstall/Scale-GUInstall.html
 /usr/bin/scale-guinstall
 /usr/lib/systemd/system/scale-guinstall.service
+/etc/profile.d/scale-guinstall-mmfs.sh
 %doc /usr/share/doc/scale-guinstall/README.md
 %doc /usr/share/doc/scale-guinstall/CHANGELOG.md
 %{_mandir}/man1/scale-guinstall.1.gz
