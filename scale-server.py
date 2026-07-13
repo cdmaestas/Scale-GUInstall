@@ -128,16 +128,22 @@ def probe_mmfs():
     versions.sort(key=lambda x: x[0], reverse=True)
     latest_tuple, latest_str = versions[0]
 
-    # Look for spectrumscale binary under ansible-toolkit/
-    toolkit_path = os.path.join(base, latest_str, "ansible-toolkit", "spectrumscale")
-    if not os.path.isfile(toolkit_path):
-        toolkit_path = None
+    # Locations to search for the spectrumscale binary, in preference order
+    _TOOLKIT_SUBDIRS = ["ansible-toolkit", "installer", ""]
+
+    def find_toolkit(ver_str):
+        for sub in _TOOLKIT_SUBDIRS:
+            tp = os.path.join(base, ver_str, sub, "spectrumscale") if sub else os.path.join(base, ver_str, "spectrumscale")
+            if os.path.isfile(tp):
+                return tp
+        return None
+
+    toolkit_path = find_toolkit(latest_str)
 
     # Build per-version toolkit map for all detected versions
     version_map = {}
     for _, vstr in versions:
-        tp = os.path.join(base, vstr, "ansible-toolkit", "spectrumscale")
-        version_map[vstr] = tp if os.path.isfile(tp) else None
+        version_map[vstr] = find_toolkit(vstr)
 
     all_versions = [v for _, v in sorted(versions, key=lambda x: x[0], reverse=True)]
 
@@ -545,7 +551,14 @@ def stream_setup():
                 if _dir_err:
                     yield sse("error", f"[ERROR] Invalid working directory: {_dir_err}")
                     return
-                spectrumscale_bin = os.path.join(directory, "ansible-toolkit", "spectrumscale")
+                # Check installer/ then ansible-toolkit/ then root of working dir
+                for sub in ("installer", "ansible-toolkit", ""):
+                    candidate = os.path.join(directory, sub, "spectrumscale") if sub else os.path.join(directory, "spectrumscale")
+                    if os.path.isfile(candidate):
+                        spectrumscale_bin = candidate
+                        break
+                else:
+                    spectrumscale_bin = os.path.join(directory, "installer", "spectrumscale")
 
             if not os.path.isfile(spectrumscale_bin):
                 yield sse("error", f"[ERROR] spectrumscale not found at: {spectrumscale_bin}")
