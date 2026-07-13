@@ -36,6 +36,8 @@ sudo apt install ./scale-guinstall_<version>-1_all.deb
 
 The post-install script automatically creates a virtual environment at `/usr/lib/scale-guinstall/venv` and installs Flask into it — no additional steps needed.
 
+Both packages also install `/etc/profile.d/scale-guinstall-mmfs.sh`, which adds `/usr/lpp/mmfs/bin` to `$PATH` so GPFS `mm*` commands work in interactive shells (log out/in or `source /etc/profile.d/scale-guinstall-mmfs.sh` to pick it up). The backend itself always uses full `/usr/lpp/mmfs/bin/...` paths and does not depend on this.
+
 After install:
 ```bash
 scale-guinstall          # run in foreground (prints the SSH tunnel command)
@@ -142,6 +144,7 @@ Prepare Software → Node Configuration → Cluster Settings → NSD Storage →
 - **`spectrumscale` toolkit** — installed and accessible (produced by the Prepare Software steps)
 - **Python 3.10+** — required for the setup service and the backend server
 - **Flask 3.x** — `pip install "flask>=3.0,<4"` (backend server only)
+- **Passwordless sudo** — the backend runs all privileged commands with `sudo -n` (non-interactive); the user running `scale-guinstall` must have `NOPASSWD` sudo rights, or every toolkit and `mm*` command will fail with "sudo is not available without a password"
 - **SSH key-based auth** — from the installer node to all target nodes before running setup
 - **`unzip`** — needed for package extraction (`sudo apt install unzip` / `sudo yum install unzip`)
 - **Ansible compatibility** — ansible-core **2.23 or earlier** is required; ansible-core 2.24+ is incompatible with the toolkit

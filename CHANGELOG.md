@@ -9,6 +9,22 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+- `_diagnose_path` no longer includes a root-privileged directory listing in error messages for paths outside `/usr/lpp/mmfs` — prevents using the setup endpoint's `bin` parameter to list root-only directories such as `/root`
+- All backend `sudo` invocations now use `sudo -n` (non-interactive) — a missing `NOPASSWD` rule fails immediately with a clear diagnostic instead of hanging the request thread on a hidden password prompt
+
+### Fixed
+- Toolkit detection failed on nodes where `/usr/lpp/mmfs/<version>` is root-only: filesystem checks (`isfile`/`isdir`/`listdir`) now run via `sudo`, and the probe searches `ansible-toolkit/`, `installer/`, and the version root for `spectrumscale`
+- Setup step error messages now explain *why* the toolkit path check failed (sudo unavailable, path is not a regular file, or path missing — with a listing of the nearest existing directory under `/usr/lpp/mmfs`) instead of a misleading bare "not found"
+- All `sudo` filesystem checks have a 10-second timeout so a stale NFS mount cannot wedge a request thread
+
+### Documentation
+- README and man page now document the passwordless sudo (`NOPASSWD`) requirement
+- README and man page document `/etc/profile.d/scale-guinstall-mmfs.sh` installed by the packages
+- Man page gains SSH tunnel troubleshooting for `administratively prohibited` (AllowTcpForwarding)
+- `start.sh` banner shows the AllowTcpForwarding fix hint
+- Added `.gitignore` (`__pycache__/`, `dist/`, packaging build dirs)
+
 ---
 
 ## [1.0.13] — 2026-07-13
