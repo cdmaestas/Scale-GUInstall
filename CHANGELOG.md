@@ -11,6 +11,21 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.13] — 2026-07-13
+
+### Added
+- `packaging/scale-guinstall-mmfs.sh` — profile.d script that appends `/usr/lpp/mmfs/bin` to `$PATH`; installed to `/etc/profile.d/` by both RPM and DEB packages so `mm*` commands are available in interactive shells after install
+- `start.sh` now prints an SSH tunnel hint (`ssh -L 5001:127.0.0.1:5001 <user>@<node>`) in the startup banner
+- `/api/probe/cluster-nodes` endpoint — parses `sudo mmlscluster` node table and returns hostnames as JSON
+- "Load from cluster" button on Populate page fetches cluster nodes and populates a dropdown for the Existing Cluster Node field
+
+### Changed
+- All `mm*` subprocess calls in the backend now use the full absolute path `/usr/lpp/mmfs/bin/<cmd>` via a `mmcmd()` helper — `sudo` no longer requires `/usr/lpp/mmfs/bin` to be in root's PATH
+- Commands updated: `mmlscluster`, `mmchconfig`, `mmhealth`, `mmcrfileset`, `mmafmconfig`, `mmlinkfileset`
+- CCR status check streams full `mmlscluster` output to the terminal (previously only the grepped Repository line); Repository type badge now shows **CCR Enabled**, **Repository: \<type\>**, or **CCR Not Found**
+
+---
+
 ## [1.0.12] — 2026-07-08
 
 ### Fixed
