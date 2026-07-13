@@ -717,7 +717,7 @@
     </div>
 
     <!-- toolkit-path hidden input: derived from Prepare Software working directory -->
-    <input type="hidden" id="toolkit-path" value="/tmp/scale-pkg/ansible-toolkit/spectrumscale">
+    <input type="hidden" id="toolkit-path" value="/tmp/scale-pkg/installer/spectrumscale">
 
     <!-- =================== OVERVIEW PAGE =================== -->
     <div class="page-section active" id="page-overview">
@@ -908,7 +908,7 @@
             <label style="font-size:12px; color:var(--cds-text-secondary); white-space:nowrap">Detected version</label>
             <select id="mmfs-version-select" class="form-select" style="height:32px; font-size:12px; font-family:var(--font-mono)" onchange="onMmfsVersionChange()"></select>
             <label style="font-size:12px; color:var(--cds-text-secondary); white-space:nowrap">Toolkit path</label>
-            <input type="text" id="mmfs-toolkit-override" class="path-input" style="font-size:12px" placeholder="/usr/lpp/mmfs/<version>/ansible-toolkit/spectrumscale">
+            <input type="text" id="mmfs-toolkit-override" class="path-input" style="font-size:12px" placeholder="/usr/lpp/mmfs/<version>/installer/spectrumscale">
           </div>
           <div style="margin-top:var(--spacing-04); font-size:12px; color:var(--cds-text-secondary)">Override the toolkit path above if you are working with a version that has not yet been extracted.</div>
           <div style="margin-top:var(--spacing-04)">
@@ -2750,7 +2750,7 @@
           <div class="panel-body">
             <div class="form-group">
               <label class="form-label">spectrumscale Binary Path</label>
-              <input type="text" class="form-input" id="settings-toolkit-path" value="/tmp/scale-pkg/ansible-toolkit/spectrumscale" oninput="syncToolkitPath()">
+              <input type="text" class="form-input" id="settings-toolkit-path" value="/tmp/scale-pkg/installer/spectrumscale" oninput="syncToolkitPath()">
               <div class="form-help">Full path to the spectrumscale installation toolkit command</div>
             </div>
             <div class="form-group">
@@ -2852,7 +2852,7 @@ const state = {
   filesystem: { name: '', mount: '/gpfs/data', blocksize: '256K', replication: 2 },
   protocols: { nfs: false, smb: false, object: false },
   clusterName: '',
-  toolkitPath: '/tmp/scale-pkg/ansible-toolkit/spectrumscale',
+  toolkitPath: '/tmp/scale-pkg/installer/spectrumscale',
   dryRun: true
 };
 
@@ -3848,13 +3848,13 @@ function updatePreparePreviews() {
   const mmfsOverride = document.getElementById('mmfs-toolkit-override')?.value.trim();
   const setupToolkit = (mmfsOverride && _mmfsProbeResult?.found)
     ? mmfsOverride
-    : `${dir}/ansible-toolkit/spectrumscale`;
+    : `${dir}/installer/spectrumscale`;
   document.getElementById('prepare-setup-preview').innerHTML =
     `<div><span class="cmd-prompt">$ </span>sudo ${h(setupToolkit)} setup -s ${h(ip)}</div>`;
 
   // Only sync toolkit path from working dir when mmfs probe hasn't been applied
   if (!(_mmfsProbeResult?.found && document.querySelector('[data-step="4"]')?.dataset.mmfsApplied)) {
-    const derivedPath = `${dir}/ansible-toolkit/spectrumscale`;
+    const derivedPath = `${dir}/installer/spectrumscale`;
     state.toolkitPath = derivedPath;
     document.getElementById('toolkit-path').value = derivedPath;
     const settingsEl = document.getElementById('settings-toolkit-path');
@@ -3874,7 +3874,7 @@ let _mmfsProbeResult = null;
 function _mmfsToolkitForVersion(ver) {
   const map = _mmfsProbeResult?.version_map || {};
   // Use probe result if available; otherwise derive canonical path
-  return map[ver] ?? `/usr/lpp/mmfs/${ver}/ansible-toolkit/spectrumscale`;
+  return map[ver] ?? `/usr/lpp/mmfs/${ver}/installer/spectrumscale`;
 }
 
 async function probeMmfs() {
@@ -4122,7 +4122,7 @@ async function runPrepare(phase, btn) {
       checkansible: `$ ansible --version | head -1`,
       checklocale:  `$ locale | grep LC_ALL`,
       checkpython: `$ python3 --version`,
-      setup:       `$ sudo ${(document.getElementById('mmfs-toolkit-override')?.value.trim() && _mmfsProbeResult?.found) ? document.getElementById('mmfs-toolkit-override').value.trim() : dir + '/ansible-toolkit/spectrumscale'} setup -s ${ip || 'SERVER_IP'}`,
+      setup:       `$ sudo ${(document.getElementById('mmfs-toolkit-override')?.value.trim() && _mmfsProbeResult?.found) ? document.getElementById('mmfs-toolkit-override').value.trim() : dir + '/installer/spectrumscale'} setup -s ${ip || 'SERVER_IP'}`,
     };
     appendToTerminal(termId, previews[phase] + '  # (dry run)', 'info');
     appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
