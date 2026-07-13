@@ -103,16 +103,40 @@ def index():
 
 def _sudo_isfile(path):
     """Return True if path is an existing file, using sudo to bypass permission checks."""
-    return subprocess.run(["sudo", "test", "-f", path], capture_output=True).returncode == 0
+    return subprocess.run(["sudo", "-n", "test", "-f", path], capture_output=True).returncode == 0
 
 def _sudo_isdir(path):
     """Return True if path is an existing directory, using sudo to bypass permission checks."""
-    return subprocess.run(["sudo", "test", "-d", path], capture_output=True).returncode == 0
+    return subprocess.run(["sudo", "-n", "test", "-d", path], capture_output=True).returncode == 0
 
 def _sudo_listdir(path):
     """Return list of entries in path using sudo, or empty list on failure."""
-    r = subprocess.run(["sudo", "ls", path], capture_output=True, text=True)
+    r = subprocess.run(["sudo", "-n", "ls", path], capture_output=True, text=True)
     return r.stdout.split() if r.returncode == 0 else []
+
+def _diagnose_path(path):
+    """
+    Explain WHY a path check failed instead of a bare False.
+    Distinguishes: file exists / missing / parent unreadable / sudo unavailable.
+    Returns a human-readable reason string.
+    """
+    # Is sudo itself usable non-interactively?
+    sudo_ok = subprocess.run(["sudo", "-n", "true"], capture_output=True)
+    if sudo_ok.returncode != 0:
+        detail = sudo_ok.stderr.decode(errors="replace").strip()
+        return (f"sudo is not available without a password ({detail or 'sudo -n failed'}). "
+                "The backend needs passwordless sudo to inspect root-owned paths.")
+    if subprocess.run(["sudo", "-n", "test", "-e", path], capture_output=True).returncode == 0:
+        return f"{path} exists but is not a regular file."
+    # Walk up to find the first missing/unreadable ancestor
+    parent = os.path.dirname(path)
+    while parent and parent != "/":
+        if subprocess.run(["sudo", "-n", "test", "-d", parent], capture_output=True).returncode == 0:
+            entries = _sudo_listdir(parent)
+            listing = ", ".join(entries[:12]) + ("…" if len(entries) > 12 else "")
+            return f"{path} does not exist. Contents of {parent}: [{listing}]"
+        parent = os.path.dirname(parent)
+    return f"{path} does not exist (no readable ancestor directory found)."
 
 
 @app.route("/api/probe/mmfs")
@@ -126,7 +150,7 @@ def probe_mmfs():
     ver_re = re.compile(r"^(\d+)\.(\d+)\.(\d+)\.(\d+)$")
 
     if not _sudo_isdir(base):
-        return jsonify({"found": False, "reason": f"{base} does not exist"})
+        return jsonify({"found": False, "reason": _diagnose_path(base)})
 
     versions = []
     for entry in _sudo_listdir(base):
@@ -560,8 +584,8 @@ def stream_setup():
                     yield sse("error", f"[ERROR] Invalid toolkit path: {bin_err}")
                     return
                 if not _sudo_isfile(bin_path):
-                    yield sse("error", f"[ERROR] spectrumscale not found at: {bin_path}")
-                    yield sse("error", "[ERROR] Make sure Step 3 (installer) completed successfully.")
+                    yield sse("error", f"[ERROR] spectrumscale not usable at: {bin_path}")
+                    yield sse("error", f"[ERROR] {_diagnose_path(bin_path)}")
                     return
                 spectrumscale_bin = bin_path
             else:
@@ -579,8 +603,9 @@ def stream_setup():
                     spectrumscale_bin = os.path.join(directory, "ansible-toolkit", "spectrumscale")
 
             if not _sudo_isfile(spectrumscale_bin):
-                yield sse("error", f"[ERROR] spectrumscale not found at: {spectrumscale_bin}")
-                yield sse("error", "[ERROR] Make sure Step 3 (installer) completed successfully.")
+                yield sse("error", f"[ERROR] spectrumscale not usable at: {spectrumscale_bin}")
+                yield sse("error", f"[ERROR] {_diagnose_path(spectrumscale_bin)}")
+                yield sse("error", "[ERROR] If the toolkit is not extracted, run Step 3 (installer) first.")
                 return
 
             # Verify system python3 >= 3.10
