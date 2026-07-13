@@ -40,6 +40,12 @@ app.after_request(cors)
 
 _ALLOWED_ROOTS = ("/tmp", "/opt", "/usr", "/home", "/root", "/var", "/srv", "/mnt", "/data", "/ibm")
 
+MMFS_BIN = "/usr/lpp/mmfs/bin"
+
+def mmcmd(*args):
+    """Return a subprocess arg list for an mm* command using the full MMFS_BIN path."""
+    return [os.path.join(MMFS_BIN, args[0])] + list(args[1:])
+
 _VALID_HOSTNAME_RE = re.compile(r'^[a-zA-Z0-9._-]{1,255}$')
 
 _ALLOWED_GPFS_FLAGS = frozenset({
@@ -1486,7 +1492,7 @@ def stream_mmchconfig():
                 if not _VALID_MMCHCONFIG_VALUE_RE.fullmatch(val):
                     yield sse("error", f"[ERROR] Invalid value for {key}: {val!r}")
                     return
-                cmd = ["sudo", "mmchconfig", f"{key}={val}", "-i"]
+                cmd = ["sudo"] + mmcmd("mmchconfig", f"{key}={val}", "-i")
                 yield sse("info", f"$ {' '.join(cmd)}")
                 rc = yield from stream_process(cmd)
                 if rc != 0:
@@ -1515,7 +1521,7 @@ def stream_healthinterval():
             if nodes != "all" and not _VALID_HOSTNAME_RE.fullmatch(nodes):
                 yield sse("error", f"[ERROR] Invalid nodes value: {nodes!r}")
                 return
-            cmd = ["sudo", "mmhealth", "config", "interval", interval, "-N", nodes]
+            cmd = ["sudo"] + mmcmd("mmhealth", "config", "interval", interval, "-N", nodes)
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd)
             if rc == 0:
@@ -1560,7 +1566,7 @@ def stream_afmgateway():
                 return
 
             # Step 1: create the fileset
-            cmd1 = ["sudo", "mmcrfileset", fs, fileset, "--inode-space", "new"]
+            cmd1 = ["sudo"] + mmcmd("mmcrfileset", fs, fileset, "--inode-space", "new")
             yield sse("info", f"$ {' '.join(cmd1)}")
             rc = yield from stream_process(cmd1)
             if rc != 0:
@@ -1573,8 +1579,8 @@ def stream_afmgateway():
                 if not nfs_target:
                     yield sse("error", "[ERROR] NFS target is required.")
                     return
-                cmd2 = ["sudo", "mmafmconfig", fs, fileset, "-N", node,
-                        "--afm-target", f"nfs://{nfs_target}", "--afm-mode", mode]
+                cmd2 = ["sudo"] + mmcmd("mmafmconfig", fs, fileset, "-N", node,
+                        "--afm-target", f"nfs://{nfs_target}", "--afm-mode", mode)
             else:
                 s3_url    = body.get("s3_url", "").strip()
                 s3_bucket = body.get("s3_bucket", "").strip()
@@ -1583,10 +1589,10 @@ def stream_afmgateway():
                 if not all([s3_url, s3_bucket, s3_key, s3_secret]):
                     yield sse("error", "[ERROR] All S3 fields are required.")
                     return
-                cmd2 = ["sudo", "mmafmconfig", fs, fileset, "-N", node,
+                cmd2 = ["sudo"] + mmcmd("mmafmconfig", fs, fileset, "-N", node,
                         "--afm-target", f"s3://{s3_url}/{s3_bucket}",
-                        "--afm-mode", mode, "-K", s3_key, "-E", s3_secret]
-                yield sse("info", f"$ sudo mmafmconfig {fs} {fileset} -N {node} --afm-target s3://{s3_url}/{s3_bucket} --afm-mode {mode} -K {s3_key} -E ********")
+                        "--afm-mode", mode, "-K", s3_key, "-E", s3_secret)
+                yield sse("info", f"$ sudo {MMFS_BIN}/mmafmconfig {fs} {fileset} -N {node} --afm-target s3://{s3_url}/{s3_bucket} --afm-mode {mode} -K {s3_key} -E ********")
 
             if proto == "nfs":
                 yield sse("info", f"$ {' '.join(cmd2)}")
@@ -1597,7 +1603,7 @@ def stream_afmgateway():
 
             # Step 3: link the fileset
             junction = f"/ibm/{fs}/{fileset}"
-            cmd3 = ["sudo", "mmlinkfileset", fs, fileset, "-J", junction]
+            cmd3 = ["sudo"] + mmcmd("mmlinkfileset", fs, fileset, "-J", junction)
             yield sse("info", f"$ {' '.join(cmd3)}")
             rc = yield from stream_process(cmd3)
             if rc == 0:
@@ -1669,8 +1675,8 @@ def stream_phase():
 def stream_ccr_status():
     def generate():
         try:
-            cmd = ["sudo", "mmlscluster"]
-            yield sse("info", "$ sudo mmlscluster")
+            cmd = ["sudo"] + mmcmd("mmlscluster")
+            yield sse("info", f"$ sudo {MMFS_BIN}/mmlscluster")
             proc = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0
             )
@@ -1690,7 +1696,7 @@ def stream_ccr_status():
             else:
                 yield sse("success", "[OK] CCR is configured.")
         except FileNotFoundError:
-            yield sse("error", "[ERROR] mmlscluster not found — is IBM Storage Scale installed and in PATH?")
+            yield sse("error", f"[ERROR] {MMFS_BIN}/mmlscluster not found — is IBM Storage Scale installed?")
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
         finally:
@@ -1703,7 +1709,7 @@ def probe_cluster_nodes():
     """Parse mmlscluster output and return the node list as JSON."""
     try:
         result = subprocess.run(
-            ["sudo", "mmlscluster"],
+            ["sudo"] + mmcmd("mmlscluster"),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, timeout=15,
         )
@@ -1726,7 +1732,7 @@ def probe_cluster_nodes():
             return jsonify({"error": result.stdout.strip() or f"mmlscluster exited {result.returncode}"}), 500
         return jsonify({"nodes": nodes})
     except FileNotFoundError:
-        return jsonify({"error": "mmlscluster not found"}), 500
+        return jsonify({"error": f"{MMFS_BIN}/mmlscluster not found — is IBM Storage Scale installed?"}), 500
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
