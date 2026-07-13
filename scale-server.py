@@ -259,7 +259,7 @@ def check_file():
     path, err = resolve_path(request.args.get("path", "").strip())
     if err:
         return jsonify({"exists": False, "error": err}), 400
-    return jsonify({"exists": os.path.isfile(path), "path": path})
+    return jsonify({"exists": _sudo_isfile(path), "path": path})
 
 
 # ---------------------------------------------------------------------------
@@ -323,24 +323,23 @@ def stream_extract():
                 yield sse("error", f"[ERROR] Invalid destination path: {_dst_err}")
                 return
 
-            if not os.path.isfile(zip_path):
-                yield sse("error", f"[ERROR] File not found: {zip_path}")
-                yield sse("error", f"[ERROR] Server working directory: {os.getcwd()}")
-                yield sse("error", "[ERROR] Use an absolute path or verify the filename.")
+            if not _sudo_isfile(zip_path):
+                yield sse("error", f"[ERROR] File not usable: {zip_path}")
+                yield sse("error", f"[ERROR] {_diagnose_path(zip_path)}")
                 return
 
             if not dest:
                 yield sse("error", "[ERROR] No extraction destination provided.")
                 return
 
-            try:
-                os.makedirs(dest, exist_ok=True)
-            except OSError as exc:
-                yield sse("error", f"[ERROR] Cannot create destination directory: {exc}")
+            rc = subprocess.run(["sudo", "-n", "mkdir", "-p", dest],
+                                capture_output=True, timeout=_SUDO_CHECK_TIMEOUT).returncode
+            if rc != 0:
+                yield sse("error", f"[ERROR] Cannot create destination directory: {dest}")
                 return
 
-            yield sse("info", f"$ unzip -o {zip_path} -d {dest}")
-            rc = yield from stream_process(["unzip", "-o", zip_path, "-d", dest])
+            yield sse("info", f"$ sudo unzip -o {zip_path} -d {dest}")
+            rc = yield from stream_process(["sudo", "-n", "unzip", "-o", zip_path, "-d", dest])
 
             if rc == 0:
                 yield sse("success", "[OK] Extraction complete.")
@@ -349,8 +348,8 @@ def stream_extract():
 
             # Find the self-extracting *-install script at the top level of dest
             installer_path = None
-            for entry in os.listdir(dest):
-                if entry.endswith("-install") and os.path.isfile(os.path.join(dest, entry)):
+            for entry in _sudo_listdir(dest):
+                if entry.endswith("-install") and _sudo_isfile(os.path.join(dest, entry)):
                     installer_path = os.path.join(dest, entry)
                     break
 
@@ -384,18 +383,21 @@ def stream_checksum():
                 yield sse("error", f"[ERROR] Invalid directory: {_dir_err}")
                 return
 
-            if not os.path.isdir(directory):
-                yield sse("error", f"[ERROR] Directory not found: {directory}")
+            if not _sudo_isdir(directory):
+                yield sse("error", f"[ERROR] Directory not usable: {directory}")
+                yield sse("error", f"[ERROR] {_diagnose_path(directory)}")
                 return
 
-            md5_files = [f for f in os.listdir(directory) if f.endswith(".md5")]
+            md5_files = [f for f in _sudo_listdir(directory) if f.endswith(".md5")]
             if not md5_files:
                 yield sse("error", f"[ERROR] No .md5 files found in {directory}")
                 yield sse("error", "[ERROR] Make sure Step 1 (extract) completed successfully.")
                 return
 
-            yield sse("info", f"$ cd {directory} && md5sum -c *.md5")
-            rc = yield from stream_process(["md5sum", "-c"] + md5_files, cwd=directory)
+            yield sse("info", f"$ cd {directory} && sudo md5sum -c *.md5")
+            # chdir must happen under sudo — the dir itself may be root-only
+            inner = f"cd {shlex.quote(directory)} && md5sum -c " + " ".join(shlex.quote(f) for f in md5_files)
+            rc = yield from stream_process(["sudo", "-n", "sh", "-c", inner])
 
             if rc == 0:
                 yield sse("success", "[OK] All checksums verified.")
@@ -429,8 +431,9 @@ def stream_install():
                 yield sse("error", f"[ERROR] Invalid target directory: {_dir_err}")
                 return
 
-            if not os.path.isfile(installer):
-                yield sse("error", f"[ERROR] Installer not found: {installer}")
+            if not _sudo_isfile(installer):
+                yield sse("error", f"[ERROR] Installer not usable: {installer}")
+                yield sse("error", f"[ERROR] {_diagnose_path(installer)}")
                 yield sse("error", "[ERROR] Run Step 1 first, or check the installer path.")
                 return
 
@@ -673,8 +676,9 @@ def stream_nodes():
                 yield sse("error", f"[ERROR] Invalid toolkit path: {_tk_err}")
                 return
 
-            if not os.path.isfile(toolkit):
-                yield sse("error", f"[ERROR] spectrumscale binary not found: {toolkit}")
+            if not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] spectrumscale binary not usable: {toolkit}")
+                yield sse("error", f"[ERROR] {_diagnose_path(toolkit)}")
                 return
 
             if not isinstance(nodes, list):
@@ -738,8 +742,9 @@ def stream_config_gpfs():
                 yield sse("error", f"[ERROR] Invalid toolkit path: {_tk_err}")
                 return
 
-            if not os.path.isfile(toolkit):
-                yield sse("error", f"[ERROR] spectrumscale binary not found: {toolkit}")
+            if not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] spectrumscale binary not usable: {toolkit}")
+                yield sse("error", f"[ERROR] {_diagnose_path(toolkit)}")
                 return
 
             if not flag:
@@ -872,8 +877,8 @@ def _parse_kv(output):
 @app.route("/api/list/nodes")
 def list_nodes():
     toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
-    if _tk_err or not os.path.isfile(toolkit):
-        return jsonify({"ok": False, "error": _tk_err or f"Toolkit not found: {toolkit}"}), 400
+    if _tk_err or not _sudo_isfile(toolkit):
+        return jsonify({"ok": False, "error": _tk_err or _diagnose_path(toolkit)}), 400
 
     raw, rc = _run_cmd(["sudo", "-n", toolkit, "node", "list"])
     if rc != 0:
@@ -949,8 +954,8 @@ def list_nodes():
 @app.route("/api/list/nsds")
 def list_nsds():
     toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
-    if _tk_err or not os.path.isfile(toolkit):
-        return jsonify({"ok": False, "error": _tk_err or f"Toolkit not found: {toolkit}"}), 400
+    if _tk_err or not _sudo_isfile(toolkit):
+        return jsonify({"ok": False, "error": _tk_err or _diagnose_path(toolkit)}), 400
 
     raw, rc = _run_cmd(["sudo", "-n", toolkit, "nsd", "list"])
     if rc != 0:
@@ -981,8 +986,8 @@ def list_nsds():
 @app.route("/api/list/filesystem")
 def list_filesystem():
     toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
-    if _tk_err or not os.path.isfile(toolkit):
-        return jsonify({"ok": False, "error": _tk_err or f"Toolkit not found: {toolkit}"}), 400
+    if _tk_err or not _sudo_isfile(toolkit):
+        return jsonify({"ok": False, "error": _tk_err or _diagnose_path(toolkit)}), 400
 
     raw, rc = _run_cmd(["sudo", "-n", toolkit, "filesystem", "list"])
     if rc != 0:
@@ -1011,8 +1016,8 @@ def list_filesystem():
 @app.route("/api/list/config")
 def list_config():
     toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
-    if _tk_err or not os.path.isfile(toolkit):
-        return jsonify({"ok": False, "error": _tk_err or f"Toolkit not found: {toolkit}"}), 400
+    if _tk_err or not _sudo_isfile(toolkit):
+        return jsonify({"ok": False, "error": _tk_err or _diagnose_path(toolkit)}), 400
 
     raw, rc = _run_cmd(["sudo", "-n", toolkit, "config", "gpfs", "--list"])
     if rc != 0:
@@ -1072,8 +1077,8 @@ def stream_populate():
 
     def generate():
         try:
-            if _tk_err or not os.path.isfile(toolkit):
-                yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
+            if _tk_err or not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
                 return
             if not node:
                 yield sse("error", "[ERROR] Node is required.")
@@ -1161,8 +1166,8 @@ def stream_callhome():
 
     def generate():
         try:
-            if _tk_err or not os.path.isfile(toolkit):
-                yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
+            if _tk_err or not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
                 return
             yield from _gen_callhome(toolkit, enable)
         except Exception as exc:
@@ -1184,8 +1189,8 @@ def stream_perfmon():
 
     def generate():
         try:
-            if _tk_err or not os.path.isfile(toolkit):
-                yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
+            if _tk_err or not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
                 return
             yield from _gen_perfmon(toolkit, enable)
         except Exception as exc:
@@ -1208,8 +1213,8 @@ def stream_fileaudit():
 
     def generate():
         try:
-            if _tk_err or not os.path.isfile(toolkit):
-                yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
+            if _tk_err or not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
                 return
             yield from _gen_fileaudit(toolkit, enable, logfs)
         except Exception as exc:
@@ -1240,8 +1245,8 @@ def stream_apply_cluster_config():
 
     def generate():
         try:
-            if _tk_err or not os.path.isfile(toolkit):
-                yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
+            if _tk_err or not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
                 return
 
             # config gpfs flags
@@ -1720,8 +1725,8 @@ def stream_phase():
 
     def generate():
         try:
-            if _tk_err or not os.path.isfile(toolkit):
-                yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
+            if _tk_err or not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
                 return
             args = PHASE_CMDS.get(phase)
             if args is None:
@@ -1905,8 +1910,8 @@ def stream_nfs_core_dump():
             if mode not in ("enable", "disable"):
                 yield sse("error", f"[ERROR] Invalid mode '{mode}'. Use 'enable' or 'disable'.")
                 return
-            if _tk_err or not os.path.isfile(toolkit):
-                yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
+            if _tk_err or not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
                 return
             cmd = ["sudo", "-n", toolkit, "nfs_core_dump", mode]
             yield sse("info", f"$ {' '.join(cmd)}")
@@ -1970,19 +1975,26 @@ def stream_node_identity():
                 yield sse("error", "[ERROR] No nodes configured.")
                 return
 
-            # 1. Create TLS directory
+            # 1. Create TLS directory, owned by the service user so that the
+            # unprivileged openssl / scp steps below can read and write it
             cmd = ["sudo", "-n", "mkdir", "-p", tls_dir]
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd)
             if rc != 0:
                 yield sse("error", "[ERROR] Could not create TLS directory.")
                 return
+            cmd = ["sudo", "-n", "chown", "-R", f"{os.getuid()}:{os.getgid()}", tls_dir]
+            yield sse("info", f"$ sudo chown -R $(id -u):$(id -g) {tls_dir}")
+            rc = yield from stream_process(cmd)
+            if rc != 0:
+                yield sse("error", "[ERROR] Could not take ownership of TLS directory.")
+                return
 
             ca_key = os.path.join(tls_dir, "ca.key")
             ca_crt = os.path.join(tls_dir, "ca.crt")
 
             # 2. Generate CA private key (skip if already exists)
-            if not os.path.exists(ca_key):
+            if not _sudo_test("-e", ca_key):
                 cmd = ["openssl", "ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", ca_key]
                 yield sse("info", f"$ {' '.join(cmd)}")
                 rc = yield from stream_process(cmd)
@@ -1993,7 +2005,7 @@ def stream_node_identity():
                 yield sse("info", f"# CA key already exists: {ca_key} (reusing)")
 
             # 3. Generate self-signed CA certificate (skip if already exists)
-            if not os.path.exists(ca_crt):
+            if not _sudo_test("-e", ca_crt):
                 subj = f"/O={org_name}/CN={ca_cn}"
                 cmd = ["openssl", "req", "-new", "-x509", "-sha256",
                        "-key", ca_key, "-out", ca_crt,
