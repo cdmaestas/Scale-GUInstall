@@ -2378,12 +2378,12 @@
         <div class="panel-body" style="display:flex; align-items:center; gap:var(--spacing-05); flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" onclick="checkCCRStatus(this)">Check CCR Status</button>
           <div class="cmd-preview" style="flex:1; margin:0">
-            <div><span class="cmd-prompt">$ </span>mmlscluster | grep -i Repository</div>
+            <div><span class="cmd-prompt">$ </span>sudo mmlscluster</div>
           </div>
           <div id="ccr-status-badge" style="display:none"></div>
         </div>
         <div id="ccr-status-output" style="display:none; padding:0 var(--spacing-05) var(--spacing-05)">
-          <div class="terminal" style="height:80px; font-size:12px" id="ccr-terminal">
+          <div class="terminal" style="height:160px; font-size:12px" id="ccr-terminal">
             <div class="terminal-line normal terminal-cursor"></div>
           </div>
         </div>
@@ -2395,7 +2395,15 @@
           <div class="panel-body">
             <div class="form-group">
               <label class="form-label">Existing Cluster Node <span class="required">*</span></label>
-              <input type="text" class="form-input" id="pop-node" placeholder="e.g. gpfs-node01 or 192.168.1.10" oninput="updatePopulatePreview()">
+              <div style="display:flex; gap:var(--spacing-03); align-items:center">
+                <input type="text" class="form-input" id="pop-node" placeholder="e.g. gpfs-node01 or 192.168.1.10" oninput="updatePopulatePreview()" style="flex:1">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="loadClusterNodes(this)" style="white-space:nowrap">Load from cluster</button>
+              </div>
+              <div id="pop-node-list" style="display:none; margin-top:var(--spacing-03)">
+                <select class="form-select" id="pop-node-select" onchange="document.getElementById('pop-node').value=this.value; updatePopulatePreview()">
+                  <option value="">— select a node —</option>
+                </select>
+              </div>
               <div class="form-help">Any node in the existing cluster with GPFS running</div>
             </div>
             <div class="form-group">
@@ -3994,7 +4002,7 @@ function sseTypeToTerminalType(type) {
   return 'normal';
 }
 
-async function streamToTerminal(termId, url, onDone) {
+async function streamToTerminal(termId, url, onDone, onEvent) {
   document.getElementById(termId)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   let response;
   try {
@@ -4045,6 +4053,7 @@ async function streamToTerminal(termId, url, onDone) {
           _lastFakeNsdPath = msg.line;
           continue;
         }
+        if (onEvent) onEvent(msg.type, msg.line);
         appendToTerminal(termId, msg.line, sseTypeToTerminalType(msg.type));
       }
     }
@@ -4665,14 +4674,13 @@ async function checkCCRStatus(btn) {
   badge.style.display = 'none';
 
   if (state.dryRun) {
-    appendToTerminal(termId, '$ mmlscluster | grep -i Repository  # (dry run)', 'info');
+    appendToTerminal(termId, '$ sudo mmlscluster  # (dry run)', 'info');
     appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
     return;
   }
 
   if (btn) btn.disabled = true;
   document.getElementById(termId)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  appendToTerminal(termId, '$ mmlscluster | grep -i Repository', 'info');
 
   try {
     const ping = await fetch(getBackendUrl() + '/api/ping', { signal: AbortSignal.timeout(2000) });
@@ -4683,31 +4691,41 @@ async function checkCCRStatus(btn) {
     return;
   }
 
-  let output = '';
-  const res = await fetch(`${getBackendUrl()}/api/stream/ccr-status`);
-  const reader = res.body.getReader();
-  const dec = new TextDecoder();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const lines = dec.decode(value).split('\n');
-    for (const line of lines) {
-      if (line.startsWith('data:')) {
-        const text = line.slice(5).trim();
-        if (text) { appendToTerminal(termId, text, 'normal'); output += text; }
-      }
-    }
-  }
+  let repoLine = '';
+  await streamToTerminal(termId, `${getBackendUrl()}/api/stream/ccr-status`, null, (type, text) => {
+    if (type === 'success' && text.toLowerCase().includes('repository')) repoLine = text;
+  });
 
   badge.style.display = 'inline-block';
-  if (/enabled/i.test(output)) {
+  const repoMatch = repoLine.match(/:\s*(\S+)\s*$/);
+  const repoType  = repoMatch ? repoMatch[1].toUpperCase() : null;
+  if (repoType === 'CCR') {
     badge.innerHTML = '<span style="background:var(--cds-support-success);color:#000;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500">CCR Enabled</span>';
-  } else if (/disabled/i.test(output)) {
-    badge.innerHTML = '<span style="background:var(--cds-support-error);color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500">CCR Disabled</span>';
+  } else if (repoType) {
+    badge.innerHTML = `<span style="background:var(--cds-support-warning);color:#000;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500">Repository: ${h(repoType)}</span>`;
   } else {
-    badge.innerHTML = '<span style="background:var(--cds-support-warning);color:#000;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500">Unknown</span>';
+    badge.innerHTML = '<span style="background:var(--cds-support-error);color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500">CCR Not Found</span>';
   }
   if (btn) btn.disabled = false;
+}
+
+async function loadClusterNodes(btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const res  = await fetch(`${getBackendUrl()}/api/probe/cluster-nodes`);
+    const data = await res.json();
+    if (data.error) { alert(`Could not load nodes: ${data.error}`); return; }
+    const nodes = data.nodes || [];
+    if (!nodes.length) { alert('No nodes found in mmlscluster output.'); return; }
+    const sel = document.getElementById('pop-node-select');
+    sel.innerHTML = '<option value="">— select a node —</option>';
+    nodes.forEach(n => { sel.innerHTML += `<option value="${h(n)}">${h(n)}</option>`; });
+    document.getElementById('pop-node-list').style.display = '';
+  } catch (e) {
+    alert('Backend not reachable.');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 function testConnection() {
