@@ -1,4 +1,4 @@
-.TH SCALE\-GUINSTALL 1 "2026-07-03" "1.0.1" "Scale GUInstall"
+.TH SCALE\-GUINSTALL 1 "2026-07-13" "1.0.14" "Scale GUInstall"
 .SH NAME
 scale\-guinstall \- IBM Storage Scale Installation Toolkit GUI backend server
 .SH SYNOPSIS
@@ -48,6 +48,16 @@ installation.
 .B /usr/lib/systemd/system/scale\-guinstall.service
 systemd unit file. The service is installed but not enabled by default.
 .TP
+.B /etc/profile.d/scale\-guinstall\-mmfs.sh
+Adds
+.B /usr/lpp/mmfs/bin
+to
+.B PATH
+in interactive shells so GPFS
+.B mm*
+commands can be run without a full path. The backend itself always uses
+absolute paths and does not depend on this file.
+.TP
 .B /usr/share/doc/scale\-guinstall/README.md
 Full documentation.
 .TP
@@ -76,6 +86,15 @@ ssh \-fNL 5001:127.0.0.1:5001 user@installer\-node
 Leave the Backend URL in the GUI at
 .BR http://127.0.0.1:5001 ;
 the SSH tunnel forwards it transparently.
+.PP
+If the tunnel fails with
+.IR "channel N: open failed: administratively prohibited" ,
+the node's SSH server has TCP forwarding disabled. Enable local
+forwarding and reload sshd:
+.EX
+echo 'AllowTcpForwarding local' | sudo tee \-a /etc/ssh/sshd_config
+sudo systemctl reload sshd
+.EE
 .SS Override the port
 .EX
 PORT=8080 scale\-guinstall
@@ -99,6 +118,18 @@ Because the server executes privileged commands (via
 .BR sudo ),
 do not expose it to untrusted networks.
 Use the SSH tunnel approach for remote access.
+.PP
+The user running the server must have
+.B passwordless
+sudo rights
+.RB ( NOPASSWD
+in
+.BR sudoers ).
+All privileged commands are invoked with
+.B sudo \-n
+so the backend can never hang on a password prompt; without
+.BR NOPASSWD ,
+they fail immediately with a diagnostic.
 .SH SEE ALSO
 .BR spectrumscale (1),
 .BR ssh (1),
