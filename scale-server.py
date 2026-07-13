@@ -101,17 +101,31 @@ def index():
 # Probe installed Scale version under /usr/lpp/mmfs
 # ---------------------------------------------------------------------------
 
+_SUDO_CHECK_TIMEOUT = 10  # seconds; a stale NFS mount must not wedge a request thread
+
+def _sudo_test(flag, path):
+    """Run `sudo -n test <flag> <path>`; False on failure, non-zero exit, or timeout."""
+    try:
+        return subprocess.run(["sudo", "-n", "test", flag, path],
+                              capture_output=True, timeout=_SUDO_CHECK_TIMEOUT).returncode == 0
+    except subprocess.TimeoutExpired:
+        return False
+
 def _sudo_isfile(path):
-    """Return True if path is an existing file, using sudo to bypass permission checks."""
-    return subprocess.run(["sudo", "-n", "test", "-f", path], capture_output=True).returncode == 0
+    """Return True if path is an existing regular file, using sudo to bypass permission checks."""
+    return _sudo_test("-f", path)
 
 def _sudo_isdir(path):
     """Return True if path is an existing directory, using sudo to bypass permission checks."""
-    return subprocess.run(["sudo", "-n", "test", "-d", path], capture_output=True).returncode == 0
+    return _sudo_test("-d", path)
 
 def _sudo_listdir(path):
     """Return list of entries in path using sudo, or empty list on failure."""
-    r = subprocess.run(["sudo", "-n", "ls", path], capture_output=True, text=True)
+    try:
+        r = subprocess.run(["sudo", "-n", "ls", path],
+                           capture_output=True, text=True, timeout=_SUDO_CHECK_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return []
     return r.stdout.split() if r.returncode == 0 else []
 
 def _diagnose_path(path):
@@ -121,20 +135,27 @@ def _diagnose_path(path):
     Returns a human-readable reason string.
     """
     # Is sudo itself usable non-interactively?
-    sudo_ok = subprocess.run(["sudo", "-n", "true"], capture_output=True)
+    try:
+        sudo_ok = subprocess.run(["sudo", "-n", "true"],
+                                 capture_output=True, timeout=_SUDO_CHECK_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return "sudo -n timed out — the backend cannot inspect root-owned paths."
     if sudo_ok.returncode != 0:
         detail = sudo_ok.stderr.decode(errors="replace").strip()
         return (f"sudo is not available without a password ({detail or 'sudo -n failed'}). "
                 "The backend needs passwordless sudo to inspect root-owned paths.")
-    if subprocess.run(["sudo", "-n", "test", "-e", path], capture_output=True).returncode == 0:
+    if _sudo_test("-e", path):
         return f"{path} exists but is not a regular file."
-    # Walk up to find the first missing/unreadable ancestor
+    # Walk up to find the first existing ancestor. Only include its listing
+    # for paths under /usr/lpp/mmfs — never expose arbitrary root-only dirs.
     parent = os.path.dirname(path)
     while parent and parent != "/":
-        if subprocess.run(["sudo", "-n", "test", "-d", parent], capture_output=True).returncode == 0:
-            entries = _sudo_listdir(parent)
-            listing = ", ".join(entries[:12]) + ("…" if len(entries) > 12 else "")
-            return f"{path} does not exist. Contents of {parent}: [{listing}]"
+        if _sudo_isdir(parent):
+            if path.startswith("/usr/lpp/mmfs/"):
+                entries = _sudo_listdir(parent)
+                listing = ", ".join(entries[:12]) + ("…" if len(entries) > 12 else "")
+                return f"{path} does not exist. Contents of {parent}: [{listing}]"
+            return f"{path} does not exist (nearest existing directory: {parent})."
         parent = os.path.dirname(parent)
     return f"{path} does not exist (no readable ancestor directory found)."
 
@@ -417,7 +438,7 @@ def stream_install():
                 yield sse("error", "[ERROR] No --dir target directory provided.")
                 return
 
-            cmd = ["sudo", "sh", installer, "--dir", target_dir, "--silent"]
+            cmd = ["sudo", "-n", "sh", installer, "--dir", target_dir, "--silent"]
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd)
 
@@ -617,7 +638,7 @@ def stream_setup():
             _, _, py_ver_str, py_binary = py_info
             yield sse("normal", f"[INFO] Python {py_ver_str} confirmed ({py_binary}).")
 
-            cmd = ["sudo", spectrumscale_bin, "setup", "-s", server_ip]
+            cmd = ["sudo", "-n", spectrumscale_bin, "setup", "-s", server_ip]
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd)
 
@@ -678,12 +699,12 @@ def stream_nodes():
                     return
 
                 # Delete first so role changes take effect cleanly
-                del_cmd = ["sudo", toolkit, "node", "delete", hostname]
+                del_cmd = ["sudo", "-n", toolkit, "node", "delete", hostname]
                 yield sse("info", f"$ {' '.join(del_cmd)}")
                 yield from stream_process(del_cmd)  # ignore rc — node may not exist yet
 
                 role_flags = [role_flag_map[r] for r in roles if r in role_flag_map]
-                add_cmd = ["sudo", toolkit, "node", "add", hostname] + role_flags
+                add_cmd = ["sudo", "-n", toolkit, "node", "add", hostname] + role_flags
                 yield sse("info", f"$ {' '.join(add_cmd)}")
                 rc = yield from stream_process(add_cmd)
                 if rc == 0:
@@ -729,7 +750,7 @@ def stream_config_gpfs():
                 yield sse("error", f"[ERROR] Unrecognised flag: {flag}")
                 return
 
-            cmd = ["sudo", toolkit, "config", "gpfs", flag]
+            cmd = ["sudo", "-n", toolkit, "config", "gpfs", flag]
             if value:
                 cmd.append(value)
 
@@ -854,7 +875,7 @@ def list_nodes():
     if _tk_err or not os.path.isfile(toolkit):
         return jsonify({"ok": False, "error": _tk_err or f"Toolkit not found: {toolkit}"}), 400
 
-    raw, rc = _run_cmd(["sudo", toolkit, "node", "list"])
+    raw, rc = _run_cmd(["sudo", "-n", toolkit, "node", "list"])
     if rc != 0:
         return jsonify({"ok": False, "error": raw.strip(), "raw": raw})
 
@@ -931,7 +952,7 @@ def list_nsds():
     if _tk_err or not os.path.isfile(toolkit):
         return jsonify({"ok": False, "error": _tk_err or f"Toolkit not found: {toolkit}"}), 400
 
-    raw, rc = _run_cmd(["sudo", toolkit, "nsd", "list"])
+    raw, rc = _run_cmd(["sudo", "-n", toolkit, "nsd", "list"])
     if rc != 0:
         return jsonify({"ok": False, "error": raw.strip(), "raw": raw})
 
@@ -963,7 +984,7 @@ def list_filesystem():
     if _tk_err or not os.path.isfile(toolkit):
         return jsonify({"ok": False, "error": _tk_err or f"Toolkit not found: {toolkit}"}), 400
 
-    raw, rc = _run_cmd(["sudo", toolkit, "filesystem", "list"])
+    raw, rc = _run_cmd(["sudo", "-n", toolkit, "filesystem", "list"])
     if rc != 0:
         return jsonify({"ok": False, "error": raw.strip(), "raw": raw})
 
@@ -993,7 +1014,7 @@ def list_config():
     if _tk_err or not os.path.isfile(toolkit):
         return jsonify({"ok": False, "error": _tk_err or f"Toolkit not found: {toolkit}"}), 400
 
-    raw, rc = _run_cmd(["sudo", toolkit, "config", "gpfs", "--list"])
+    raw, rc = _run_cmd(["sudo", "-n", toolkit, "config", "gpfs", "--list"])
     if rc != 0:
         return jsonify({"ok": False, "error": raw.strip(), "raw": raw})
 
@@ -1060,7 +1081,7 @@ def stream_populate():
             if not _VALID_HOSTNAME_RE.fullmatch(node):
                 yield sse("error", f"[ERROR] Invalid node hostname: {node!r}")
                 return
-            cmd = ["sudo", toolkit, "config", "populate", "-N", node]
+            cmd = ["sudo", "-n", toolkit, "config", "populate", "-N", node]
             if skip_ssh:
                 cmd += ["--skip", "ssh"]
             if skip_nsd:
@@ -1086,7 +1107,7 @@ def stream_populate():
 
 def _gen_callhome(toolkit, enable):
     action = "enable" if enable else "disable"
-    cmd = ["sudo", toolkit, "callhome", action]
+    cmd = ["sudo", "-n", toolkit, "callhome", action]
     yield sse("info", f"$ {' '.join(cmd)}")
     rc = yield from stream_process(cmd)
     if rc == 0:
@@ -1100,7 +1121,7 @@ def _gen_perfmon(toolkit, enable, node=""):
         yield sse("error", f"[ERROR] Invalid perfmon node: {node!r}")
         return
     pm_flag = "on" if enable else "off"
-    cmd = ["sudo", toolkit, "config", "perfmon", "-r", pm_flag]
+    cmd = ["sudo", "-n", toolkit, "config", "perfmon", "-r", pm_flag]
     if node:
         cmd += ["-N", node]
     yield sse("info", f"$ {' '.join(cmd)}")
@@ -1116,11 +1137,11 @@ def _gen_fileaudit(toolkit, enable, logfs=""):
         yield sse("error", f"[ERROR] Invalid log filesystem name: {logfs!r}")
         return
     if enable:
-        cmd = ["sudo", toolkit, "fileauditlogging", "enable"]
+        cmd = ["sudo", "-n", toolkit, "fileauditlogging", "enable"]
         if logfs:
             cmd += ["--log-fileset", logfs]
     else:
-        cmd = ["sudo", toolkit, "fileauditlogging", "disable"]
+        cmd = ["sudo", "-n", toolkit, "fileauditlogging", "disable"]
     yield sse("info", f"$ {' '.join(cmd)}")
     rc = yield from stream_process(cmd)
     if rc == 0:
@@ -1232,7 +1253,7 @@ def stream_apply_cluster_config():
                 if flag not in _ALLOWED_GPFS_FLAGS:
                     yield sse("error", f"[ERROR] Unrecognised flag: {flag}")
                     return
-                cmd = ["sudo", toolkit, "config", "gpfs", flag]
+                cmd = ["sudo", "-n", toolkit, "config", "gpfs", flag]
                 if value:
                     cmd.append(value)
                 yield sse("info", f"$ {' '.join(cmd)}")
@@ -1317,7 +1338,7 @@ def stream_fake_nsd():
                     return
             else:
                 # Run locally on the installer node
-                cmd = ["sudo", "mkdir", "-p", directory]
+                cmd = ["sudo", "-n", "mkdir", "-p", directory]
                 yield sse("info", f"$ {' '.join(cmd)}")
                 rc = yield from stream_process(cmd)
                 if rc != 0:
@@ -1325,9 +1346,9 @@ def stream_fake_nsd():
                     return
 
                 if tool == "truncate":
-                    cmd = ["sudo", "truncate", "-s", size, filepath]
+                    cmd = ["sudo", "-n", "truncate", "-s", size, filepath]
                 else:
-                    cmd = ["sudo", "fallocate", "-l", size, filepath]
+                    cmd = ["sudo", "-n", "fallocate", "-l", size, filepath]
                 yield sse("info", f"$ {' '.join(cmd)}")
                 rc = yield from stream_process(cmd)
                 if rc != 0:
@@ -1402,7 +1423,7 @@ def stream_nsd_add():
                     yield sse("error", f"[ERROR] NSD {i+1}: invalid pool name {pool!r}")
                     return
 
-                cmd = ["sudo", toolkit, "nsd", "add", "-p", server]
+                cmd = ["sudo", "-n", toolkit, "nsd", "add", "-p", server]
                 if backups:
                     cmd += ["-b", ",".join(backups)]
                 cmd += ["-u", usage, "-f", failure_group]
@@ -1478,13 +1499,13 @@ def stream_profiled():
                 tmp_path = tf.name
 
             dest = "/etc/profile.d/gpfs.sh"
-            cmd = ["sudo", "cp", tmp_path, dest]
+            cmd = ["sudo", "-n", "cp", tmp_path, dest]
             yield sse("info", f"$ sudo cp <tmpfile> {dest}  # content: export PATH=$PATH:{binpath}")
             rc = yield from stream_process(cmd)
             os.unlink(tmp_path)
 
             if rc == 0:
-                chmod_cmd = ["sudo", "chmod", "644", dest]
+                chmod_cmd = ["sudo", "-n", "chmod", "644", dest]
                 yield from stream_process(chmod_cmd)
             if rc == 0:
                 yield sse("success", "[OK] /etc/profile.d/gpfs.sh created. Source it or re-login to apply.")
@@ -1519,7 +1540,7 @@ def stream_guiuser():
                 yield sse("error", f"[ERROR] Invalid role '{role}'. Must be one of: {', '.join(sorted(_ALLOWED_GUI_ROLES))}.")
                 return
             gui_cli = "/usr/lpp/mmfs/gui/cli/mkuser"
-            cmd = ["sudo", gui_cli, username, "-g", role, "-p", password]
+            cmd = ["sudo", "-n", gui_cli, username, "-g", role, "-p", password]
             yield sse("info", f"$ sudo {gui_cli} {username} -g {role} -p ********")
             rc = yield from stream_process(cmd)
             if rc == 0:
@@ -1548,7 +1569,7 @@ def stream_mmchconfig():
                 if not _VALID_MMCHCONFIG_VALUE_RE.fullmatch(val):
                     yield sse("error", f"[ERROR] Invalid value for {key}: {val!r}")
                     return
-                cmd = ["sudo"] + mmcmd("mmchconfig", f"{key}={val}", "-i")
+                cmd = ["sudo", "-n"] + mmcmd("mmchconfig", f"{key}={val}", "-i")
                 yield sse("info", f"$ {' '.join(cmd)}")
                 rc = yield from stream_process(cmd)
                 if rc != 0:
@@ -1577,7 +1598,7 @@ def stream_healthinterval():
             if nodes != "all" and not _VALID_HOSTNAME_RE.fullmatch(nodes):
                 yield sse("error", f"[ERROR] Invalid nodes value: {nodes!r}")
                 return
-            cmd = ["sudo"] + mmcmd("mmhealth", "config", "interval", interval, "-N", nodes)
+            cmd = ["sudo", "-n"] + mmcmd("mmhealth", "config", "interval", interval, "-N", nodes)
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd)
             if rc == 0:
@@ -1622,7 +1643,7 @@ def stream_afmgateway():
                 return
 
             # Step 1: create the fileset
-            cmd1 = ["sudo"] + mmcmd("mmcrfileset", fs, fileset, "--inode-space", "new")
+            cmd1 = ["sudo", "-n"] + mmcmd("mmcrfileset", fs, fileset, "--inode-space", "new")
             yield sse("info", f"$ {' '.join(cmd1)}")
             rc = yield from stream_process(cmd1)
             if rc != 0:
@@ -1635,7 +1656,7 @@ def stream_afmgateway():
                 if not nfs_target:
                     yield sse("error", "[ERROR] NFS target is required.")
                     return
-                cmd2 = ["sudo"] + mmcmd("mmafmconfig", fs, fileset, "-N", node,
+                cmd2 = ["sudo", "-n"] + mmcmd("mmafmconfig", fs, fileset, "-N", node,
                         "--afm-target", f"nfs://{nfs_target}", "--afm-mode", mode)
             else:
                 s3_url    = body.get("s3_url", "").strip()
@@ -1645,7 +1666,7 @@ def stream_afmgateway():
                 if not all([s3_url, s3_bucket, s3_key, s3_secret]):
                     yield sse("error", "[ERROR] All S3 fields are required.")
                     return
-                cmd2 = ["sudo"] + mmcmd("mmafmconfig", fs, fileset, "-N", node,
+                cmd2 = ["sudo", "-n"] + mmcmd("mmafmconfig", fs, fileset, "-N", node,
                         "--afm-target", f"s3://{s3_url}/{s3_bucket}",
                         "--afm-mode", mode, "-K", s3_key, "-E", s3_secret)
                 yield sse("info", f"$ sudo {MMFS_BIN}/mmafmconfig {fs} {fileset} -N {node} --afm-target s3://{s3_url}/{s3_bucket} --afm-mode {mode} -K {s3_key} -E ********")
@@ -1659,7 +1680,7 @@ def stream_afmgateway():
 
             # Step 3: link the fileset
             junction = f"/ibm/{fs}/{fileset}"
-            cmd3 = ["sudo"] + mmcmd("mmlinkfileset", fs, fileset, "-J", junction)
+            cmd3 = ["sudo", "-n"] + mmcmd("mmlinkfileset", fs, fileset, "-J", junction)
             yield sse("info", f"$ {' '.join(cmd3)}")
             rc = yield from stream_process(cmd3)
             if rc == 0:
@@ -1706,7 +1727,7 @@ def stream_phase():
             if args is None:
                 yield sse("error", f"[ERROR] Unknown phase: {phase}")
                 return
-            cmd = ["sudo", toolkit] + args
+            cmd = ["sudo", "-n", toolkit] + args
             if skip_ssh and phase in _SKIP_SSH_PHASES:
                 cmd += ["--skip", "ssh"]
             yield sse("info", f"$ {' '.join(cmd)}")
@@ -1731,7 +1752,7 @@ def stream_phase():
 def stream_ccr_status():
     def generate():
         try:
-            cmd = ["sudo"] + mmcmd("mmlscluster")
+            cmd = ["sudo", "-n"] + mmcmd("mmlscluster")
             yield sse("info", f"$ sudo {MMFS_BIN}/mmlscluster")
             proc = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0
@@ -1765,7 +1786,7 @@ def probe_cluster_nodes():
     """Parse mmlscluster output and return the node list as JSON."""
     try:
         result = subprocess.run(
-            ["sudo"] + mmcmd("mmlscluster"),
+            ["sudo", "-n"] + mmcmd("mmlscluster"),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, timeout=15,
         )
@@ -1887,7 +1908,7 @@ def stream_nfs_core_dump():
             if _tk_err or not os.path.isfile(toolkit):
                 yield sse("error", f"[ERROR] Toolkit not found: {_tk_err or toolkit}")
                 return
-            cmd = ["sudo", toolkit, "nfs_core_dump", mode]
+            cmd = ["sudo", "-n", toolkit, "nfs_core_dump", mode]
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd)
             if rc == 0:
@@ -1950,7 +1971,7 @@ def stream_node_identity():
                 return
 
             # 1. Create TLS directory
-            cmd = ["sudo", "mkdir", "-p", tls_dir]
+            cmd = ["sudo", "-n", "mkdir", "-p", tls_dir]
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd)
             if rc != 0:
@@ -2100,11 +2121,11 @@ def stream_node_identity():
             # 5. Add CA cert to local system trust store
             if add_trust:
                 trust_path = "/etc/pki/ca-trust/source/anchors/scale-ca.crt"
-                cmd = ["sudo", "cp", ca_crt, trust_path]
+                cmd = ["sudo", "-n", "cp", ca_crt, trust_path]
                 yield sse("info", f"$ {' '.join(cmd)}")
                 rc = yield from stream_process(cmd)
                 if rc == 0:
-                    cmd = ["sudo", "update-ca-trust"]
+                    cmd = ["sudo", "-n", "update-ca-trust"]
                     yield sse("info", f"$ {' '.join(cmd)}")
                     yield from stream_process(cmd)
                     yield sse("success", "[OK] CA added to system trust store.")
