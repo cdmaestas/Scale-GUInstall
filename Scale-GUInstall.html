@@ -2774,6 +2774,18 @@
         </div>
 
         <div class="panel">
+          <div class="panel-header"><div><h3>Running Toolkit Processes</h3><p>Only one spectrumscale command can run at a time — inspect or kill stuck invocations here</p></div></div>
+          <div class="panel-body">
+            <div class="btn-group" style="margin-bottom:var(--spacing-04)">
+              <button class="btn btn-secondary btn-sm" onclick="checkSpectrumscaleProcs(this)">Check Running</button>
+              <button class="btn btn-danger btn-sm" onclick="killSpectrumscaleProcs(this)">Kill All spectrumscale Processes</button>
+            </div>
+            <div class="form-help" style="margin-bottom:var(--spacing-04)">Kill only terminates toolkit CLI invocations — the backend service and GPFS daemons are never touched.</div>
+            <div class="terminal" id="ss-procs-log" style="display:none; height:140px; font-size:12px"></div>
+          </div>
+        </div>
+
+        <div class="panel">
           <div class="panel-header"><div><h3>Pre/Post Check Defaults</h3></div></div>
           <div class="panel-body">
             <div class="form-group">
@@ -4716,6 +4728,57 @@ async function checkCCRStatus(btn) {
     badge.innerHTML = '<span style="background:var(--cds-support-error);color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500">CCR Not Found</span>';
   }
   if (btn) btn.disabled = false;
+}
+
+async function checkSpectrumscaleProcs(btn) {
+  const log = document.getElementById('ss-procs-log');
+  log.style.display = 'block';
+  log.innerHTML = '';
+  if (btn) btn.disabled = true;
+  try {
+    const res  = await fetch(`${getBackendUrl()}/api/spectrumscale/running`, { signal: AbortSignal.timeout(15000) });
+    const data = await res.json();
+    const procs = data.processes || [];
+    if (!procs.length) {
+      appendToTerminal('ss-procs-log', '[OK] No spectrumscale processes running.', 'success');
+    } else {
+      procs.forEach(p => appendToTerminal('ss-procs-log', `PID ${p.pid}: ${p.cmd}`, 'normal'));
+      appendToTerminal('ss-procs-log', `[WARN] ${procs.length} process(es) running.`, 'warn');
+    }
+  } catch (e) {
+    appendToTerminal('ss-procs-log', `[ERROR] ${e.message}`, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function killSpectrumscaleProcs(btn) {
+  if (!confirm('Kill ALL running spectrumscale commands? A partially completed install/deploy may need to be re-run.')) return;
+  const log = document.getElementById('ss-procs-log');
+  log.style.display = 'block';
+  log.innerHTML = '';
+  if (btn) btn.disabled = true;
+  try {
+    const res  = await fetch(`${getBackendUrl()}/api/spectrumscale/kill`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+      signal: AbortSignal.timeout(20000),
+    });
+    const data = await res.json();
+    if (data.message) {
+      appendToTerminal('ss-procs-log', `[OK] ${data.message}`, 'success');
+    } else {
+      (data.killed || []).forEach(p => appendToTerminal('ss-procs-log', `[OK] Killed PID ${p.pid}: ${p.cmd}`, 'success'));
+      if ((data.remaining || []).length) {
+        data.remaining.forEach(p => appendToTerminal('ss-procs-log', `[ERROR] Still running PID ${p.pid}: ${p.cmd}`, 'error'));
+      } else {
+        appendToTerminal('ss-procs-log', '[OK] All spectrumscale processes terminated.', 'success');
+      }
+    }
+  } catch (e) {
+    appendToTerminal('ss-procs-log', `[ERROR] ${e.message}`, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 async function loadClusterNodes(btn) {

@@ -17,6 +17,7 @@ import re
 import shlex
 import subprocess
 import tempfile
+import time
 
 from flask import Flask, Response, jsonify, request, stream_with_context
 
@@ -263,6 +264,40 @@ def check_file():
 
 
 # ---------------------------------------------------------------------------
+# Running toolkit processes: inspect and kill
+# ---------------------------------------------------------------------------
+
+@app.route("/api/spectrumscale/running")
+def spectrumscale_running():
+    procs = _running_spectrumscale()
+    return jsonify({"processes": [{"pid": p, "cmd": c} for p, c in procs]})
+
+
+@app.route("/api/spectrumscale/kill", methods=["POST", "OPTIONS"])
+def spectrumscale_kill():
+    """Kill all running spectrumscale CLI invocations (never the backend service)."""
+    if request.method == "OPTIONS":
+        return "", 204
+    procs = _running_spectrumscale()
+    if not procs:
+        return jsonify({"killed": [], "remaining": [], "message": "No spectrumscale processes running."})
+    pids = [str(p) for p, _ in procs]
+    subprocess.run(["sudo", "-n", "kill", "-TERM"] + pids,
+                   capture_output=True, timeout=_SUDO_CHECK_TIMEOUT)
+    time.sleep(2)
+    remaining = _running_spectrumscale()
+    if remaining:
+        subprocess.run(["sudo", "-n", "kill", "-KILL"] + [str(p) for p, _ in remaining],
+                       capture_output=True, timeout=_SUDO_CHECK_TIMEOUT)
+        time.sleep(1)
+        remaining = _running_spectrumscale()
+    return jsonify({
+        "killed":    [{"pid": p, "cmd": c} for p, c in procs],
+        "remaining": [{"pid": p, "cmd": c} for p, c in remaining],
+    })
+
+
+# ---------------------------------------------------------------------------
 # SSE helpers
 # ---------------------------------------------------------------------------
 
@@ -284,6 +319,28 @@ def sse_response(generator):
     )
 
 
+def _running_spectrumscale():
+    """
+    Return [(pid, cmdline), ...] for running spectrumscale CLI invocations.
+    Excludes this backend, pgrep itself, and anything that is not an actual
+    toolkit command (scaleadmd and the scale-guinstall service never match).
+    """
+    try:
+        r = subprocess.run(["pgrep", "-af", "spectrumscale"],
+                           capture_output=True, text=True, timeout=_SUDO_CHECK_TIMEOUT)
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    procs = []
+    for line in r.stdout.splitlines():
+        pid, _, cmdline = line.strip().partition(" ")
+        if not pid.isdigit():
+            continue
+        if "scale-server.py" in cmdline or "pgrep" in cmdline:
+            continue
+        procs.append((int(pid), cmdline))
+    return procs
+
+
 def stream_process(cmd, cwd=None, stdin_text=None):
     """
     Run *cmd* as a subprocess and yield SSE lines from stdout/stderr.
@@ -293,7 +350,19 @@ def stream_process(cmd, cwd=None, stdin_text=None):
     stdin is /dev/null by default so an interactive prompt in the child
     reads EOF and fails visibly instead of hanging the stream forever.
     Pass stdin_text to answer a known prompt (e.g. "y\\n").
+
+    If cmd invokes the spectrumscale toolkit and another toolkit command is
+    already running, refuses to start and returns 1 — concurrent toolkit
+    invocations corrupt the cluster definition.
     """
+    if any(str(a).endswith("spectrumscale") for a in cmd):
+        busy = _running_spectrumscale()
+        if busy:
+            yield sse("error", "[ERROR] Another spectrumscale command is already running:")
+            for pid, cmdline in busy:
+                yield sse("error", f"[ERROR]   PID {pid}: {cmdline}")
+            yield sse("error", "[ERROR] Wait for it to finish, or kill it from Settings → Running Toolkit Processes.")
+            return 1
     proc = subprocess.Popen(
         cmd,
         stdin=subprocess.PIPE if stdin_text is not None else subprocess.DEVNULL,
