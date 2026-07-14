@@ -1085,7 +1085,6 @@ def stream_populate():
     body     = request.get_json(silent=True) or {}
     toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
     node      = body.get("node", "").strip()
-    skip_ssh  = body.get("skip_ssh", True)
     skip_nsd  = body.get("skip_nsd", False)
     overwrite = bool(body.get("overwrite", False))
 
@@ -1101,8 +1100,6 @@ def stream_populate():
                 yield sse("error", f"[ERROR] Invalid node hostname: {node!r}")
                 return
             cmd = ["sudo", "-n", toolkit, "config", "populate", "-N", node]
-            if skip_ssh:
-                cmd += ["--skip", "ssh"]
             if skip_nsd:
                 cmd += ["--skip", "nsd"]
             yield sse("info", f"$ {' '.join(cmd)}")
