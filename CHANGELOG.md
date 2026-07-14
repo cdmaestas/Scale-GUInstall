@@ -9,6 +9,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Committable local git hooks in `.githooks/` (pre-commit: py_compile + shellcheck + HTML markers; pre-push: pre-commit checks plus package builds when tools are present); enable with `git config core.hooksPath .githooks`
+
+### Security
+- Escape backend URL with `h()` in the "Backend not reachable" banner (last unescaped user-controlled `innerHTML` interpolation)
+
+### Changed
+- Narrow broad `except Exception: pass` probes in `find_compliant_python()` / `_parse_python_version()` to expected failure types (`OSError`, `TimeoutExpired`, `ValueError`) so genuine bugs surface instead of being swallowed
+- Add `# shellcheck shell=sh` directive to `scale-guinstall-mmfs.sh` so the sourced profile.d snippet lints cleanly
+
 ---
 
 ## [1.0.14] — 2026-07-13

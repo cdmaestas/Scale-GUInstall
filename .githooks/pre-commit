@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Pre-commit: fast checks mirroring the CI python/shell/html jobs.
+# Enable with:  git config core.hooksPath .githooks
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+fail() { echo "pre-commit: FAIL — $1" >&2; exit 1; }
+
+echo "pre-commit: compiling scale-server.py"
+python3 -m py_compile scale-server.py || fail "scale-server.py does not compile"
+
+if command -v shellcheck &>/dev/null; then
+  echo "pre-commit: shellcheck"
+  shellcheck --severity=warning \
+    start.sh \
+    packaging/build-pkg.sh \
+    packaging/scale-guinstall-wrapper \
+    packaging/scale-guinstall-mmfs.sh \
+    .githooks/pre-commit \
+    .githooks/pre-push \
+    || fail "shellcheck reported warnings"
+else
+  echo "pre-commit: WARN — shellcheck not installed, skipping shell lint" >&2
+fi
+
+echo "pre-commit: HTML markers"
+python3 - <<'EOF' || exit 1
+import sys
+with open("Scale-GUInstall.html") as f:
+    html = f.read()
+checks = {
+    "h() escape helper": "function h(str)",
+    "streamToTerminalPost": "async function streamToTerminalPost",
+    "127.0.0.1 backend default": "127.0.0.1:5001",
+}
+failed = [name for name, marker in checks.items() if marker not in html]
+if failed:
+    print(f"pre-commit: FAIL — missing HTML markers: {failed}", file=sys.stderr)
+    sys.exit(1)
+EOF
+
+echo "pre-commit: OK"

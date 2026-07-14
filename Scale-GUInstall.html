@@ -3990,7 +3990,7 @@ async function checkPrepareBackend() {
     }
   } catch {
     dot.style.background = 'var(--cds-support-error)';
-    label.innerHTML = `Backend not reachable at <code style="font-family:var(--font-mono)">${getBackendUrl()}</code>. Start it with: <code style="font-family:var(--font-mono)">python3 scale-server.py</code>`;
+    label.innerHTML = `Backend not reachable at <code style="font-family:var(--font-mono)">${h(getBackendUrl())}</code>. Start it with: <code style="font-family:var(--font-mono)">python3 scale-server.py</code>`;
   }
 }
 

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Pre-push: run the full CI-equivalent suite, including package builds
+# when the tools are available locally.
+# Enable with:  git config core.hooksPath .githooks
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+echo "pre-push: running pre-commit checks"
+.githooks/pre-commit
+
+if command -v dpkg-deb &>/dev/null || command -v rpmbuild &>/dev/null; then
+  echo "pre-push: building packages"
+  ./packaging/build-pkg.sh
+else
+  echo "pre-push: WARN — no rpmbuild/dpkg-deb; package build left to CI" >&2
+fi
+
+echo "pre-push: OK"
