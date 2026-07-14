@@ -9,11 +9,21 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.16] — 2026-07-14
+
 ### Added
 - `packaging/enable-ssh-forwarding.sh` — enables local SSH TCP forwarding via an `/etc/ssh/sshd_config.d/60-scale-guinstall.conf` drop-in when the directory exists (falls back to in-place edit of `sshd_config`), validates with `sshd -t` before reloading; shipped in RPM/DEB at `/usr/lib/scale-guinstall/`
+- Concurrency guard: the backend refuses to start a `spectrumscale` command while another toolkit invocation is running, listing the conflicting PIDs — concurrent runs corrupt the cluster definition
+- Settings → Running Toolkit Processes panel: Check Running lists toolkit CLI processes; Kill All terminates them (TERM, then KILL after 2s) — never touches the backend service or GPFS daemons
+- Setup service status badge on Prepare Software Step 4 — green Running / red Not running, auto-checked on page load and after Start/Restart; detects the toolkit's `installer.snap.py` daemon
+- Restart Service button on Step 4 — stops the setup daemon and re-runs `spectrumscale setup -s <ip>`
+- Review Node Configuration after a successful populate now imports the populated nodes via `spectrumscale node list` before navigating, instead of landing on a blank table
 
 ### Fixed
 - `config populate` hung forever when a cluster definition already existed: the toolkit's overwrite prompt was waiting on stdin nobody could see. All backend subprocesses now default stdin to `/dev/null` (prompts fail visibly), and the Overwrite checkbox — previously not sent to the backend at all — now answers the prompt with y/n
+- Removed `--skip ssh` from the Populate page — `spectrumscale config populate` does not support it (`--skip nsd` remains)
 
 ### Documentation
 - SSH forwarding docs corrected: appending `AllowTcpForwarding local` to the end of `sshd_config` does **not** override an earlier `no` (sshd is first-match-wins); README, man page, and `start.sh` hint now recommend the `sshd_config.d` drop-in or in-place edit
