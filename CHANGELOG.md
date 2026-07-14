@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.15] — 2026-07-13
+
 ### Added
 - Committable local git hooks in `.githooks/` (pre-commit: py_compile + shellcheck + HTML markers; pre-push: pre-commit checks plus package builds when tools are present); enable with `git config core.hooksPath .githooks`
 
@@ -245,7 +249,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - `start.sh` Python detection when system `python3` is below 3.10
 - RPM version field: hyphens replaced with `.` to satisfy RPM version format rules
 
-[Unreleased]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.15...HEAD
+[1.0.15]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.14...v1.0.15
 [1.0.2]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/cdmaestas/Scale-GUInstall/releases/tag/v1.0.0
