@@ -668,6 +668,84 @@ def stream_checkpython():
 # Setup installation service
 # ---------------------------------------------------------------------------
 
+# Cmdline patterns that identify the toolkit's setup/installer daemon.
+# installer.snap.py is the CherryPy service started by `spectrumscale setup`.
+_SETUP_SERVICE_PATTERNS = ("installer.snap", "installer.snap.py")
+
+def _setup_service_procs():
+    """Return [(pid, cmdline), ...] for the running toolkit setup service."""
+    procs = []
+    for pattern in _SETUP_SERVICE_PATTERNS:
+        try:
+            r = subprocess.run(["pgrep", "-af", pattern],
+                               capture_output=True, text=True, timeout=_SUDO_CHECK_TIMEOUT)
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        for line in r.stdout.splitlines():
+            pid, _, cmdline = line.strip().partition(" ")
+            if pid.isdigit() and "pgrep" not in cmdline:
+                entry = (int(pid), cmdline)
+                if entry not in procs:
+                    procs.append(entry)
+    return procs
+
+
+@app.route("/api/setup-service/status")
+def setup_service_status():
+    procs = _setup_service_procs()
+    return jsonify({
+        "running": bool(procs),
+        "processes": [{"pid": p, "cmd": c} for p, c in procs],
+    })
+
+
+@app.route("/api/stream/setup-restart")
+def stream_setup_restart():
+    """Stop the toolkit setup service if running, then run `spectrumscale setup -s <ip>`."""
+    toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
+    server_ip = request.args.get("ip", "").strip()
+
+    def generate():
+        try:
+            if _tk_err or not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
+                return
+            if not server_ip or not _VALID_HOSTNAME_RE.fullmatch(server_ip):
+                yield sse("error", f"[ERROR] Invalid or missing server IP: {server_ip!r}")
+                return
+
+            procs = _setup_service_procs()
+            if procs:
+                pids = [str(p) for p, _ in procs]
+                for p, c in procs:
+                    yield sse("info", f"# Stopping setup service PID {p}: {c}")
+                subprocess.run(["sudo", "-n", "kill", "-TERM"] + pids,
+                               capture_output=True, timeout=_SUDO_CHECK_TIMEOUT)
+                time.sleep(2)
+                leftover = _setup_service_procs()
+                if leftover:
+                    subprocess.run(["sudo", "-n", "kill", "-KILL"] + [str(p) for p, _ in leftover],
+                                   capture_output=True, timeout=_SUDO_CHECK_TIMEOUT)
+                    time.sleep(1)
+                yield sse("success", "[OK] Setup service stopped.")
+            else:
+                yield sse("info", "# Setup service not running — starting fresh.")
+
+            cmd = ["sudo", "-n", toolkit, "setup", "-s", server_ip]
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd)
+            if rc == 0:
+                yield sse("success", "[OK] Setup service restarted.")
+            else:
+                yield sse("error", f"[ERROR] setup exited with code {rc}.")
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+        finally:
+            yield sse("done", "")
+
+    return sse_response(generate())
+
+
 @app.route("/api/stream/setup")
 def stream_setup():
     directory, _dir_err = resolve_path(request.args.get("dir", "").strip())
