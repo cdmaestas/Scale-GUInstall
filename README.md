@@ -289,13 +289,21 @@ Scale-GUInstall/
 ├── scale-server.py             # Backend server (Flask) for live command execution
 ├── start.sh                    # Convenience script: finds Python, installs Flask, starts server
 ├── CHANGELOG.md                # Release history (Keep a Changelog format)
+├── .githooks/                  # Local git hooks (pre-commit, pre-push) mirroring CI
 └── packaging/
     ├── build-pkg.sh            # Builds RPM and DEB packages into dist/
     ├── scale-guinstall.spec    # RPM spec
     ├── scale-guinstall.service # systemd unit (installed but not enabled by default)
     ├── scale-guinstall-wrapper # /usr/bin/scale-guinstall installed by package
+    ├── scale-guinstall-mmfs.sh # /etc/profile.d snippet adding /usr/lpp/mmfs/bin to PATH
     ├── scale-guinstall.1       # man page source (troff)
     └── debian/                 # DEB control files (control, postinst, prerm, postrm)
+```
+
+**Developing?** Enable the local git hooks so the CI checks run before each commit and push:
+
+```bash
+git config core.hooksPath .githooks
 ```
 
 ---
