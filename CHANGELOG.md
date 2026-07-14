@@ -9,6 +9,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `packaging/enable-ssh-forwarding.sh` — enables local SSH TCP forwarding via an `/etc/ssh/sshd_config.d/60-scale-guinstall.conf` drop-in when the directory exists (falls back to in-place edit of `sshd_config`), validates with `sshd -t` before reloading; shipped in RPM/DEB at `/usr/lib/scale-guinstall/`
+
+### Fixed
+- `config populate` hung forever when a cluster definition already existed: the toolkit's overwrite prompt was waiting on stdin nobody could see. All backend subprocesses now default stdin to `/dev/null` (prompts fail visibly), and the Overwrite checkbox — previously not sent to the backend at all — now answers the prompt with y/n
+
+### Documentation
+- SSH forwarding docs corrected: appending `AllowTcpForwarding local` to the end of `sshd_config` does **not** override an earlier `no` (sshd is first-match-wins); README, man page, and `start.sh` hint now recommend the `sshd_config.d` drop-in or in-place edit
+
 ---
 
 ## [1.0.15] — 2026-07-13
