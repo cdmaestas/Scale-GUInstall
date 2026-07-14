@@ -4781,6 +4781,7 @@ async function populateCluster(btn) {
     node,
     skip_ssh:  skipSsh,
     skip_nsd:  skipNsd,
+    overwrite: document.getElementById('pop-overwrite')?.checked || false,
   });
   if (btn) btn.disabled = false;
   document.getElementById('pop-results').style.display = 'block';

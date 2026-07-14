@@ -284,19 +284,30 @@ def sse_response(generator):
     )
 
 
-def stream_process(cmd, cwd=None):
+def stream_process(cmd, cwd=None, stdin_text=None):
     """
     Run *cmd* as a subprocess and yield SSE lines from stdout/stderr.
     Does NOT yield a done event — the caller is responsible for that.
     Returns the process exit code via StopIteration.value (yield from).
+
+    stdin is /dev/null by default so an interactive prompt in the child
+    reads EOF and fails visibly instead of hanging the stream forever.
+    Pass stdin_text to answer a known prompt (e.g. "y\\n").
     """
     proc = subprocess.Popen(
         cmd,
+        stdin=subprocess.PIPE if stdin_text is not None else subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         cwd=cwd,
         bufsize=0,  # unbuffered — don't wait for a full buffer before yielding
     )
+    if stdin_text is not None:
+        try:
+            proc.stdin.write(stdin_text.encode())
+            proc.stdin.close()
+        except BrokenPipeError:
+            pass  # child exited before reading — its output/rc tell the story
     for raw_line in iter(proc.stdout.readline, b""):
         line = raw_line.decode("utf-8", errors="replace").rstrip()
         if line:
@@ -1073,9 +1084,10 @@ def stream_populate():
         return "", 204
     body     = request.get_json(silent=True) or {}
     toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
-    node     = body.get("node", "").strip()
-    skip_ssh = body.get("skip_ssh", True)
-    skip_nsd = body.get("skip_nsd", False)
+    node      = body.get("node", "").strip()
+    skip_ssh  = body.get("skip_ssh", True)
+    skip_nsd  = body.get("skip_nsd", False)
+    overwrite = bool(body.get("overwrite", False))
 
     def generate():
         try:
@@ -1094,9 +1106,17 @@ def stream_populate():
             if skip_nsd:
                 cmd += ["--skip", "nsd"]
             yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd)
+            # The toolkit prompts for confirmation when a cluster definition
+            # already exists — answer from the Overwrite checkbox so the
+            # process can never sit waiting on invisible interactive input.
+            answer = "y\n" if overwrite else "n\n"
+            rc = yield from stream_process(cmd, stdin_text=answer)
             if rc == 0:
                 yield sse("success", "[OK] Cluster definition populated successfully.")
+            elif not overwrite:
+                yield sse("error", f"[ERROR] config populate exited with code {rc}.")
+                yield sse("warn", "[WARN] A cluster definition may already exist — enable "
+                                  "'Overwrite existing cluster definition' to replace it.")
             else:
                 yield sse("error", f"[ERROR] config populate exited with code {rc}.")
         except Exception as exc:
