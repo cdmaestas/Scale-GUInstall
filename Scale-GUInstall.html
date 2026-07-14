@@ -2466,7 +2466,7 @@
             </div>
           </div>
           <div class="btn-group">
-            <button class="btn btn-secondary" onclick="navigateTo('nodes')">Review Node Configuration</button>
+            <button class="btn btn-secondary" onclick="reviewPopulatedNodes(this)">Review Node Configuration</button>
             <button class="btn btn-secondary" onclick="navigateTo('upgrade')">Go to Upgrade</button>
           </div>
         </div>
@@ -3635,18 +3635,31 @@ async function _fetchList(endpoint, logId, displayCmd) {
 }
 
 async function loadNodesFromCluster(btn) {
-  btn.disabled = true;
+  if (btn) btn.disabled = true;
   const data = await _fetchList('/api/list/nodes', 'nodes-load-log', 'node list');
+  let imported = 0;
   if (data && data.nodes) {
-    const imported = data.nodes.filter(n => n.hostname && !state.nodes.find(x => x.hostname === n.hostname));
-    imported.forEach(n => state.nodes.push(n));
-    const skipped = data.nodes.length - imported.length;
-    _showLoadLog('nodes-load-log', `[OK] Imported ${imported.length} node(s)${skipped ? `, skipped ${skipped} duplicate(s)` : ''}.`, 'success');
+    const fresh = data.nodes.filter(n => n.hostname && !state.nodes.find(x => x.hostname === n.hostname));
+    fresh.forEach(n => state.nodes.push(n));
+    imported = fresh.length;
+    const skipped = data.nodes.length - imported;
+    _showLoadLog('nodes-load-log', `[OK] Imported ${imported} node(s)${skipped ? `, skipped ${skipped} duplicate(s)` : ''}.`, 'success');
     updateNodeDisplay();
     updateNSDServerList();
     updateAllPreviews();
   }
-  btn.disabled = false;
+  if (btn) btn.disabled = false;
+  return imported;
+}
+
+async function reviewPopulatedNodes(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading nodes…'; }
+  try {
+    await loadNodesFromCluster(null);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Review Node Configuration'; }
+  }
+  navigateTo('nodes');
 }
 
 async function loadNSDsFromCluster(btn) {
