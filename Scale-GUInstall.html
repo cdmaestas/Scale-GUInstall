@@ -2424,10 +2424,6 @@
               <label class="form-label">Skip Checks <code>--skip</code></label>
               <div class="checkbox-group">
                 <label class="checkbox-item">
-                  <input type="checkbox" id="pop-skip-ssh" checked onchange="updatePopulatePreview()">
-                  <div><span>Skip SSH check <code>--skip ssh</code></span><span class="label-desc">Bypasses SSH connectivity precheck. Safe when SSH is already verified from the admin node.</span></div>
-                </label>
-                <label class="checkbox-item">
                   <input type="checkbox" id="pop-skip-nsd" onchange="updatePopulatePreview()">
                   <div><span>Skip NSD population <code>--skip nsd</code></span><span class="label-desc">Does not populate NSD disk definitions from the cluster.</span></div>
                 </label>
@@ -2442,7 +2438,7 @@
             </div>
 
             <div class="cmd-preview" style="margin-top:var(--spacing-06)" id="pop-cmd-preview">
-              <div><span class="cmd-prompt">$ </span>sudo <span id="pop-path-display">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> config populate -N <span id="pop-node-display" style="color:#f1c21b">&lt;node&gt;</span><span id="pop-skip-display" style="color:var(--cds-text-disabled)"> --skip ssh</span></div>
+              <div><span class="cmd-prompt">$ </span>sudo <span id="pop-path-display">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> config populate -N <span id="pop-node-display" style="color:#f1c21b">&lt;node&gt;</span><span id="pop-skip-display" style="color:var(--cds-text-disabled)"></span></div>
             </div>
           </div>
         </div>
@@ -4740,29 +4736,23 @@ function testConnection() {
 
 function updatePopulatePreview() {
   const node    = document.getElementById('pop-node')?.value.trim() || '<node>';
-  const skipSsh = document.getElementById('pop-skip-ssh')?.checked;
   const skipNsd = document.getElementById('pop-skip-nsd')?.checked;
   const nodeEl  = document.getElementById('pop-node-display');
   const skipEl  = document.getElementById('pop-skip-display');
   if (nodeEl) nodeEl.textContent = node;
-  const skips = [];
-  if (skipSsh) skips.push('--skip ssh');
-  if (skipNsd) skips.push('--skip nsd');
-  if (skipEl)  skipEl.textContent = skips.length ? ' ' + skips.join(' ') : '';
+  if (skipEl) skipEl.textContent = skipNsd ? ' --skip nsd' : '';
 }
 
 async function populateCluster(btn) {
   const node = document.getElementById('pop-node')?.value.trim();
   if (!node) { alert('Enter a cluster node first'); return; }
-  const skipSsh = document.getElementById('pop-skip-ssh')?.checked;
   const skipNsd = document.getElementById('pop-skip-nsd')?.checked;
   const termId  = 'pop-terminal';
   updatePopulatePreview();
 
   if (state.dryRun) {
-    const tp    = state.toolkitPath;
-    const skips = [skipSsh && '--skip ssh', skipNsd && '--skip nsd'].filter(Boolean);
-    appendToTerminal(termId, `$ sudo ${tp} config populate -N ${node}${skips.length ? ' ' + skips.join(' ') : ''}  # (dry run)`, 'info');
+    const tp = state.toolkitPath;
+    appendToTerminal(termId, `$ sudo ${tp} config populate -N ${node}${skipNsd ? ' --skip nsd' : ''}  # (dry run)`, 'info');
     appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
     return;
   }
@@ -4779,7 +4769,6 @@ async function populateCluster(btn) {
   await streamToTerminalPost(termId, `${getBackendUrl()}/api/stream/populate`, {
     toolkit:   state.toolkitPath,
     node,
-    skip_ssh:  skipSsh,
     skip_nsd:  skipNsd,
     overwrite: document.getElementById('pop-overwrite')?.checked || false,
   });
