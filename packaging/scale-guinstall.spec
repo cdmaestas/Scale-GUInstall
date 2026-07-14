@@ -35,6 +35,7 @@ install -m 0644 %{_sourcedir}/Scale-GUInstall.html %{buildroot}/usr/lib/scale-gu
 install -m 0755 %{_sourcedir}/scale-guinstall      %{buildroot}/usr/bin/scale-guinstall
 install -m 0644 %{_sourcedir}/scale-guinstall.service %{buildroot}/usr/lib/systemd/system/scale-guinstall.service
 install -m 0644 %{_sourcedir}/scale-guinstall-mmfs.sh %{buildroot}/etc/profile.d/scale-guinstall-mmfs.sh
+install -m 0755 %{_sourcedir}/enable-ssh-forwarding.sh %{buildroot}/usr/lib/scale-guinstall/enable-ssh-forwarding.sh
 install -m 0644 %{_sourcedir}/README.md            %{buildroot}/usr/share/doc/scale-guinstall/README.md
 install -m 0644 %{_sourcedir}/CHANGELOG.md         %{buildroot}/usr/share/doc/scale-guinstall/CHANGELOG.md
 install -m 0644 %{_sourcedir}/scale-guinstall.1.gz %{buildroot}/usr/share/man/man1/scale-guinstall.1.gz
@@ -87,6 +88,7 @@ fi
 /usr/bin/scale-guinstall
 /usr/lib/systemd/system/scale-guinstall.service
 /etc/profile.d/scale-guinstall-mmfs.sh
+/usr/lib/scale-guinstall/enable-ssh-forwarding.sh
 %doc /usr/share/doc/scale-guinstall/README.md
 %doc /usr/share/doc/scale-guinstall/CHANGELOG.md
 %{_mandir}/man1/scale-guinstall.1.gz

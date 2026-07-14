@@ -48,6 +48,12 @@ installation.
 .B /usr/lib/systemd/system/scale\-guinstall.service
 systemd unit file. The service is installed but not enabled by default.
 .TP
+.B /usr/lib/scale\-guinstall/enable\-ssh\-forwarding.sh
+Helper script that enables local SSH TCP forwarding via an
+.B sshd_config.d
+drop-in (or in-place edit on systems without drop-in support),
+validates the configuration, and reloads sshd. Run as root.
+.TP
 .B /etc/profile.d/scale\-guinstall\-mmfs.sh
 Adds
 .B /usr/lpp/mmfs/bin
@@ -90,11 +96,25 @@ the SSH tunnel forwards it transparently.
 If the tunnel fails with
 .IR "channel N: open failed: administratively prohibited" ,
 the node's SSH server has TCP forwarding disabled. Enable local
-forwarding and reload sshd:
+forwarding with a drop-in file (sshd applies the first value it sees,
+and the
+.B Include sshd_config.d/*.conf
+directive at the top of
+.B sshd_config
+makes the drop-in win over a later
+.IR "AllowTcpForwarding no" ):
 .EX
-echo 'AllowTcpForwarding local' | sudo tee \-a /etc/ssh/sshd_config
-sudo systemctl reload sshd
+echo 'AllowTcpForwarding local' | sudo tee /etc/ssh/sshd_config.d/60\-scale\-guinstall.conf
+sudo sshd \-t && sudo systemctl reload sshd
 .EE
+The repository also ships
+.B packaging/enable\-ssh\-forwarding.sh
+which detects whether
+.B /etc/ssh/sshd_config.d
+exists, falls back to editing the directive in place when it does not,
+validates with
+.BR "sshd \-t" ,
+and reloads sshd.
 .SS Override the port
 .EX
 PORT=8080 scale\-guinstall

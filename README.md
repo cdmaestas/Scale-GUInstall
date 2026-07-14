@@ -256,11 +256,24 @@ Hardened servers (common on RHEL/CentOS) often disable TCP forwarding, which sil
 sudo sshd -T | grep allowtcpforwarding
 ```
 
-If it shows `allowtcpforwarding no`, enable local forwarding:
+If it shows `allowtcpforwarding no`, enable local forwarding. The easiest way is the bundled helper script, which picks the right method automatically and validates the config before reloading sshd:
+
+```bash
+sudo ./packaging/enable-ssh-forwarding.sh
+```
+
+Or manually — **prefer a drop-in file** when `/etc/ssh/sshd_config.d/` exists (stock on RHEL 8+/Ubuntu 20.04+). sshd uses the *first* value it sees for a keyword, and the `Include sshd_config.d/*.conf` directive sits at the top of `sshd_config`, so a drop-in overrides any `AllowTcpForwarding no` in the main config:
+
+```bash
+echo 'AllowTcpForwarding local' | sudo tee /etc/ssh/sshd_config.d/60-scale-guinstall.conf
+sudo sshd -t && sudo systemctl reload sshd
+```
+
+On systems without `sshd_config.d`, edit the existing directive in place (do **not** append to the end of the file — the earlier `no` would win):
 
 ```bash
 sudo sed -i 's/^#*AllowTcpForwarding.*/AllowTcpForwarding local/' /etc/ssh/sshd_config
-sudo systemctl reload sshd
+sudo sshd -t && sudo systemctl reload sshd
 ```
 
 `local` allows `ssh -L` tunnels while blocking remote port forwarding — more restrictive than `yes` and appropriate for hardened environments.
