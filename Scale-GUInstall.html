@@ -1019,7 +1019,13 @@
 
           <!-- Step 4 -->
           <div class="panel" data-step="4">
-            <div class="panel-header"><div><h3>Step 4: Setup Installation Service</h3></div></div>
+            <div class="panel-header">
+              <div><h3>Step 4: Setup Installation Service</h3></div>
+              <div style="display:flex; align-items:center; gap:var(--spacing-03)">
+                <span id="setup-svc-badge" style="display:none"></span>
+                <button class="btn btn-sm btn-ghost" onclick="checkSetupService(this)" title="Check whether the setup service is running">Check</button>
+              </div>
+            </div>
             <div class="panel-body">
               <div style="display:flex; align-items:flex-start; gap:var(--spacing-03); padding:var(--spacing-03) var(--spacing-04); background:rgba(241,194,27,0.08); border:1px solid rgba(241,194,27,0.3); margin-bottom:var(--spacing-04); font-size:12px; color:var(--cds-support-warning)">
                 <svg width="14" height="14" viewBox="0 0 32 32" fill="currentColor" style="flex-shrink:0; margin-top:1px"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm-1 6h2v9h-2zm1 14a1.5 1.5 0 111.5-1.5A1.5 1.5 0 0116 22z"/></svg>
@@ -1042,6 +1048,10 @@
                 <button class="btn btn-primary" onclick="runPrepare('setup', this)">
                   <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M28 6H4a2 2 0 00-2 2v16a2 2 0 002 2h24a2 2 0 002-2V8a2 2 0 00-2-2zm0 18H4V8h24zm-4-8H8v-2h16zm-6 4H8v-2h10z"/></svg>
                   Start Setup Service
+                </button>
+                <button class="btn btn-secondary" onclick="restartSetupService(this)" title="Stop the running setup service and start it again with the IP above">
+                  <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M25.95 7.65l.005-.004c-2.092-2.512-5.24-4.146-8.788-4.146-6.317 0-11.44 5.122-11.44 11.44h2.5c0-4.943 4.007-8.94 8.94-8.94 2.812 0 5.305 1.306 6.946 3.337l-3.107 3.108h8v-8zM16.34 26.06c-2.812 0-5.305-1.306-6.946-3.337l3.106-3.108h-8v8l2.45-2.45c2.092 2.512 5.24 4.145 8.79 4.145 6.316 0 11.44-5.122 11.44-11.44h-2.5c0 4.943-4.008 8.94-8.94 8.94z"/></svg>
+                  Restart Service
                 </button>
               </div>
               <div class="cmd-preview" style="margin-top:var(--spacing-05)">
@@ -3898,6 +3908,47 @@ function _mmfsToolkitForVersion(ver) {
   return map[ver] ?? `/usr/lpp/mmfs/${ver}/installer/spectrumscale`;
 }
 
+async function checkSetupService(btn) {
+  const badge = document.getElementById('setup-svc-badge');
+  if (!badge) return;
+  if (btn) btn.disabled = true;
+  try {
+    const res  = await fetch(`${getBackendUrl()}/api/setup-service/status`, { signal: AbortSignal.timeout(5000) });
+    const data = await res.json();
+    badge.style.display = 'inline-block';
+    if (data.running) {
+      const pids = (data.processes || []).map(p => p.pid).join(', ');
+      badge.innerHTML = `<span style="background:var(--cds-support-success);color:#000;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500" title="PID ${h(pids)}">● Running</span>`;
+    } else {
+      badge.innerHTML = '<span style="background:var(--cds-support-error);color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500">● Not running</span>';
+    }
+  } catch {
+    badge.style.display = 'inline-block';
+    badge.innerHTML = '<span style="background:var(--cds-text-disabled);color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500">Unknown</span>';
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function restartSetupService(btn) {
+  const ip = document.getElementById('prepare-server-ip')?.value.trim();
+  if (!ip) { alert('Enter the installer node IP address first.'); return; }
+  const tp = state.toolkitPath;
+  if (!tp) { alert('Toolkit path not set. Apply a detected version or configure it in Settings.'); return; }
+  const termId = 'prepare-terminal';
+
+  if (state.dryRun) {
+    appendToTerminal(termId, `$ sudo kill <setup-service-pids> && sudo ${tp} setup -s ${ip}  # (dry run)`, 'info');
+    appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  await streamToTerminal(termId,
+    `${getBackendUrl()}/api/stream/setup-restart?toolkit=${encodeURIComponent(tp)}&ip=${encodeURIComponent(ip)}`,
+    () => { if (btn) btn.disabled = false; checkSetupService(null); });
+}
+
 async function probeMmfs() {
   if (!document.getElementById('mmfs-detected-banner')) return;
   try {
@@ -4006,6 +4057,7 @@ async function checkPrepareBackend() {
       label.textContent = `Backend server connected — ready to run real commands (${getBackendUrl()})`;
       probeMmfs();
       probeInterfaces();
+      checkSetupService(null);
     } else {
       throw new Error('non-ok');
     }
@@ -4241,7 +4293,7 @@ async function runPrepare(phase, btn) {
     const params = new URLSearchParams({ dir, ip });
     if (toolkitBin) params.set('bin', toolkitBin);
     const url = `${getBackendUrl()}/api/stream/setup?${params}`;
-    streamToTerminal(termId, url, () => { btn.disabled = false; });
+    streamToTerminal(termId, url, () => { btn.disabled = false; checkSetupService(null); });
   }
 }
 
