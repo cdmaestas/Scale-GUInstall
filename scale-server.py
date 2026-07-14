@@ -477,7 +477,9 @@ def _parse_python_version(binary):
         if len(parts) == 2 and parts[0] == "Python":
             major, minor, *_ = parts[1].split(".")
             return int(major), int(minor), parts[1], binary
-    except Exception:
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        # Binary missing, hung, or emitted an unparseable version — not a
+        # usable interpreter; the caller falls through to other candidates.
         pass
     return None
 
@@ -523,8 +525,8 @@ def find_compliant_python():
                 binary = f"/usr/bin/python3.{minor_str}"
                 if os.path.isfile(binary):
                     pkg_binaries.append(binary)
-    except Exception:
-        pass
+    except (OSError, subprocess.TimeoutExpired):
+        pass  # rpm not present on this distro — try dpkg next
     # apt/dpkg (Debian, Ubuntu)
     try:
         r = subprocess.run(
@@ -539,8 +541,8 @@ def find_compliant_python():
                     binary = f"/usr/bin/python3.{suffix}"
                     if os.path.isfile(binary):
                         pkg_binaries.append(binary)
-    except Exception:
-        pass
+    except (OSError, subprocess.TimeoutExpired):
+        pass  # dpkg not present on this distro — fall back to python3
 
     for binary in pkg_binaries:
         info = _parse_python_version(binary)
