@@ -9,6 +9,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Concurrency guard no longer fails open: if the pgrep process check itself fails or times out, spectrumscale commands are refused with an explicit error instead of silently proceeding as if nothing were running
+- `/api/spectrumscale/running`, `/api/spectrumscale/kill`, and `/api/setup-service/status` return HTTP 500 with an error field when the process check fails, instead of reporting "nothing running" / "not running"; the Step 4 badge shows grey **Unknown** and the Settings panel shows the error instead of a false "[OK]"
+- Setup service restart refuses to proceed when the service state cannot be determined
+
+### Changed
+- Pre-commit hook and CI now shellcheck `enable-ssh-forwarding.sh` and the `.githooks/` scripts, and validate the embedded JavaScript with `node --check` (new `js-check` CI job)
+
 ---
 
 ## [1.0.16] — 2026-07-14

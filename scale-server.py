@@ -270,6 +270,8 @@ def check_file():
 @app.route("/api/spectrumscale/running")
 def spectrumscale_running():
     procs = _running_spectrumscale()
+    if procs is None:
+        return jsonify({"error": "process check failed (pgrep unavailable)"}), 500
     return jsonify({"processes": [{"pid": p, "cmd": c} for p, c in procs]})
 
 
@@ -279,6 +281,8 @@ def spectrumscale_kill():
     if request.method == "OPTIONS":
         return "", 204
     procs = _running_spectrumscale()
+    if procs is None:
+        return jsonify({"error": "process check failed (pgrep unavailable) — nothing killed"}), 500
     if not procs:
         return jsonify({"killed": [], "remaining": [], "message": "No spectrumscale processes running."})
     pids = [str(p) for p, _ in procs]
@@ -291,6 +295,12 @@ def spectrumscale_kill():
                        capture_output=True, timeout=_SUDO_CHECK_TIMEOUT)
         time.sleep(1)
         remaining = _running_spectrumscale()
+    if remaining is None:
+        return jsonify({
+            "killed":    [{"pid": p, "cmd": c} for p, c in procs],
+            "remaining": [],
+            "error":     "post-kill process check failed — verify manually with: pgrep -af spectrumscale",
+        }), 500
     return jsonify({
         "killed":    [{"pid": p, "cmd": c} for p, c in procs],
         "remaining": [{"pid": p, "cmd": c} for p, c in remaining],
@@ -321,15 +331,20 @@ def sse_response(generator):
 
 def _running_spectrumscale():
     """
-    Return [(pid, cmdline), ...] for running spectrumscale CLI invocations.
+    Return [(pid, cmdline), ...] for running spectrumscale CLI invocations,
+    or None if the check itself failed (pgrep missing or timed out).
     Excludes this backend, pgrep itself, and anything that is not an actual
     toolkit command (scaleadmd and the scale-guinstall service never match).
+
+    Callers MUST treat None as "cannot verify" and refuse to proceed — a
+    concurrency guard that fails open is worse than no guard at all.
     """
     try:
         r = subprocess.run(["pgrep", "-af", "spectrumscale"],
                            capture_output=True, text=True, timeout=_SUDO_CHECK_TIMEOUT)
-    except (OSError, subprocess.TimeoutExpired):
-        return []
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        app.logger.error("concurrency check failed: pgrep unavailable: %s", exc)
+        return None
     procs = []
     for line in r.stdout.splitlines():
         pid, _, cmdline = line.strip().partition(" ")
@@ -357,6 +372,11 @@ def stream_process(cmd, cwd=None, stdin_text=None):
     """
     if any(str(a).endswith("spectrumscale") for a in cmd):
         busy = _running_spectrumscale()
+        if busy is None:
+            yield sse("error", "[ERROR] Cannot verify that no other spectrumscale command is "
+                               "running (pgrep failed) — refusing to start. Check that procps "
+                               "is installed and the backend host is healthy.")
+            return 1
         if busy:
             yield sse("error", "[ERROR] Another spectrumscale command is already running:")
             for pid, cmdline in busy:
@@ -673,26 +693,37 @@ def stream_checkpython():
 _SETUP_SERVICE_PATTERNS = ("installer.snap", "installer.snap.py")
 
 def _setup_service_procs():
-    """Return [(pid, cmdline), ...] for the running toolkit setup service."""
+    """
+    Return [(pid, cmdline), ...] for the running toolkit setup service,
+    or None if every pgrep probe failed — callers must report "unknown"
+    rather than claiming the service is down.
+    """
     procs = []
+    probes_ok = 0
     for pattern in _SETUP_SERVICE_PATTERNS:
         try:
             r = subprocess.run(["pgrep", "-af", pattern],
                                capture_output=True, text=True, timeout=_SUDO_CHECK_TIMEOUT)
-        except (OSError, subprocess.TimeoutExpired):
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            app.logger.error("setup-service probe %r failed: %s", pattern, exc)
             continue
+        probes_ok += 1
         for line in r.stdout.splitlines():
             pid, _, cmdline = line.strip().partition(" ")
             if pid.isdigit() and "pgrep" not in cmdline:
                 entry = (int(pid), cmdline)
                 if entry not in procs:
                     procs.append(entry)
+    if probes_ok == 0:
+        return None
     return procs
 
 
 @app.route("/api/setup-service/status")
 def setup_service_status():
     procs = _setup_service_procs()
+    if procs is None:
+        return jsonify({"error": "status check failed (pgrep unavailable)"}), 500
     return jsonify({
         "running": bool(procs),
         "processes": [{"pid": p, "cmd": c} for p, c in procs],
@@ -715,6 +746,9 @@ def stream_setup_restart():
                 return
 
             procs = _setup_service_procs()
+            if procs is None:
+                yield sse("error", "[ERROR] Cannot determine setup service state (pgrep failed) — refusing to restart.")
+                return
             if procs:
                 pids = [str(p) for p, _ in procs]
                 for p, c in procs:
