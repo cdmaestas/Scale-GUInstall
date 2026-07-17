@@ -58,7 +58,29 @@ jobs:
           shellcheck --severity=warning \
             start.sh \
             packaging/build-pkg.sh \
-            packaging/scale-guinstall-wrapper
+            packaging/scale-guinstall-wrapper \
+            packaging/scale-guinstall-mmfs.sh \
+            packaging/enable-ssh-forwarding.sh \
+            .githooks/pre-commit \
+            .githooks/pre-push
+
+  # ── JavaScript syntax check ───────────────────────────────────────────────
+  js-check:
+    name: JS syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Extract and parse embedded JavaScript
+        run: |
+          python3 - <<'EOF'
+          import re
+          html = open("Scale-GUInstall.html").read()
+          m = re.search(r"<script>(.*?)</script>", html, re.DOTALL)
+          assert m, "no <script> block found"
+          open("app.js", "w").write(m.group(1))
+          EOF
+          node --check app.js
 
   # ── HTML sanity check ─────────────────────────────────────────────────────
   html-check:

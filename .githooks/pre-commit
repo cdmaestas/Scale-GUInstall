@@ -18,11 +18,26 @@ if command -v shellcheck &>/dev/null; then
     packaging/build-pkg.sh \
     packaging/scale-guinstall-wrapper \
     packaging/scale-guinstall-mmfs.sh \
+    packaging/enable-ssh-forwarding.sh \
     .githooks/pre-commit \
     .githooks/pre-push \
     || fail "shellcheck reported warnings"
 else
   echo "pre-commit: WARN — shellcheck not installed, skipping shell lint" >&2
+fi
+
+if command -v node &>/dev/null; then
+  echo "pre-commit: JS syntax"
+  python3 - <<'EOF' || fail "could not extract <script> block"
+import re
+html = open("Scale-GUInstall.html").read()
+m = re.search(r"<script>(.*?)</script>", html, re.DOTALL)
+assert m, "no <script> block found in Scale-GUInstall.html"
+open("/tmp/scale-guinstall-precommit.js", "w").write(m.group(1))
+EOF
+  node --check /tmp/scale-guinstall-precommit.js || fail "JavaScript in Scale-GUInstall.html does not parse"
+else
+  echo "pre-commit: WARN — node not installed, skipping JS syntax check" >&2
 fi
 
 echo "pre-commit: HTML markers"
