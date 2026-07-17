@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.17] — 2026-07-16
+
 ### Fixed
 - Concurrency guard no longer fails open: if the pgrep process check itself fails or times out, spectrumscale commands are refused with an explicit error instead of silently proceeding as if nothing were running
 - `/api/spectrumscale/running`, `/api/spectrumscale/kill`, and `/api/setup-service/status` return HTTP 500 with an error field when the process check fails, instead of reporting "nothing running" / "not running"; the Step 4 badge shows grey **Unknown** and the Settings panel shows the error instead of a false "[OK]"
