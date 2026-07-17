@@ -3916,7 +3916,9 @@ async function checkSetupService(btn) {
     const res  = await fetch(`${getBackendUrl()}/api/setup-service/status`, { signal: AbortSignal.timeout(5000) });
     const data = await res.json();
     badge.style.display = 'inline-block';
-    if (data.running) {
+    if (data.error) {
+      badge.innerHTML = `<span style="background:var(--cds-text-disabled);color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500" title="${h(data.error)}">Unknown</span>`;
+    } else if (data.running) {
       const pids = (data.processes || []).map(p => p.pid).join(', ');
       badge.innerHTML = `<span style="background:var(--cds-support-success);color:#000;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500" title="PID ${h(pids)}">● Running</span>`;
     } else {
@@ -4790,6 +4792,10 @@ async function checkSpectrumscaleProcs(btn) {
   try {
     const res  = await fetch(`${getBackendUrl()}/api/spectrumscale/running`, { signal: AbortSignal.timeout(15000) });
     const data = await res.json();
+    if (data.error) {
+      appendToTerminal('ss-procs-log', `[ERROR] ${data.error}`, 'error');
+      return;
+    }
     const procs = data.processes || [];
     if (!procs.length) {
       appendToTerminal('ss-procs-log', '[OK] No spectrumscale processes running.', 'success');
@@ -4816,7 +4822,10 @@ async function killSpectrumscaleProcs(btn) {
       signal: AbortSignal.timeout(20000),
     });
     const data = await res.json();
-    if (data.message) {
+    if (data.error) {
+      (data.killed || []).forEach(p => appendToTerminal('ss-procs-log', `[OK] Sent kill to PID ${p.pid}: ${p.cmd}`, 'normal'));
+      appendToTerminal('ss-procs-log', `[ERROR] ${data.error}`, 'error');
+    } else if (data.message) {
       appendToTerminal('ss-procs-log', `[OK] ${data.message}`, 'success');
     } else {
       (data.killed || []).forEach(p => appendToTerminal('ss-procs-log', `[OK] Killed PID ${p.pid}: ${p.cmd}`, 'success'));
