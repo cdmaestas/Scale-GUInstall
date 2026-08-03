@@ -3215,7 +3215,7 @@ async function listAllPartitions(btn) {
   async function queryNode(node) {
     const headerDiv = document.createElement('div');
     headerDiv.className = 'terminal-line info';
-    headerDiv.innerHTML = `<span class="cmd-prompt">$ </span>ssh ${h(node)} sudo -n cat /proc/partitions`;
+    headerDiv.innerHTML = `<span class="cmd-prompt">$ </span>sudo ssh ${h(node)} cat /proc/partitions`;
     term.appendChild(headerDiv);
 
     const params = new URLSearchParams({ node });
@@ -3283,7 +3283,7 @@ function selectPartitionForFormat(i) {
   const device = `/dev/${p.name}`;
   document.getElementById('format-disk-target').textContent = `${device} on ${p.node}`;
   document.getElementById('format-disk-preview').innerHTML =
-    `<div><span class="cmd-prompt">$ </span>ssh ${h(p.node)} sudo -n wipefs -a ${h(device)}</div>`;
+    `<div><span class="cmd-prompt">$ </span>sudo ssh ${h(p.node)} wipefs -a ${h(device)}</div>`;
   const confirmBox = document.getElementById('format-disk-confirm');
   confirmBox.style.display = 'block';
   const fterm = document.getElementById('format-disk-terminal');
@@ -3308,7 +3308,7 @@ async function confirmFormatDisk(btn) {
   term.innerHTML = '';
 
   if (state.dryRun) {
-    appendToTerminal(termId, `$ ssh ${p.node} sudo -n wipefs -a ${device}  # (dry run)`, 'info');
+    appendToTerminal(termId, `$ sudo ssh ${p.node} wipefs -a ${device}  # (dry run)`, 'info');
     appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
     return;
   }

@@ -1702,8 +1702,12 @@ def stream_list_partitions():
             if not _VALID_HOSTNAME_RE.fullmatch(node):
                 yield sse("error", f"[ERROR] Invalid node hostname: {node!r}")
                 return
-            cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS, node, "sudo", "-n", "cat", "/proc/partitions"]
-            yield sse("info", f"$ ssh {node} sudo -n cat /proc/partitions")
+            # sudo elevates the local ssh client to root before it connects —
+            # GPFS clusters rely on passwordless root-to-root SSH trust, and
+            # the webserver's own user generally isn't authorized on target
+            # nodes, only root's key is.
+            cmd = ["sudo", "-n", "ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS, node, "cat", "/proc/partitions"]
+            yield sse("info", f"$ sudo ssh {node} cat /proc/partitions")
             # Run synchronously rather than streaming — /proc/partitions is a
             # handful of short lines, and the full output is parsed below.
             stdout, rc = _run_cmd(cmd, timeout=25)
@@ -1743,8 +1747,10 @@ def stream_format_disk():
             if not device or not _VALID_DEVICE_PATH_RE.fullmatch(device):
                 yield sse("error", f"[ERROR] Invalid device path: {device!r}")
                 return
-            cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS,
-                   node, "sudo", "-n", "wipefs", "-a", device]
+            # sudo elevates the local ssh client to root before it connects —
+            # see stream_list_partitions for why.
+            cmd = ["sudo", "-n", "ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS,
+                   node, "wipefs", "-a", device]
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd)
             if rc == 0:
