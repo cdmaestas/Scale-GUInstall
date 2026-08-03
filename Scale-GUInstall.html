@@ -1204,13 +1204,12 @@
                 <th style="text-align:center">NSD Server</th>
                 <th style="text-align:center">Protocol</th>
                 <th style="text-align:center">GUI Server</th>
-                <th style="text-align:center">AFM Gateway</th>
                 <th style="text-align:center">Client Only</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="nodes-table-body">
-              <tr><td colspan="10" style="color:var(--cds-text-secondary); text-align:center; padding:var(--spacing-07)">No nodes configured yet</td></tr>
+              <tr><td colspan="9" style="color:var(--cds-text-secondary); text-align:center; padding:var(--spacing-07)">No nodes configured yet</td></tr>
             </tbody>
           </table>
         </div>
@@ -2975,7 +2974,7 @@ function addNode() {
   updateAllPreviews();
 }
 
-const _CLIENT_INCOMPATIBLE_ROLES = ['nsd', 'protocol', 'gui', 'gateway', 'ems', 'callhome', 'archive-ee'];
+const _CLIENT_INCOMPATIBLE_ROLES = ['nsd', 'protocol', 'gui', 'ems', 'callhome', 'archive-ee'];
 
 function onClientRoleChange(checked) {
   _CLIENT_INCOMPATIBLE_ROLES.forEach(role => {
@@ -3021,7 +3020,7 @@ function toggleNodeRole(index, role, enabled) {
 }
 
 function updateRoleAssignGrid() {
-  const roleTagColors = { nsd:'cyan', client:'teal', manager:'purple', quorum:'gray', protocol:'green', gui:'blue', gateway:'warning', 'archive-ee':'teal', ems:'gray', callhome:'gray' };
+  const roleTagColors = { nsd:'cyan', client:'teal', manager:'purple', quorum:'gray', protocol:'green', gui:'blue', 'archive-ee':'teal', ems:'gray', callhome:'gray' };
   const grid = document.getElementById('role-assign-grid');
   if (!grid) return;
   if (state.nodes.length === 0) {
@@ -3032,7 +3031,7 @@ function updateRoleAssignGrid() {
     <div class="node-card">
       <div class="node-card-header"><span class="node-card-hostname">${h(n.hostname)}</span></div>
       <div class="node-card-roles">${n.roles.length
-        ? n.roles.map(r => `<span class="tag tag-${h(roleTagColors[r]||'gray')}">${r === 'nsd' ? 'NSD Server' : r === 'gui' ? 'GUI Server' : r === 'gateway' ? 'AFM Gateway' : r === 'archive-ee' ? 'Archive EE' : r === 'ems' ? 'EMS' : r === 'callhome' ? 'Call Home' : h(r)}</span>`).join(' ')
+        ? n.roles.map(r => `<span class="tag tag-${h(roleTagColors[r]||'gray')}">${r === 'nsd' ? 'NSD Server' : r === 'gui' ? 'GUI Server' : r === 'archive-ee' ? 'Archive EE' : r === 'ems' ? 'EMS' : r === 'callhome' ? 'Call Home' : h(r)}</span>`).join(' ')
         : '<span style="color:var(--cds-text-disabled);font-size:12px">No roles assigned</span>'}</div>
     </div>`).join('');
 }
@@ -3061,13 +3060,13 @@ function updateNodeDisplay() {
   document.getElementById('node-count-label').textContent = count + ' node' + (count !== 1 ? 's' : '') + ' configured';
 
   if (count === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="color:var(--cds-text-secondary); text-align:center; padding:var(--spacing-07)">No nodes configured yet</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="color:var(--cds-text-secondary); text-align:center; padding:var(--spacing-07)">No nodes configured yet</td></tr>';
     document.getElementById('role-assign-grid').innerHTML = '<div style="color:var(--cds-text-secondary); grid-column:1/-1; text-align:center; padding:var(--spacing-07)">Add nodes first to assign roles here</div>';
     return;
   }
 
-  const roleTagColors = { nsd:'cyan', client:'teal', manager:'purple', quorum:'gray', protocol:'green', gui:'blue', gateway:'warning', 'archive-ee':'teal', ems:'gray', callhome:'gray' };
-  const tableRoles = ['quorum','manager','nsd','protocol','gui','gateway','client'];
+  const roleTagColors = { nsd:'cyan', client:'teal', manager:'purple', quorum:'gray', protocol:'green', gui:'blue', 'archive-ee':'teal', ems:'gray', callhome:'gray' };
+  const tableRoles = ['quorum','manager','nsd','protocol','gui','client'];
 
   const chk = (idx, role, checked) => {
     const isClient = state.nodes[idx]?.roles.includes('client');
@@ -3086,7 +3085,6 @@ function updateNodeDisplay() {
       <td style="text-align:center">${chk(i,'nsd',     n.roles.includes('nsd'))}</td>
       <td style="text-align:center">${chk(i,'protocol',n.roles.includes('protocol'))}</td>
       <td style="text-align:center">${chk(i,'gui',     n.roles.includes('gui'))}</td>
-      <td style="text-align:center">${chk(i,'gateway', n.roles.includes('gateway'))}</td>
       <td style="text-align:center">${chk(i,'client',  n.roles.includes('client'))}</td>
       <td><div class="table-actions">
         <button class="btn btn-sm btn-danger" onclick="removeNode(${i})">Remove</button>
