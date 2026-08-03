@@ -12,6 +12,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Added
 - CI `security-guard` job and a matching local pre-commit check: fails the build on `shell=True`, unsafe `pickle`/`yaml.load`/`eval`, bare `except:` (silent-failure regression), or an `innerHTML` template literal that interpolates a value without routing it through the `h()` escape helper
 
+### Removed
+- "AFM Gateway" checkbox/column from Node Configuration. The `spectrumscale` install toolkit has no node-add flag for it — the role was silently dropped from `node add` on the backend and never wired to the AFM Gateway post-configuration panel, so checking it did nothing. AFM gateway designation still works as intended via the Post Configuration → AFM Gateway panel (`mmafmconfig -N <node>`), which is unaffected. Can be reintroduced as a real node role if the toolkit ever adds support.
+
 ---
 
 ## [1.0.18] — 2026-08-02
