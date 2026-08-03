@@ -419,6 +419,22 @@
   }
   .toggle.on::after { transform: translateX(16px); }
   .toggle-label { font-size: 14px; }
+  .toggle-sm { width: 28px; height: 16px; border-radius: 8px; }
+  .toggle-sm::after { width: 10px; height: 10px; top: 3px; left: 3px; }
+  .toggle-sm.on::after { transform: translateX(12px); }
+
+  /* ===== HEADER DRY-RUN BADGE ===== */
+  .header-dryrun {
+    display: flex; align-items: center; gap: var(--spacing-03);
+    background: var(--cds-layer-01); border: 1px solid var(--cds-border-subtle-01);
+    padding: 4px var(--spacing-04); font-size: 12px; cursor: pointer;
+  }
+  .header-dryrun-label { white-space: nowrap; }
+  .header-dryrun.live {
+    background: var(--cds-notification-error-background);
+    border-color: var(--cds-button-danger);
+  }
+  .header-dryrun.live .header-dryrun-label { color: var(--cds-button-danger); font-weight: 600; }
 
   /* ===== PATH EDITOR ===== */
   .toolkit-path-bar {
@@ -526,6 +542,15 @@
     display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 149;
   }
 
+  /* ===== ICON-RAIL NAV TOOLTIP ===== */
+  .nav-tooltip {
+    position: fixed; background: var(--cds-layer-02); color: var(--cds-text-primary);
+    font-size: 12px; padding: 6px 10px; border-radius: 4px; white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4); pointer-events: none; z-index: 300;
+    opacity: 0; transition: opacity 0.1s ease; display: none;
+  }
+  .nav-tooltip.visible { opacity: 1; }
+
   /* Collapsed sidebar: on large screens it becomes an icon rail
      (rules in the min-width media block below); on small screens the
      drawer stays hidden until opened, so no extra rules are needed. */
@@ -612,6 +637,7 @@
 
 <!-- ===== SIDEBAR OVERLAY ===== -->
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<div class="nav-tooltip" id="nav-tooltip" role="tooltip"></div>
 
 <!-- ===== HEADER ===== -->
 <header>
@@ -631,6 +657,14 @@
     <span class="cluster-status-dot" id="cluster-dot"></span>
     <span id="cluster-name-display">No cluster configured</span>
   </div>
+  <div class="header-dryrun" id="header-dryrun-badge" title="Toggle Dry Run mode" onclick="toggleDryRun(document.getElementById('header-dry-run-toggle'))">
+    <button class="toggle toggle-sm on dry-run-toggle-btn" id="header-dry-run-toggle" onclick="event.stopPropagation(); toggleDryRun(this)" aria-label="Toggle Dry Run mode"></button>
+    <span class="header-dryrun-label" id="header-dry-run-label">Dry Run</span>
+  </div>
+  <a class="btn btn-sm btn-ghost" href="help.html" target="_blank" rel="noopener noreferrer">
+    <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm0 24a10 10 0 1110-10 10 10 0 01-10 10z"/><path d="M17 22h-2v2h2zm3.5-9.5c0-2.5-2-4.5-4.5-4.5s-4.5 2-4.5 4.5h2c0-1.4 1.1-2.5 2.5-2.5s2.5 1.1 2.5 2.5c0 1.1-.5 1.7-1.4 2.4-.3.2-.6.5-.9.7-.9.8-1.2 1.6-1.2 3.2v.2h2v-.2c0-1 .2-1.3.7-1.7.2-.2.5-.4.8-.6 1-.8 2-1.7 2-3.5z"/></svg>
+    Help
+  </a>
   <button class="btn btn-sm btn-ghost" onclick="navigateTo('settings')">
     <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M27 16.76v-1.53l1.92-1.68A2 2 0 0029.3 11l-2.36-4a2 2 0 00-2.44-.89l-2.47.83a11.86 11.86 0 00-1.32-.76l-.36-2.6A2 2 0 0018.36 2h-4.72a2 2 0 00-2 1.61l-.36 2.6a12.48 12.48 0 00-1.32.76l-2.47-.83a2 2 0 00-2.44.89L2.7 11a2 2 0 00.41 2.51L5 15.24v1.53l-1.89 1.68A2 2 0 002.7 21l2.36 4a2 2 0 002.44.89l2.47-.83a11.86 11.86 0 001.32.76l.36 2.6A2 2 0 0013.64 30h4.72a2 2 0 002-1.61l.36-2.6a12.48 12.48 0 001.32-.76l2.47.83a2 2 0 002.44-.89L29.3 21a2 2 0 00-.38-2.56zm-11 3.24a4 4 0 110-8 4 4 0 010 8z"/></svg>
     Settings
@@ -2770,7 +2804,7 @@
             <div class="form-group">
               <label class="form-label">Dry Run Mode</label>
               <div class="toggle-wrapper">
-                <button class="toggle on" id="dry-run-toggle" onclick="toggleDryRun(this)"></button>
+                <button class="toggle on dry-run-toggle-btn" id="dry-run-toggle" onclick="toggleDryRun(this)"></button>
                 <span class="toggle-label" id="dry-run-label">Enabled — commands will be previewed only, not executed</span>
               </div>
               <div class="form-help">Disable only after reviewing the command output and confirming it is correct</div>
@@ -5066,14 +5100,12 @@ function toggleDryRun(btn) {
     document.getElementById('dryrun-confirm-overlay').style.display = 'flex';
   } else {
     // Turning back ON — no confirmation needed
-    btn.classList.add('on');
     setDryRunState(true);
   }
 }
 
 function confirmDisableDryRun() {
   document.getElementById('dryrun-confirm-overlay').style.display = 'none';
-  document.getElementById('dry-run-toggle').classList.remove('on');
   setDryRunState(false);
 }
 
@@ -5083,6 +5115,8 @@ function cancelDisableDryRun() {
 
 function setDryRunState(enabled) {
   state.dryRun = enabled;
+  document.querySelectorAll('.dry-run-toggle-btn').forEach(btn => btn.classList.toggle('on', enabled));
+
   const label = document.getElementById('dry-run-label');
   const banner = document.getElementById('dryrun-banner');
   if (enabled) {
@@ -5094,6 +5128,13 @@ function setDryRunState(enabled) {
     label.style.color = 'var(--cds-support-warning)';
     banner.style.display = 'none';
   }
+
+  const headerBadge = document.getElementById('header-dryrun-badge');
+  const headerLabel = document.getElementById('header-dry-run-label');
+  headerBadge.classList.toggle('live', !enabled);
+  headerBadge.title = enabled ? 'Dry Run is on — click to go live' : 'LIVE — commands execute against the cluster. Click to re-enable Dry Run.';
+  headerLabel.textContent = enabled ? 'Dry Run' : 'LIVE';
+
   // Update all run buttons
   document.querySelectorAll('.run-btn').forEach(btn => {
     btn.querySelector('.btn-mode-label').textContent = enabled ? '(Dry Run)' : '(Live)';
@@ -5104,9 +5145,42 @@ function setDryRunState(enabled) {
 // ===== INIT =====
 updateAllPreviews();
 setDryRunState(true);
-// Tooltips for the collapsed icon-rail sidebar
+// Tooltips for the collapsed icon-rail sidebar. Native `title` is kept as
+// an accessibility fallback; the visible tooltip is a single shared element
+// positioned via JS so it isn't clipped by the sidebar's overflow-x:hidden.
+const navTooltip = document.getElementById('nav-tooltip');
+function isIconRailCollapsed() {
+  return window.innerWidth > 960 && document.body.classList.contains('sidebar-collapsed');
+}
 document.querySelectorAll('.nav-item').forEach(item => {
-  if (!item.title) item.title = item.textContent.trim();
+  let label = item.title;
+  if (!label) {
+    const clone = item.cloneNode(true);
+    clone.querySelectorAll('.nav-badge').forEach(b => b.remove());
+    label = clone.textContent.trim();
+  }
+  item.title = label;
+  item.addEventListener('mouseenter', () => {
+    if (!isIconRailCollapsed()) return;
+    const r = item.getBoundingClientRect();
+    navTooltip.textContent = label;
+    navTooltip.style.display = 'block';
+    navTooltip.style.left = (r.right + 8) + 'px';
+    navTooltip.style.top = (r.top + r.height / 2) + 'px';
+    navTooltip.style.transform = 'translateY(-50%)';
+    requestAnimationFrame(() => navTooltip.classList.add('visible'));
+  });
+  item.addEventListener('mouseleave', () => {
+    navTooltip.classList.remove('visible');
+    navTooltip.style.display = 'none';
+  });
+  item.addEventListener('focus', () => item.dispatchEvent(new Event('mouseenter')));
+  item.addEventListener('blur', () => item.dispatchEvent(new Event('mouseleave')));
+});
+// Hide immediately if the sidebar collapses/expands or the icon rail scrolls
+document.querySelector('.sidebar').addEventListener('scroll', () => {
+  navTooltip.classList.remove('visible');
+  navTooltip.style.display = 'none';
 });
 </script>
 </body>

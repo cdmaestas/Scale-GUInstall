@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Help — Scale GUInstall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cds-background: #161616;
+    --cds-layer-01: #262626;
+    --cds-layer-02: #393939;
+    --cds-border-subtle-01: #393939;
+    --cds-text-primary: #f4f4f4;
+    --cds-text-secondary: #c6c6c6;
+    --cds-text-placeholder: #6f6f6f;
+    --cds-link-primary: #78a9ff;
+    --cds-link-primary-hover: #a6c8ff;
+    --cds-button-primary: #0f62fe;
+    --cds-button-danger: #da1e28;
+    --cds-support-warning: #f1c21b;
+    --cds-support-error: #fa4d56;
+    --cds-notification-info-background: #0043ce1a;
+    --cds-notification-warning-background: #f1c21b1a;
+    --font-family: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --header-height: 48px;
+    --toc-width: 240px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--cds-background); color: var(--cds-text-primary);
+    font-family: var(--font-family); font-size: 14px; line-height: 1.6;
+  }
+  code, pre, .mono { font-family: var(--font-mono); }
+  a { color: var(--cds-link-primary); }
+  a:hover { color: var(--cds-link-primary-hover); }
+
+  header {
+    display: flex; align-items: center; gap: 12px; height: var(--header-height);
+    padding: 0 16px; background: #000; border-bottom: 1px solid var(--cds-border-subtle-01);
+    position: sticky; top: 0; z-index: 10;
+  }
+  header svg { color: #0f62fe; flex-shrink: 0; }
+  header .title { font-size: 14px; font-weight: 600; }
+  header .divider { width: 1px; height: 16px; background: var(--cds-border-subtle-01); }
+  header .subtitle { font-size: 14px; color: var(--cds-text-secondary); }
+  header .spacer { flex: 1; }
+  header a.back {
+    font-size: 13px; color: var(--cds-text-secondary); text-decoration: none;
+    display: flex; align-items: center; gap: 6px;
+  }
+  header a.back:hover { color: var(--cds-text-primary); }
+
+  .layout { display: flex; max-width: 1100px; margin: 0 auto; }
+
+  nav.toc {
+    width: var(--toc-width); flex-shrink: 0; padding: 32px 16px;
+    position: sticky; top: var(--header-height); align-self: flex-start;
+    max-height: calc(100vh - var(--header-height)); overflow-y: auto;
+  }
+  nav.toc .toc-label {
+    font-size: 11px; font-weight: 600; color: var(--cds-text-secondary);
+    text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 8px 12px;
+  }
+  nav.toc a {
+    display: block; padding: 6px 12px; font-size: 13px; text-decoration: none;
+    color: var(--cds-text-secondary); border-left: 2px solid transparent;
+  }
+  nav.toc a:hover { color: var(--cds-text-primary); background: var(--cds-layer-01); }
+
+  main { flex: 1; min-width: 0; padding: 32px 32px 96px; }
+  main h1 { font-size: 28px; font-weight: 300; margin: 0 0 8px; }
+  main > p.lede { color: var(--cds-text-secondary); font-size: 15px; max-width: 640px; margin: 0 0 40px; }
+  section { margin-bottom: 48px; scroll-margin-top: calc(var(--header-height) + 16px); }
+  section h2 {
+    font-size: 20px; font-weight: 400; margin: 0 0 16px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--cds-border-subtle-01);
+  }
+  section h3 { font-size: 15px; font-weight: 600; margin: 24px 0 8px; }
+  section p { color: var(--cds-text-secondary); margin: 0 0 12px; }
+  section ul, section ol { color: var(--cds-text-secondary); padding-left: 20px; margin: 0 0 12px; }
+  section li { margin-bottom: 6px; }
+  section li strong { color: var(--cds-text-primary); }
+
+  code {
+    background: var(--cds-layer-02); padding: 1px 6px; border-radius: 4px;
+    font-size: 12.5px; color: var(--cds-text-primary);
+  }
+  pre {
+    background: #000; border: 1px solid var(--cds-border-subtle-01); border-radius: 4px;
+    padding: 12px 16px; overflow-x: auto; margin: 0 0 12px;
+  }
+  pre code { background: none; padding: 0; font-size: 13px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 0 0 16px; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--cds-border-subtle-01); }
+  th { color: var(--cds-text-secondary); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { color: var(--cds-text-secondary); }
+  td code { white-space: nowrap; }
+
+  .callout {
+    display: flex; gap: 12px; padding: 12px 16px; border-radius: 4px; margin: 0 0 16px;
+    font-size: 13px; border: 1px solid;
+  }
+  .callout.info { background: var(--cds-notification-info-background); border-color: var(--cds-button-primary); }
+  .callout.warning { background: var(--cds-notification-warning-background); border-color: var(--cds-support-warning); }
+  .callout p { margin: 0; color: var(--cds-text-primary); }
+  .callout strong { display: block; margin-bottom: 2px; }
+
+  footer {
+    max-width: 1100px; margin: 0 auto; padding: 24px 32px 48px;
+    border-top: 1px solid var(--cds-border-subtle-01); color: var(--cds-text-placeholder); font-size: 12px;
+  }
+
+  @media (max-width: 860px) {
+    .layout { flex-direction: column; }
+    nav.toc { width: 100%; position: static; max-height: none; padding: 16px 16px 0; }
+    main { padding: 24px 16px 64px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="22" height="22" viewBox="0 0 32 32" fill="currentColor">
+    <path d="M0 7h32v2H0zm5 4h22v2H5zm-5 4h32v2H0zm5 4h22v2H5zM0 23h32v2H0zM0 3h32v2H0z"/>
+  </svg>
+  <span class="title">Scale GUInstall</span>
+  <div class="divider"></div>
+  <span class="subtitle">Help</span>
+  <div class="spacer"></div>
+  <a class="back" href="Scale-GUInstall.html">
+    <svg width="14" height="14" viewBox="0 0 32 32" fill="currentColor"><path d="M14 26L2 16 14 6 15.4 7.6 5.8 16 15.4 24.4z"/><path d="M4 15h26v2H4z"/></svg>
+    Back to app
+  </a>
+</header>
+
+<div class="layout">
+  <nav class="toc">
+    <div class="toc-label">Contents</div>
+    <a href="#getting-started">Getting started</a>
+    <a href="#dry-run">Dry Run mode</a>
+    <a href="#pages">Page-by-page guide</a>
+    <a href="#remote-access">Connecting remotely</a>
+    <a href="#troubleshooting">Troubleshooting</a>
+    <a href="#more-help">More help</a>
+  </nav>
+
+  <main>
+    <h1>Help</h1>
+    <p class="lede">A quick reference for using Scale GUInstall — a guided GUI for the IBM Storage Scale Installation Toolkit (<code>spectrumscale</code>).</p>
+
+    <div class="callout warning">
+      <div>
+        <strong>Unofficial community tool</strong>
+        <p>This is not an IBM product. All operations target real cluster infrastructure — read every command preview before executing, especially with Dry Run off.</p>
+      </div>
+    </div>
+
+    <section id="getting-started">
+      <h2>Getting started</h2>
+      <p>Scale GUInstall has two parts: this HTML page (runs entirely in your browser) and a small backend server, <code>scale-server.py</code>, that runs on the installer node and executes real <code>spectrumscale</code> commands.</p>
+      <p>The HTML page works on its own as a command generator — in Dry Run mode every button shows the command it would run without a backend at all. You only need the backend when you are ready to execute commands for real.</p>
+      <h3>Start the backend</h3>
+      <pre><code>python3 scale-server.py
+# or, if installed via RPM/DEB package:
+scale-guinstall</code></pre>
+      <p>It listens on <code>http://127.0.0.1:5001</code> — loopback only, never exposed to the network directly.</p>
+      <h3>Work through the pages in order</h3>
+      <p>Prepare Software → Node Configuration → Cluster Settings → NSD Storage → Filesystem → Protocol Services → Install &amp; Deploy → Post Configuration.</p>
+    </section>
+
+    <section id="dry-run">
+      <h2>Dry Run mode</h2>
+      <p>Dry Run is <strong>on by default</strong>. Every action button generates and displays the command that would run — nothing is sent to the cluster or backend. The toggle lives in two places: the top header (always visible) and the Settings page.</p>
+      <p>Turning Dry Run off requires an explicit confirmation, and the header badge turns red with a <strong>LIVE</strong> label as a persistent reminder that commands will execute for real.</p>
+      <div class="callout info">
+        <div>
+          <strong>Before going live</strong>
+          <p>Run the relevant pre-checks (Install &amp; Deploy → Pre-check, or the standalone Pre/Post Checks page) first. NSD creation and filesystem operations are destructive and irreversible.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="pages">
+      <h2>Page-by-page guide</h2>
+      <table>
+        <thead><tr><th>Page</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Dashboard</td><td>Live summary of configured nodes, NSDs, filesystems, and protocols; workflow progress tracker.</td></tr>
+          <tr><td>Prepare Software</td><td>Extract the Scale zip package, verify checksum, run the installer, check Ansible/locale prerequisites, start the <code>spectrumscale</code> setup service.</td></tr>
+          <tr><td>Node Configuration</td><td>Add nodes one at a time or via bulk import; assign roles (NSD, Manager, Quorum, Admin, Protocol/CES, GUI, EMS, Call Home, Archive EE).</td></tr>
+          <tr><td>Cluster Settings</td><td>GPFS cluster name, I/O profile, remote shell/copy binaries, port range, GPL binary directory, call home, performance monitoring, file audit logging.</td></tr>
+          <tr><td>NSD Storage</td><td>Define Network Shared Disks — server, disk path, failure group, usage type, size. Inline edit, remove, and partition discovery.</td></tr>
+          <tr><td>Filesystem</td><td>GPFS filesystem name, mount point, block size, replication, inodes, and advanced options (quotas, compression, encryption, IAM).</td></tr>
+          <tr><td>Protocol Services</td><td>Enable and configure NFS (v3/v4/v4.1), SMB/Samba, Object Storage (Swift), and CES floating IPs.</td></tr>
+          <tr><td>Install &amp; Deploy</td><td>Guided pre-check → install → enable daemon → deploy → verify flow.</td></tr>
+          <tr><td>Post Configuration</td><td>GPFS PATH setup, GUI admin users, <code>mmchconfig</code> tuning, health monitoring, NFS core dump collection, AFM gateway (NFS or S3).</td></tr>
+          <tr><td>Populate from Cluster</td><td>CCR status check, then pull an existing cluster's configuration via <code>spectrumscale config populate</code>.</td></tr>
+          <tr><td>Upgrade</td><td>Online (rolling) or offline cluster upgrade via <code>spectrumscale upgrade</code>.</td></tr>
+          <tr><td>Pre/Post Checks</td><td>Run standalone pre-checks and post-checks at any time.</td></tr>
+          <tr><td>Settings</td><td>Toggle Dry Run, set the toolkit binary path, SSH tunnel helper.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="remote-access">
+      <h2>Connecting remotely</h2>
+      <p>The backend binds to <code>127.0.0.1</code> only, so it is never reachable from the network directly. To drive it from your own workstation, forward the port over SSH and open this app locally:</p>
+      <pre><code># Interactive (tunnel closes when the terminal closes)
+ssh -L 5001:127.0.0.1:5001 user@installer-node
+
+# Background (stays open after the terminal exits)
+ssh -fNL 5001:127.0.0.1:5001 user@installer-node</code></pre>
+      <p>Leave the Backend URL field as <code>http://127.0.0.1:5001</code> — the tunnel forwards it transparently. The Settings page has a tunnel helper that generates this command and tests the connection for you.</p>
+    </section>
+
+    <section id="troubleshooting">
+      <h2>Troubleshooting</h2>
+
+      <h3>"Backend not reachable"</h3>
+      <p>The page can't reach <code>http://127.0.0.1:5001</code>. Confirm the backend is running (<code>python3 scale-server.py</code> or <code>scale-guinstall</code>), and if you're connecting remotely, confirm the SSH tunnel is up.</p>
+
+      <h3>SSH tunnel fails: "channel N: open failed: administratively prohibited"</h3>
+      <p>The installer node's <code>sshd</code> has TCP forwarding disabled. Enable it and reload:</p>
+      <pre><code>echo 'AllowTcpForwarding local' | sudo tee -a /etc/ssh/sshd_config
+sudo systemctl reload sshd</code></pre>
+      <p>Or run the bundled helper script: <code>sudo ./packaging/enable-ssh-forwarding.sh</code>.</p>
+
+      <h3>Commands fail with a sudo password prompt error</h3>
+      <p>The backend runs all privileged commands with <code>sudo -n</code> (non-interactive) so it can never hang waiting for input. The user running <code>scale-guinstall</code> needs passwordless sudo rights (<code>NOPASSWD</code> in <code>sudoers</code>) — without it, every toolkit and <code>mm*</code> command fails immediately with a diagnostic instead of silently hanging.</p>
+
+      <h3>Ansible prerequisite warning</h3>
+      <p>The toolkit requires <strong>ansible-core 2.23 or earlier</strong>; 2.24+ is incompatible. The Prepare Software page checks this automatically and warns if the installed version is too new.</p>
+
+      <h3>Node role checkboxes are disabled</h3>
+      <p>Nodes marked <strong>Client Only</strong> can't hold roles that require full toolkit management (NSD, Protocol, GUI, EMS, Call Home, Archive EE). Uncheck Client Only first if you need one of those roles.</p>
+    </section>
+
+    <section id="more-help">
+      <h2>More help</h2>
+      <ul>
+        <li><strong>Full documentation:</strong> see <a href="https://github.com/cdmaestas/Scale-GUInstall#readme" target="_blank" rel="noopener noreferrer">README</a> in the repository.</li>
+        <li><strong>Release history:</strong> see <a href="https://github.com/cdmaestas/Scale-GUInstall/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">CHANGELOG</a>.</li>
+        <li><strong>Command-line reference:</strong> <code>man scale-guinstall</code> (if installed via RPM/DEB package).</li>
+        <li><strong>IBM Storage Scale docs:</strong> <a href="https://www.ibm.com/docs/en/storage-scale/6.0.1" target="_blank" rel="noopener noreferrer">ibm.com/docs/en/storage-scale/6.0.1</a>.</li>
+        <li><strong>File an issue:</strong> <a href="https://github.com/cdmaestas/Scale-GUInstall/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>.</li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<footer>Scale GUInstall is an unofficial community tool and is not an IBM product or service.</footer>
+
+</body>
+</html>

@@ -11,6 +11,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 - CI `security-guard` job and a matching local pre-commit check: fails the build on `shell=True`, unsafe `pickle`/`yaml.load`/`eval`, bare `except:` (silent-failure regression), or an `innerHTML` template literal that interpolates a value without routing it through the `h()` escape helper
+- Always-visible Dry Run toggle in the top header, synchronized with the existing Settings-page toggle; turns red with a **LIVE** label when disabled
+- `help.html` — a standalone in-app help/reference page (getting started, Dry Run explanation, page-by-page guide, remote access, troubleshooting) linked from a new **Help** button in the header; served by `scale-server.py` at `/help.html` and packaged in both RPM and DEB
+- README screenshots (Dashboard, Node Configuration, NSD Storage, Install & Deploy, Settings) under `docs/screenshots/`
+- Styled hover tooltip for the collapsed icon-rail sidebar, replacing the native browser `title` tooltip — appears instantly, matches the app's dark theme, and is positioned via JS so it isn't clipped by the sidebar's `overflow-x: hidden`
+
+### Fixed
+- CI `python-check` job used the deprecated `ast.Constant.s` accessor, removed in Python 3.12+; switched to `ast.Constant.value`
 
 ### Removed
 - "AFM Gateway" checkbox/column from Node Configuration. The `spectrumscale` install toolkit has no node-add flag for it — the role was silently dropped from `node add` on the backend and never wired to the AFM Gateway post-configuration panel, so checking it did nothing. AFM gateway designation still works as intended via the Post Configuration → AFM Gateway panel (`mmafmconfig -N <node>`), which is unaffected. Can be reintroduced as a real node role if the toolkit ever adds support.

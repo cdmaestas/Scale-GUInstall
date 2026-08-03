@@ -79,10 +79,14 @@ checks = {
     "h() escape helper": "function h(str)",
     "streamToTerminalPost": "async function streamToTerminalPost",
     "127.0.0.1 backend default": "127.0.0.1:5001",
+    "help link": 'href="help.html"',
 }
 failed = [name for name, marker in checks.items() if marker not in html]
 if failed:
     print(f"pre-commit: FAIL — missing HTML markers: {failed}", file=sys.stderr)
+    sys.exit(1)
+if not __import__("os").path.isfile("help.html"):
+    print("pre-commit: FAIL — help.html is missing", file=sys.stderr)
     sys.exit(1)
 EOF
 
