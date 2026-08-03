@@ -194,7 +194,7 @@ scale-guinstall</code></pre>
           <tr><td>Prepare Software</td><td>Extract the Scale zip package, verify checksum, run the installer, check Ansible/locale prerequisites, start the <code>spectrumscale</code> setup service.</td></tr>
           <tr><td>Node Configuration</td><td>Add nodes one at a time or via bulk import; assign roles (NSD, Manager, Quorum, Admin, Protocol/CES, GUI, EMS, Call Home, Archive EE).</td></tr>
           <tr><td>Cluster Settings</td><td>GPFS cluster name, I/O profile, remote shell/copy binaries, port range, GPL binary directory, call home, performance monitoring, file audit logging.</td></tr>
-          <tr><td>NSD Storage</td><td>Define Network Shared Disks — server, disk path, failure group, usage type, size. Inline edit, remove, and partition discovery.</td></tr>
+          <tr><td>NSD Storage</td><td>Scan block devices across NSD nodes with <code>lsblk</code>, multi-select and bulk-configure them into NSDs (usage, failure group, pool, filesystem, optional format). Manual add with backup servers, inline edit, and remove.</td></tr>
           <tr><td>Filesystem</td><td>GPFS filesystem name, mount point, block size, replication, inodes, and advanced options (quotas, compression, encryption, IAM).</td></tr>
           <tr><td>Protocol Services</td><td>Enable and configure NFS (v3/v4/v4.1), SMB/Samba, Object Storage (Swift), and CES floating IPs.</td></tr>
           <tr><td>Install &amp; Deploy</td><td>Guided pre-check → install → enable daemon → deploy → verify flow.</td></tr>

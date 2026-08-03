@@ -143,7 +143,7 @@ Prepare Software → Node Configuration → Cluster Settings → NSD Storage →
 | **Prepare Software** | Extract the Scale zip package, verify checksum, run the installer, check Ansible and locale prerequisites, and start the `spectrumscale` setup service |
 | **Node Configuration** | Add nodes one at a time or via bulk import; assign roles (NSD, Manager, Quorum, Admin, Protocol/CES, GUI, EMS, Call Home, Archive EE); generates `spectrumscale node add` commands |
 | **Cluster Settings** | Set GPFS cluster name, I/O profile, remote shell/copy binaries, port range, GPL binary directory, call home, performance monitoring, and file audit logging |
-| **NSD Storage** | Define Network Shared Disks with server, disk path, failure group, usage type, and size; inline edit and remove; discover partitions on a node |
+| **NSD Storage** | Discover block devices across all NSD nodes with `lsblk` (size, type, filesystem, mount, in-use detection; only disks ≥ 32 GB by default), multi-select devices and bulk-configure them into NSDs (usage type, auto/manual failure group, storage pool, filesystem, optional `wipefs` format); plus manual add with backup servers, inline edit, and remove |
 | **Filesystem** | Configure GPFS filesystem name, mount point, block size, replication, metadata replication, inodes, and advanced options (quotas, compression, encryption, IAM) |
 | **Protocol Services** | Enable and configure NFS (v3/v4/v4.1), SMB/Samba, Object Storage (Swift), and CES floating IPs |
 | **Install & Deploy** | Guided pre-check → install → enable daemon → deploy → verify flow using `spectrumscale install` / `spectrumscale deploy` / `scaleadmd enable` |
