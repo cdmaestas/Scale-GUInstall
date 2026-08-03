@@ -1656,6 +1656,12 @@ def stream_nsd_add():
                 if filesystem and not _VALID_GPFS_NAME_RE.fullmatch(filesystem):
                     yield sse("error", f"[ERROR] NSD {i+1}: invalid filesystem name {filesystem!r}")
                     return
+                # GPFS rule: metadata can only live in the system pool, so a
+                # non-system pool may only hold dataOnly NSDs. Catch the invalid
+                # combination up front rather than after the toolkit connects.
+                if pool and pool.lower() != "system" and usage != "dataOnly":
+                    yield sse("error", f"[ERROR] NSD {i+1}: pool {pool!r} is not the system pool, so usage must be dataOnly (got {usage!r}). Metadata can only live in the system pool.")
+                    return
 
                 # spectrumscale nsd add flags: -p primary, -s secondary (comma
                 # list), -u usage, -fg failure group, -po pool, -fs filesystem.

@@ -1665,7 +1665,7 @@
             <div class="form-group">
               <label class="form-label">Storage Pool</label>
               <input type="text" class="form-input" id="nsd-pool" placeholder="system (default)">
-              <div class="form-help">Leave blank for the system pool</div>
+              <div class="form-help">Leave blank for the system pool. A non-system pool can only hold <code>dataOnly</code> NSDs — metadata must be in the system pool.</div>
             </div>
             <div class="form-group">
               <label class="form-label">Filesystem (optional)</label>
@@ -1712,17 +1712,12 @@
         </div>
       </div>
 
+      <!-- Apply NSDs — primary action, always visible -->
       <div class="panel" style="margin-top:var(--spacing-06)">
         <div class="panel-header">
-          <div><h3>Stanza File Preview</h3><p>Reference stanza for the NSDs below — run with <code>spectrumscale nsd add</code> flags</p></div>
-          <button class="btn btn-sm btn-ghost" onclick="copyStanza()">Copy</button>
+          <div><h3>Apply NSDs to Cluster</h3><p>Run <code>spectrumscale nsd add</code> for each configured NSD</p></div>
         </div>
-        <div class="panel-body" style="padding:0">
-          <div class="cmd-preview" id="nsd-stanza-preview">
-            <div style="color:#6f6f6f"># No NSDs configured yet</div>
-          </div>
-        </div>
-        <div class="panel-body" style="border-top:1px solid var(--border-subtle)">
+        <div class="panel-body">
           <div class="cmd-preview" style="margin-bottom:var(--spacing-04)">
             <div id="nsd-add-cmd-preview" style="color:#6f6f6f"># Configure NSDs above to generate the command</div>
           </div>
@@ -1732,6 +1727,22 @@
           </button>
           <div class="terminal" id="nsd-add-terminal" style="margin-top:var(--spacing-05); min-height:120px; max-height:300px; overflow-y:auto; display:none">
             <div class="terminal-line muted"># spectrumscale nsd add output will appear here</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stanza File Preview — reference only, collapsed by default, last -->
+      <div class="panel" style="margin-top:var(--spacing-06)">
+        <div class="panel-header collapsible-header" onclick="toggleCollapsible(this)">
+          <div><h3>Stanza File Preview</h3><p>Reference stanza for the configured NSDs (informational)</p></div>
+          <svg class="chevron" width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M16 22L6 12l1.414-1.414L16 19.172l8.586-8.586L26 12z"/></svg>
+        </div>
+        <div class="collapsible-body">
+          <div style="display:flex; justify-content:flex-end; margin-bottom:var(--spacing-03)">
+            <button class="btn btn-sm btn-ghost" onclick="copyStanza()">Copy</button>
+          </div>
+          <div class="cmd-preview" id="nsd-stanza-preview">
+            <div style="color:#6f6f6f"># No NSDs configured yet</div>
           </div>
         </div>
       </div>
@@ -3512,6 +3523,8 @@ function commitBulkNsds(nsds) {
 async function applyBulkNsds(btn) {
   const nsds = buildBulkNsds();
   if (!nsds.length) { alert('No devices selected.'); return; }
+  const poolErr = nsdPoolUsageError(document.getElementById('bulk-nsd-usage').value, document.getElementById('bulk-nsd-pool').value);
+  if (poolErr) { alert(poolErr); return; }
   const format = document.getElementById('bulk-nsd-format').checked;
   const termId = 'bulk-nsd-terminal';
   const term = document.getElementById(termId);
@@ -3675,10 +3688,28 @@ function addBackupRow() {
   if (list.children.length >= 7) document.querySelector('[onclick="addBackupRow()"]').style.display = 'none';
 }
 
+// GPFS rule: metadata (and descriptors) can only live in the system pool.
+// A non-system storage pool may only hold dataOnly NSDs. Returns an error
+// string for an invalid usage/pool combination, or null when it is valid.
+function nsdPoolUsageError(usage, pool) {
+  const p = (pool || '').trim().toLowerCase();
+  const isSystemPool = p === '' || p === 'system';
+  if (!isSystemPool && usage !== 'dataOnly') {
+    return `A non-system pool ("${pool.trim()}") can only hold dataOnly NSDs. `
+         + `Set Usage to "Data Only", or use the system pool (leave Storage Pool blank) for ${usage}.`;
+  }
+  return null;
+}
+
 function addNSD() {
   const server = document.getElementById('nsd-server').value;
   const disk = document.getElementById('nsd-disk').value.trim();
   if (!server || !disk) { alert('Please select a server and enter a disk path'); return; }
+
+  const usage = document.getElementById('nsd-usage').value;
+  const pool = document.getElementById('nsd-pool').value.trim();
+  const poolErr = nsdPoolUsageError(usage, pool);
+  if (poolErr) { alert(poolErr); return; }
 
   const size = document.getElementById('nsd-size').value;
   const sizeUnit = document.getElementById('nsd-size-unit').value;
@@ -3686,8 +3717,8 @@ function addNSD() {
     server, disk,
     backups: getBackupServers(),
     failureGroup: document.getElementById('nsd-fg').value || '1',
-    usage: document.getElementById('nsd-usage').value,
-    pool: document.getElementById('nsd-pool').value.trim(),
+    usage,
+    pool,
     filesystem: document.getElementById('nsd-filesystem').value.trim(),
     size: size ? `${size} ${sizeUnit}` : 'Unknown'
   });
