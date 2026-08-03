@@ -1647,7 +1647,9 @@ def stream_nsd_add():
                 if len(backups) > 7:
                     yield sse("error", f"[ERROR] NSD {i+1}: maximum 7 backup servers allowed")
                     return
-                if not re.fullmatch(r'\d+', failure_group):
+                # Failure group is optional (omitted in GUI-filesystem mode);
+                # validate only when provided.
+                if failure_group and not re.fullmatch(r'\d+', failure_group):
                     yield sse("error", f"[ERROR] NSD {i+1}: invalid failure group {failure_group!r}")
                     return
                 if pool and not _VALID_GPFS_NAME_RE.fullmatch(pool):
@@ -1671,7 +1673,9 @@ def stream_nsd_add():
                 cmd = ["sudo", "-n", toolkit, "nsd", "add", "-p", server]
                 if backups:
                     cmd += ["-s", ",".join(backups)]
-                cmd += ["-u", usage, "-fg", failure_group]
+                cmd += ["-u", usage]
+                if failure_group:
+                    cmd += ["-fg", failure_group]
                 if pool and pool.lower() != "system":  # system is the default pool
                     cmd += ["-po", pool]
                 if filesystem:
