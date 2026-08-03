@@ -526,9 +526,9 @@
     display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 149;
   }
 
-  /* Collapsed sidebar state (all sizes) */
-  body.sidebar-collapsed .sidebar { transform: translateX(-100%); }
-  body.sidebar-collapsed .main-content { margin-left: 0; width: 100vw; }
+  /* Collapsed sidebar: on large screens it becomes an icon rail
+     (rules in the min-width media block below); on small screens the
+     drawer stays hidden until opened, so no extra rules are needed. */
 
   /* On small screens the sidebar is always drawer-style */
   @media (max-width: 960px) {
@@ -543,9 +543,18 @@
     .upgrade-type-cards { grid-template-columns: 1fr; }
   }
 
-  /* On large screens the sidebar slides in/out without overlay */
+  /* On large screens the collapsed sidebar becomes a 56px icon rail */
   @media (min-width: 961px) {
-    .sidebar { transition: transform 0.2s ease; }
+    .sidebar { transition: width 0.2s ease; }
+    body.sidebar-collapsed .sidebar { width: 56px; overflow-x: hidden; }
+    body.sidebar-collapsed .main-content { margin-left: 56px; width: calc(100vw - 56px); }
+    body.sidebar-collapsed .sidebar-section-label { display: none; }
+    body.sidebar-collapsed .sidebar-section { padding: var(--spacing-03) 0; }
+    body.sidebar-collapsed .nav-badge { display: none; }
+    body.sidebar-collapsed .nav-item {
+      font-size: 0; gap: 0; justify-content: center; padding: 12px 0;
+    }
+    body.sidebar-collapsed .nav-item.active { border-right-width: 3px; }
   }
 </style>
 </head>
@@ -5097,6 +5106,10 @@ function setDryRunState(enabled) {
 // ===== INIT =====
 updateAllPreviews();
 setDryRunState(true);
+// Tooltips for the collapsed icon-rail sidebar
+document.querySelectorAll('.nav-item').forEach(item => {
+  if (!item.title) item.title = item.textContent.trim();
+});
 </script>
 </body>
 </html>
