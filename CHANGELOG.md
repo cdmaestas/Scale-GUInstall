@@ -11,6 +11,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.18] — 2026-08-02
+
+### Changed
+- Collapsing the sidebar on desktop (>960px) now shrinks it to a 56px icon rail instead of sliding it fully off-screen. Section labels, item text, and count badges hide; icons stay visible and centered, each with a hover tooltip naming the page. Mobile drawer behavior (≤960px) is unchanged.
+
+---
+
 ## [1.0.17] — 2026-07-16
 
 ### Fixed
@@ -280,7 +287,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - `start.sh` Python detection when system `python3` is below 3.10
 - RPM version field: hyphens replaced with `.` to satisfy RPM version format rules
 
-[Unreleased]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.15...HEAD
+[Unreleased]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.18...HEAD
+[1.0.18]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.17...v1.0.18
 [1.0.15]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.14...v1.0.15
 [1.0.2]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.0...v1.0.1
