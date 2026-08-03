@@ -1631,7 +1631,9 @@ def stream_nsd_add():
                 pool          = str(nsd.get("pool", "")).strip()
                 filesystem    = str(nsd.get("filesystem", "")).strip()
 
-                if usage not in _VALID_NSD_USAGE:
+                # Usage is optional (omitted in GUI-filesystem mode, where the
+                # Scale GUI sets usage/pool when it builds the filesystem).
+                if usage and usage not in _VALID_NSD_USAGE:
                     yield sse("error", f"[ERROR] NSD {i+1}: invalid usage {usage!r}. Must be one of: {', '.join(sorted(_VALID_NSD_USAGE))}")
                     return
                 if not disk or not _SAFE_PATH_RE.fullmatch(disk):
@@ -1673,7 +1675,8 @@ def stream_nsd_add():
                 cmd = ["sudo", "-n", toolkit, "nsd", "add", "-p", server]
                 if backups:
                     cmd += ["-s", ",".join(backups)]
-                cmd += ["-u", usage]
+                if usage:
+                    cmd += ["-u", usage]
                 if failure_group:
                     cmd += ["-fg", failure_group]
                 if pool and pool.lower() != "system":  # system is the default pool
