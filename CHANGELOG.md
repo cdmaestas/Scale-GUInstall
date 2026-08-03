@@ -12,12 +12,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Added
 - Block-device discovery on NSD Storage now runs `lsblk` (via `/api/stream/list-devices`, `sudo -n ssh <node> lsblk -b -P -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,MODEL`) across every NSD-role node in parallel, returning structured records (new `devices` SSE event) with size, type, filesystem, mount point, and model. Sudo elevates the local ssh client to root before it connects, since GPFS clusters rely on passwordless root-to-root SSH trust.
 - Discovered devices are shown in a selectable table (checkbox per row, select-all, sortable Node/Device/Size/Type columns). Only disks ≥ 32 GB are listed by default, with a "Show devices under 32 GB" toggle. Devices that carry a filesystem or are mounted are flagged **In use** and cannot be selected, so a running OS/data disk can't be wiped by accident.
-- Multi-select devices and configure them all at once into NSDs: usage type, failure group (**Auto** assigns one per node, or a manual value), storage pool, filesystem, and an optional `wipefs -a` format step (reuses `/api/stream/format-disk`, gated by Dry Run and a confirmation dialog). Configured NSDs are pushed into the Configured NSDs table; the manual Add NSD Disk form remains for backup-server assignment and edits. Discovered disks omit the `-s` size flag so the toolkit auto-detects real device size.
+- Multi-select devices and configure them all at once into NSDs: usage type, failure group (**Auto** assigns one per node, or a manual value), storage pool, filesystem, and an optional `wipefs -a` format step (reuses `/api/stream/format-disk`, gated by Dry Run and a confirmation dialog). Configured NSDs are pushed into the Configured NSDs table; the manual Add NSD Disk form remains for backup-server assignment and edits.
 - Model column in the NSD Storage device discovery table (from `lsblk` MODEL)
+- EMS, Call Home, and Archive EE are now editable inline as columns in the Configured Nodes table (previously only settable when first adding a node)
 
 ### Changed
 - `/api/stream/list-partitions` (which parsed `/proc/partitions`) is replaced by `/api/stream/list-devices`; the per-row "Use & Format" action is replaced by the multi-select bulk-configure flow.
 - Help opens in a named tab and its "Back to app" link now returns to the existing app tab (closing the Help tab) instead of loading a second copy of the app inside the Help tab; falls back to normal navigation when Help was opened directly.
+- Node Configuration redesigned: the Configured Nodes table (with a prominent **Load from cluster** button) is now at the top so current state is visible first, followed by Bulk Import, with Add Single Node collapsed at the bottom. The redundant read-only "Role Assignment" card grid is removed — roles are edited only inline in the table.
+
+### Fixed
+- `spectrumscale nsd add` used the wrong option flags and failed with `error: ambiguous option: -f could match -fs, -fg`. Corrected to the toolkit's actual flags: `-fg` (failure group, was `-f`), `-po` (pool, was `-t`), `-fs` (filesystem, previously stanza-only), and `-s` (secondary/backup servers, was `-b`). The bogus size flag is dropped entirely — the toolkit reads the device size itself, and `-s` had meant secondary server, not size. Both the backend command and the frontend preview are fixed.
 
 ---
 

@@ -1628,8 +1628,8 @@ def stream_nsd_add():
                 backups       = [str(b).strip() for b in nsd.get("backups", []) if str(b).strip()]
                 usage         = str(nsd.get("usage", "dataAndMetadata")).strip()
                 failure_group = str(nsd.get("failureGroup", "1")).strip()
-                size          = str(nsd.get("size", "")).strip()
                 pool          = str(nsd.get("pool", "")).strip()
+                filesystem    = str(nsd.get("filesystem", "")).strip()
 
                 if usage not in _VALID_NSD_USAGE:
                     yield sse("error", f"[ERROR] NSD {i+1}: invalid usage {usage!r}. Must be one of: {', '.join(sorted(_VALID_NSD_USAGE))}")
@@ -1650,21 +1650,26 @@ def stream_nsd_add():
                 if not re.fullmatch(r'\d+', failure_group):
                     yield sse("error", f"[ERROR] NSD {i+1}: invalid failure group {failure_group!r}")
                     return
-                if size and not _VALID_NSD_SIZE_RE.fullmatch(size):
-                    yield sse("error", f"[ERROR] NSD {i+1}: invalid size {size!r}")
-                    return
                 if pool and not _VALID_GPFS_NAME_RE.fullmatch(pool):
                     yield sse("error", f"[ERROR] NSD {i+1}: invalid pool name {pool!r}")
                     return
+                if filesystem and not _VALID_GPFS_NAME_RE.fullmatch(filesystem):
+                    yield sse("error", f"[ERROR] NSD {i+1}: invalid filesystem name {filesystem!r}")
+                    return
 
+                # spectrumscale nsd add flags: -p primary, -s secondary (comma
+                # list), -u usage, -fg failure group, -po pool, -fs filesystem.
+                # There is NO size flag — the toolkit reads the device itself.
+                # -f/-t are rejected as ambiguous (-f matches -fs/-fg), and -s
+                # is the secondary server, not size.
                 cmd = ["sudo", "-n", toolkit, "nsd", "add", "-p", server]
                 if backups:
-                    cmd += ["-b", ",".join(backups)]
-                cmd += ["-u", usage, "-f", failure_group]
+                    cmd += ["-s", ",".join(backups)]
+                cmd += ["-u", usage, "-fg", failure_group]
                 if pool:
-                    cmd += ["-t", pool]
-                if size:
-                    cmd += ["-s", size]
+                    cmd += ["-po", pool]
+                if filesystem:
+                    cmd += ["-fs", filesystem]
                 cmd.append(disk)
 
                 yield sse("info", f"$ {' '.join(cmd)}")
