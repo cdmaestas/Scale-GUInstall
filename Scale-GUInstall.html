@@ -3877,13 +3877,18 @@ function updateNSDDisplay() {
   } else {
     tbody.innerHTML = state.nsds.map((n, i) => {
       const backups = n.backups || (n.backup ? [n.backup] : []);
+      const dash = '<span style="color:#6f6f6f">—</span>';
+      // Empty failure group / pool means "not set here" — shown as — rather
+      // than blank or "system". In GUI-filesystem mode neither is assigned.
+      const fgCell = n.failureGroup ? h(n.failureGroup) : dash;
+      const poolCell = n.pool ? h(n.pool) : (state.fsViaGui ? dash : '<span style="color:#6f6f6f">system</span>');
       return `<tr>
         <td class="mono">${h(n.disk)}</td>
         <td class="mono">${h(n.server)}</td>
-        <td class="mono" style="font-size:12px">${backups.length ? h(backups.join(', ')) : '<span style="color:#6f6f6f">—</span>'}</td>
-        <td>${h(n.failureGroup)}</td>
+        <td class="mono" style="font-size:12px">${backups.length ? h(backups.join(', ')) : dash}</td>
+        <td>${fgCell}</td>
         <td><span class="tag tag-blue">${h(n.usage)}</span></td>
-        <td>${n.pool ? h(n.pool) : '<span style="color:#6f6f6f">system</span>'}</td>
+        <td>${poolCell}</td>
         <td>${h(n.sizeDisplay || n.size)}</td>
         <td style="display:flex;gap:4px">
           <button class="btn btn-sm btn-secondary" onclick="editNSD(${i})">Edit</button>
