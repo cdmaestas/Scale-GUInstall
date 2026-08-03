@@ -1533,7 +1533,7 @@
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:var(--spacing-05)">
                   <div class="form-group" style="margin:0">
                     <label class="form-label">Usage Type</label>
-                    <select class="form-select" id="bulk-nsd-usage">
+                    <select class="form-select" id="bulk-nsd-usage" onchange="syncBulkNsdPoolField()">
                       <option value="dataAndMetadata">dataAndMetadata</option>
                       <option value="dataOnly">dataOnly</option>
                       <option value="metadataOnly">metadataOnly</option>
@@ -1645,7 +1645,7 @@
             </div>
             <div class="form-group">
               <label class="form-label">Usage</label>
-              <select class="form-select" id="nsd-usage">
+              <select class="form-select" id="nsd-usage" onchange="syncNsdPoolField()">
                 <option value="dataAndMetadata">Data and Metadata</option>
                 <option value="dataOnly">Data Only</option>
                 <option value="metadataOnly">Metadata Only</option>
@@ -3041,7 +3041,7 @@ function navigateTo(page) {
   closeSidebar();
   updateAllPreviews();
   if (page === 'prepare') checkPrepareBackend();
-  if (page === 'storage') { updateNSDServerList(); updateFakeNsdNodeList(); }
+  if (page === 'storage') { updateNSDServerList(); updateFakeNsdNodeList(); syncNsdPoolField(); }
   if (page === 'install') {
     // Auto-fill cluster name in Node Identity panel from cluster settings
     const niCn = document.getElementById('ni-cluster-name');
@@ -3465,7 +3465,7 @@ function bulkFgForSelection(devs) {
 function buildBulkNsds() {
   const devs = selectedDeviceObjects();
   const usage = document.getElementById('bulk-nsd-usage').value;
-  const pool = document.getElementById('bulk-nsd-pool').value.trim();
+  const pool = _normalizePool(document.getElementById('bulk-nsd-pool').value);
   const filesystem = document.getElementById('bulk-nsd-filesystem').value.trim();
   const fgMap = bulkFgForSelection(devs);
   return devs.map(d => ({
@@ -3502,6 +3502,7 @@ function openConfigureSelected() {
   wireBulkInputs();
   const panel = document.getElementById('bulk-nsd-config');
   panel.style.display = 'block';
+  syncBulkNsdPoolField();
   updateBulkNsdPreview();
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -3701,13 +3702,38 @@ function nsdPoolUsageError(usage, pool) {
   return null;
 }
 
+// Only dataOnly NSDs may name a custom storage pool; every other usage must
+// live in the system pool. Lock the pool field to "system" accordingly so an
+// invalid pool can't be entered in the first place.
+function _syncPoolField(usageId, poolId) {
+  const usage = document.getElementById(usageId)?.value;
+  const pool = document.getElementById(poolId);
+  if (!usage || !pool) return;
+  if (usage === 'dataOnly') {
+    if (pool.value.trim().toLowerCase() === 'system') pool.value = '';
+    pool.disabled = false;
+  } else {
+    pool.value = 'system';
+    pool.disabled = true;
+  }
+}
+function syncNsdPoolField() { _syncPoolField('nsd-usage', 'nsd-pool'); }
+function syncBulkNsdPoolField() { _syncPoolField('bulk-nsd-usage', 'bulk-nsd-pool'); updateBulkNsdPreview(); }
+
+// "system" is the default pool — store it as empty so the command and stanza
+// omit an explicit -po/pool= line.
+function _normalizePool(v) {
+  const p = (v || '').trim();
+  return p.toLowerCase() === 'system' ? '' : p;
+}
+
 function addNSD() {
   const server = document.getElementById('nsd-server').value;
   const disk = document.getElementById('nsd-disk').value.trim();
   if (!server || !disk) { alert('Please select a server and enter a disk path'); return; }
 
   const usage = document.getElementById('nsd-usage').value;
-  const pool = document.getElementById('nsd-pool').value.trim();
+  const pool = _normalizePool(document.getElementById('nsd-pool').value);
   const poolErr = nsdPoolUsageError(usage, pool);
   if (poolErr) { alert(poolErr); return; }
 
@@ -3748,6 +3774,7 @@ function editNSD(i) {
   document.getElementById('nsd-fg').value = n.failureGroup;
   document.getElementById('nsd-usage').value = n.usage;
   document.getElementById('nsd-pool').value = n.pool || '';
+  syncNsdPoolField();  // lock the pool field to match the loaded usage
   document.getElementById('nsd-filesystem').value = n.filesystem || '';
   // Rebuild backup rows
   const list = document.getElementById('nsd-backup-list');
