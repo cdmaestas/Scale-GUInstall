@@ -10,10 +10,12 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- "List Partitions" on NSD Storage now queries every NSD-role node in parallel (instead of one node at a time) and shows all discovered devices in a single table with node, device path, and size. Runs as `sudo -n ssh <node> cat /proc/partitions` — sudo elevates the local ssh client to root before it connects, since GPFS clusters rely on passwordless root-to-root SSH trust and the webserver's own user generally isn't authorized on target nodes.
-- Selecting a partition shows a "Use & Format" action that wipes the device (`sudo -n ssh <node> wipefs -a <device>`, via a new `/api/stream/format-disk` endpoint) and auto-fills the Server Node and Disk Path fields in Add NSD Disk on success. Gated by Dry Run and a native confirmation dialog before executing.
-- `stream_list_partitions` now also parses `/proc/partitions` into structured `{name, sizeKb}` data (new `partitions` SSE event type), reusable by the frontend without a second round-trip
-- Sortable Node/Device/Size column headers on the partition results table, with an ascending/descending indicator arrow
+- Block-device discovery on NSD Storage now runs `lsblk` (via `/api/stream/list-devices`, `sudo -n ssh <node> lsblk -b -P -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,MODEL`) across every NSD-role node in parallel, returning structured records (new `devices` SSE event) with size, type, filesystem, mount point, and model. Sudo elevates the local ssh client to root before it connects, since GPFS clusters rely on passwordless root-to-root SSH trust.
+- Discovered devices are shown in a selectable table (checkbox per row, select-all, sortable Node/Device/Size/Type columns). Only disks ≥ 32 GB are listed by default, with a "Show devices under 32 GB" toggle. Devices that carry a filesystem or are mounted are flagged **In use** and cannot be selected, so a running OS/data disk can't be wiped by accident.
+- Multi-select devices and configure them all at once into NSDs: usage type, failure group (**Auto** assigns one per node, or a manual value), storage pool, filesystem, and an optional `wipefs -a` format step (reuses `/api/stream/format-disk`, gated by Dry Run and a confirmation dialog). Configured NSDs are pushed into the Configured NSDs table; the manual Add NSD Disk form remains for backup-server assignment and edits. Discovered disks omit the `-s` size flag so the toolkit auto-detects real device size.
+
+### Changed
+- `/api/stream/list-partitions` (which parsed `/proc/partitions`) is replaced by `/api/stream/list-devices`; the per-row "Use & Format" action is replaced by the multi-select bulk-configure flow.
 
 ---
 
