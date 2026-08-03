@@ -1465,6 +1465,16 @@
       </div>
 
       <div class="panel" style="margin-top:var(--spacing-06)">
+        <div class="panel-body" style="display:flex; align-items:flex-start; gap:var(--spacing-05); flex-wrap:wrap">
+          <button class="toggle on" id="fs-via-gui-toggle" onclick="toggleFsViaGui(this)"></button>
+          <div style="flex:1; min-width:260px">
+            <div style="font-weight:500; margin-bottom:2px">Configure the filesystem in the IBM Storage Scale GUI</div>
+            <div class="form-help" style="margin:0" id="fs-via-gui-desc">On — this installer adds the NSDs only (no storage pool or failure group), and the Filesystem step is skipped. Create the filesystem later in the Scale management GUI.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:var(--spacing-06)">
         <div class="panel-header">
           <div><h3>Disk Discovery</h3><p>List available block devices on a node or create a file-backed NSD for testing</p></div>
         </div>
@@ -1540,7 +1550,7 @@
                       <option value="descOnly">descOnly</option>
                     </select>
                   </div>
-                  <div class="form-group" style="margin:0">
+                  <div class="form-group" style="margin:0" id="bulk-fg-group">
                     <label class="form-label">Failure Group</label>
                     <div style="display:flex; gap:var(--spacing-04); align-items:center; flex-wrap:wrap">
                       <label class="checkbox-item" style="margin:0"><input type="radio" name="bulk-fg-mode" value="auto" checked onchange="updateBulkFgMode()"> <div><span>Auto (one per node)</span></div></label>
@@ -1548,11 +1558,11 @@
                       <input type="number" class="form-input" id="bulk-nsd-fg" value="1" min="1" style="width:90px" disabled>
                     </div>
                   </div>
-                  <div class="form-group" style="margin:0">
+                  <div class="form-group" style="margin:0" id="bulk-pool-group">
                     <label class="form-label">Storage Pool</label>
                     <input type="text" class="form-input" id="bulk-nsd-pool" placeholder="system (default)">
                   </div>
-                  <div class="form-group" style="margin:0">
+                  <div class="form-group" style="margin:0" id="bulk-filesystem-group">
                     <label class="form-label">Filesystem (optional)</label>
                     <input type="text" class="form-input" id="bulk-nsd-filesystem" placeholder="e.g. gpfs0">
                   </div>
@@ -1638,7 +1648,7 @@
               <label class="form-label">Disk Path <span class="required">*</span></label>
               <input type="text" class="form-input" id="nsd-disk" placeholder="e.g. /dev/sdb or /dev/disk/by-id/...">
             </div>
-            <div class="form-group">
+            <div class="form-group" id="nsd-fg-group">
               <label class="form-label">Failure Group</label>
               <input type="number" class="form-input" id="nsd-fg" value="1" min="1" placeholder="1">
               <div class="form-help">Disks in the same failure group are treated as a failure domain (e.g. same RAID array or rack)</div>
@@ -1662,12 +1672,12 @@
                 </select>
               </div>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="nsd-pool-group">
               <label class="form-label">Storage Pool</label>
               <input type="text" class="form-input" id="nsd-pool" placeholder="system (default)">
               <div class="form-help">Leave blank for the system pool. A non-system pool can only hold <code>dataOnly</code> NSDs — metadata must be in the system pool.</div>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="nsd-filesystem-group">
               <label class="form-label">Filesystem (optional)</label>
               <input type="text" class="form-input" id="nsd-filesystem" placeholder="e.g. gpfs0">
               <div class="form-help">Associate with a specific filesystem in the stanza</div>
@@ -1749,7 +1759,7 @@
 
       <div class="step-nav">
         <button class="btn btn-ghost" onclick="navigateTo('nodes')">← Back to Node Configuration</button>
-        <button class="btn btn-primary" onclick="navigateTo('filesystem')">Next: Filesystem →</button>
+        <button class="btn btn-primary" id="storage-next-btn" onclick="storageNext()">Next: Filesystem →</button>
       </div>
     </div>
 
@@ -2024,7 +2034,7 @@
       </div>
 
       <div class="step-nav">
-        <button class="btn btn-ghost" onclick="navigateTo('filesystem')">← Back to Filesystem</button>
+        <button class="btn btn-ghost" id="protocols-back-btn" onclick="protocolsBack()">← Back to Filesystem</button>
         <button class="btn btn-primary" onclick="navigateTo('install')">Next: Install & Deploy →</button>
       </div>
     </div>
@@ -2985,7 +2995,11 @@ const state = {
   protocols: { nfs: false, smb: false, object: false },
   clusterName: '',
   toolkitPath: '/tmp/scale-pkg/installer/spectrumscale',
-  dryRun: true
+  dryRun: true,
+  // When true, the filesystem is created later in the IBM Storage Scale
+  // management GUI, so this installer collects no pool / failure group /
+  // filesystem detail for NSDs and skips its own Filesystem step.
+  fsViaGui: true
 };
 
 // ===== HTML ESCAPE =====
@@ -3041,7 +3055,7 @@ function navigateTo(page) {
   closeSidebar();
   updateAllPreviews();
   if (page === 'prepare') checkPrepareBackend();
-  if (page === 'storage') { updateNSDServerList(); updateFakeNsdNodeList(); syncNsdPoolField(); document.getElementById('nsd-fg').value = nextFailureGroup(); }
+  if (page === 'storage') { updateNSDServerList(); updateFakeNsdNodeList(); syncNsdPoolField(); document.getElementById('nsd-fg').value = nextFailureGroup(); applyFsViaGuiMode(); }
   if (page === 'install') {
     // Auto-fill cluster name in Node Identity panel from cluster settings
     const niCn = document.getElementById('ni-cluster-name');
@@ -3465,14 +3479,16 @@ function bulkFgForSelection(devs) {
 function buildBulkNsds() {
   const devs = selectedDeviceObjects();
   const usage = document.getElementById('bulk-nsd-usage').value;
-  const pool = _normalizePool(document.getElementById('bulk-nsd-pool').value);
-  const filesystem = document.getElementById('bulk-nsd-filesystem').value.trim();
-  const fgMap = bulkFgForSelection(devs);
+  // GUI-filesystem mode adds bare NSDs — no pool / failure group / filesystem.
+  const guiMode = state.fsViaGui;
+  const pool = guiMode ? '' : _normalizePool(document.getElementById('bulk-nsd-pool').value);
+  const filesystem = guiMode ? '' : document.getElementById('bulk-nsd-filesystem').value.trim();
+  const fgMap = guiMode ? {} : bulkFgForSelection(devs);
   return devs.map(d => ({
     server: d.node,
     disk: `/dev/${d.name}`,
     backups: [],
-    failureGroup: fgMap[d.node],
+    failureGroup: guiMode ? '' : fgMap[d.node],
     usage, pool, filesystem,
     size: '',                        // real disks: let the toolkit detect size
     sizeDisplay: humanBytes(d.sizeBytes),
@@ -3524,8 +3540,10 @@ function commitBulkNsds(nsds) {
 async function applyBulkNsds(btn) {
   const nsds = buildBulkNsds();
   if (!nsds.length) { alert('No devices selected.'); return; }
-  const poolErr = nsdPoolUsageError(document.getElementById('bulk-nsd-usage').value, document.getElementById('bulk-nsd-pool').value);
-  if (poolErr) { alert(poolErr); return; }
+  if (!state.fsViaGui) {
+    const poolErr = nsdPoolUsageError(document.getElementById('bulk-nsd-usage').value, document.getElementById('bulk-nsd-pool').value);
+    if (poolErr) { alert(poolErr); return; }
+  }
   const format = document.getElementById('bulk-nsd-format').checked;
   const termId = 'bulk-nsd-terminal';
   const term = document.getElementById(termId);
@@ -3720,6 +3738,37 @@ function _syncPoolField(usageId, poolId) {
 function syncNsdPoolField() { _syncPoolField('nsd-usage', 'nsd-pool'); }
 function syncBulkNsdPoolField() { _syncPoolField('bulk-nsd-usage', 'bulk-nsd-pool'); updateBulkNsdPreview(); }
 
+// "Configure the filesystem in the IBM Storage Scale GUI" mode. When on, this
+// installer adds bare NSDs (no pool / failure group / filesystem) and skips
+// its own Filesystem step — the filesystem is created later in the Scale GUI.
+function toggleFsViaGui(btn) {
+  state.fsViaGui = !state.fsViaGui;
+  btn.classList.toggle('on', state.fsViaGui);
+  applyFsViaGuiMode();
+  updateAllPreviews();
+}
+
+function applyFsViaGuiMode() {
+  const on = state.fsViaGui;
+  const show = (id, visible) => { const el = document.getElementById(id); if (el) el.style.display = visible ? '' : 'none'; };
+  // NSD config fields that only matter when the toolkit builds the filesystem
+  ['nsd-fg-group', 'nsd-pool-group', 'nsd-filesystem-group',
+   'bulk-fg-group', 'bulk-pool-group', 'bulk-filesystem-group'].forEach(id => show(id, !on));
+  // Skip the Filesystem step: hide its nav item and retarget the flow buttons
+  show('nav-filesystem', !on);
+  const nextBtn = document.getElementById('storage-next-btn');
+  if (nextBtn) nextBtn.textContent = on ? 'Next: Protocol Services →' : 'Next: Filesystem →';
+  const backBtn = document.getElementById('protocols-back-btn');
+  if (backBtn) backBtn.textContent = on ? '← Back to NSD Storage' : '← Back to Filesystem';
+  const desc = document.getElementById('fs-via-gui-desc');
+  if (desc) desc.textContent = on
+    ? 'On — this installer adds the NSDs only (no storage pool or failure group), and the Filesystem step is skipped. Create the filesystem later in the Scale management GUI.'
+    : 'Off — configure the storage pool, failure group, and a Filesystem step in this installer.';
+}
+
+function storageNext() { navigateTo(state.fsViaGui ? 'protocols' : 'filesystem'); }
+function protocolsBack() { navigateTo(state.fsViaGui ? 'storage' : 'filesystem'); }
+
 // "system" is the default pool — store it as empty so the command and stanza
 // omit an explicit -po/pool= line.
 function _normalizePool(v) {
@@ -3743,19 +3792,24 @@ function addNSD() {
   if (!server || !disk) { alert('Please select a server and enter a disk path'); return; }
 
   const usage = document.getElementById('nsd-usage').value;
-  const pool = _normalizePool(document.getElementById('nsd-pool').value);
-  const poolErr = nsdPoolUsageError(usage, pool);
-  if (poolErr) { alert(poolErr); return; }
+  // In GUI-filesystem mode, pool / failure group / filesystem are configured
+  // later in the Scale GUI, so they aren't collected or sent here.
+  const guiMode = state.fsViaGui;
+  const pool = guiMode ? '' : _normalizePool(document.getElementById('nsd-pool').value);
+  if (!guiMode) {
+    const poolErr = nsdPoolUsageError(usage, pool);
+    if (poolErr) { alert(poolErr); return; }
+  }
 
   const size = document.getElementById('nsd-size').value;
   const sizeUnit = document.getElementById('nsd-size-unit').value;
   state.nsds.push({
     server, disk,
     backups: getBackupServers(),
-    failureGroup: document.getElementById('nsd-fg').value || '1',
+    failureGroup: guiMode ? '' : (document.getElementById('nsd-fg').value || '1'),
     usage,
     pool,
-    filesystem: document.getElementById('nsd-filesystem').value.trim(),
+    filesystem: guiMode ? '' : document.getElementById('nsd-filesystem').value.trim(),
     size: size ? `${size} ${sizeUnit}` : 'Unknown'
   });
   document.getElementById('nsd-disk').value = '';
@@ -3850,7 +3904,8 @@ function nsdAddCmd(tp, n) {
   const backups = n.backups || (n.backup ? [n.backup] : []);
   const parts = ['sudo', tp, 'nsd', 'add', '-p', n.server];
   if (backups.length) parts.push('-s', backups.join(','));
-  parts.push('-u', n.usage, '-fg', n.failureGroup);
+  parts.push('-u', n.usage);
+  if (n.failureGroup) parts.push('-fg', n.failureGroup);
   if (n.pool) parts.push('-po', n.pool);
   if (n.filesystem) parts.push('-fs', n.filesystem);
   parts.push(n.disk);
@@ -3883,8 +3938,8 @@ function updateNSDStanza() {
       `<div>&nbsp; nsd=${h(n.disk.replace(/\//g,'_').replace(/^_/,'nsd'))}</div>`,
       `<div>&nbsp; servers=${h(servers)}</div>`,
       `<div>&nbsp; usage=${h(n.usage)}</div>`,
-      `<div>&nbsp; failureGroup=${h(n.failureGroup)}</div>`,
     ];
+    if (n.failureGroup) rows.push(`<div>&nbsp; failureGroup=${h(n.failureGroup)}</div>`);
     if (n.pool) rows.push(`<div>&nbsp; pool=${h(n.pool)}</div>`);
     if (n.filesystem) rows.push(`<div>&nbsp; filesystem=${h(n.filesystem)}</div>`);
     rows.push('');
@@ -5567,6 +5622,7 @@ function setDryRunState(enabled) {
 // ===== INIT =====
 updateAllPreviews();
 setDryRunState(true);
+applyFsViaGuiMode();  // default ON: hide the Filesystem nav item + skip its step
 // Tooltips for the collapsed icon-rail sidebar. Native `title` is kept as
 // an accessibility fallback; the visible tooltip is a single shared element
 // positioned via JS so it isn't clipped by the sidebar's overflow-x:hidden.
