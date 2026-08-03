@@ -1497,44 +1497,88 @@
           <!-- List Partitions section -->
           <div id="disk-mode-list">
             <div style="display:flex; gap:var(--spacing-04); align-items:center; flex-wrap:wrap">
-              <button class="btn btn-secondary" onclick="listAllPartitions(this)" style="flex-shrink:0">
+              <button class="btn btn-secondary" onclick="listAllDevices(this)" style="flex-shrink:0">
                 <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M28 6H4a2 2 0 00-2 2v16a2 2 0 002 2h24a2 2 0 002-2V8a2 2 0 00-2-2zm0 18H4V8h24zM8 14h16v2H8zm0 4h10v2H8z"/></svg>
-                List Partitions on All NSD Nodes
+                Scan Block Devices on All NSD Nodes
               </button>
-              <span class="form-help" style="margin:0">Queries every node with the NSD Server role, in parallel</span>
+              <span class="form-help" style="margin:0">Runs <code>lsblk</code> on every node with the NSD Server role, in parallel</span>
             </div>
             <div class="terminal" id="partition-terminal" style="margin-top:var(--spacing-05); min-height:120px; max-height:260px; overflow-y:auto; display:none">
-              <div class="terminal-line muted"># sudo cat /proc/partitions output will appear here</div>
+              <div class="terminal-line muted"># sudo ssh &lt;node&gt; lsblk output will appear here</div>
             </div>
 
             <div id="partition-results" style="margin-top:var(--spacing-05); display:none">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--spacing-04); flex-wrap:wrap; margin-bottom:var(--spacing-04)">
+                <label class="checkbox-item" style="margin:0">
+                  <input type="checkbox" id="show-small-devices" onchange="toggleShowSmallDevices(this)">
+                  <div><span>Show devices under 32&nbsp;GB</span><span class="label-desc">By default only disks ≥ 32 GB are listed as NSD candidates.</span></div>
+                </label>
+                <span class="form-help" id="device-count-help" style="margin:0"></span>
+              </div>
               <div style="overflow-x:auto">
                 <table class="data-table">
                   <thead>
                     <tr>
-                      <th class="sortable" onclick="sortPartitionTable('node')">Node <span class="sort-arrow" data-sort="node"></span></th>
-                      <th class="sortable" onclick="sortPartitionTable('device')">Device <span class="sort-arrow" data-sort="device"></span></th>
-                      <th class="sortable" onclick="sortPartitionTable('size')">Size <span class="sort-arrow" data-sort="size"></span></th>
-                      <th>Action</th>
+                      <th style="width:36px; text-align:center"><input type="checkbox" id="select-all-devices" onchange="toggleSelectAllDevices(this)" title="Select all available devices"></th>
+                      <th class="sortable" onclick="sortDeviceTable('node')">Node <span class="sort-arrow" data-sort="node"></span></th>
+                      <th class="sortable" onclick="sortDeviceTable('device')">Device <span class="sort-arrow" data-sort="device"></span></th>
+                      <th class="sortable" onclick="sortDeviceTable('size')">Size <span class="sort-arrow" data-sort="size"></span></th>
+                      <th class="sortable" onclick="sortDeviceTable('type')">Type <span class="sort-arrow" data-sort="type"></span></th>
+                      <th>Filesystem</th>
+                      <th>Mount</th>
+                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody id="partition-results-body"></tbody>
                 </table>
               </div>
-              <div id="format-disk-confirm" style="display:none; margin-top:var(--spacing-05)">
-                <div class="notification notification-warning">
-                  <svg width="20" height="20" viewBox="0 0 32 32" fill="currentColor" style="color:var(--cds-support-warning)"><path d="M29 26H3L16 3zm-13-4h2v-8h-2zm0 4h2v-2h-2z"/></svg>
-                  <div class="notification-content">
-                    <h4>Format <span id="format-disk-target"></span>?</h4>
-                    <p>This permanently erases all filesystem, partition table, and RAID signatures on the device — any data on it is unrecoverable. Only proceed if the disk contains no important data.</p>
+
+              <div id="device-select-bar" style="display:flex; align-items:center; gap:var(--spacing-04); margin-top:var(--spacing-05); flex-wrap:wrap">
+                <button class="btn btn-primary" id="configure-selected-btn" onclick="openConfigureSelected()" disabled>
+                  Configure Selected as NSDs
+                </button>
+                <span class="form-help" id="device-select-count" style="margin:0">No devices selected</span>
+              </div>
+
+              <div id="bulk-nsd-config" style="display:none; margin-top:var(--spacing-05); border-top:1px solid var(--cds-border-subtle); padding-top:var(--spacing-05)">
+                <h4 style="margin:0 0 var(--spacing-04)">Configure <span id="bulk-nsd-count">0</span> selected device(s) as NSDs</h4>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:var(--spacing-05)">
+                  <div class="form-group" style="margin:0">
+                    <label class="form-label">Usage Type</label>
+                    <select class="form-select" id="bulk-nsd-usage">
+                      <option value="dataAndMetadata">dataAndMetadata</option>
+                      <option value="dataOnly">dataOnly</option>
+                      <option value="metadataOnly">metadataOnly</option>
+                      <option value="descOnly">descOnly</option>
+                    </select>
+                  </div>
+                  <div class="form-group" style="margin:0">
+                    <label class="form-label">Failure Group</label>
+                    <div style="display:flex; gap:var(--spacing-04); align-items:center; flex-wrap:wrap">
+                      <label class="checkbox-item" style="margin:0"><input type="radio" name="bulk-fg-mode" value="auto" checked onchange="updateBulkFgMode()"> <div><span>Auto (one per node)</span></div></label>
+                      <label class="checkbox-item" style="margin:0"><input type="radio" name="bulk-fg-mode" value="manual" onchange="updateBulkFgMode()"> <div><span>Manual</span></div></label>
+                      <input type="number" class="form-input" id="bulk-nsd-fg" value="1" min="1" style="width:90px" disabled>
+                    </div>
+                  </div>
+                  <div class="form-group" style="margin:0">
+                    <label class="form-label">Storage Pool</label>
+                    <input type="text" class="form-input" id="bulk-nsd-pool" placeholder="system (default)">
+                  </div>
+                  <div class="form-group" style="margin:0">
+                    <label class="form-label">Filesystem (optional)</label>
+                    <input type="text" class="form-input" id="bulk-nsd-filesystem" placeholder="e.g. gpfs0">
                   </div>
                 </div>
-                <div class="cmd-preview" style="margin-top:var(--spacing-04)"><div id="format-disk-preview"></div></div>
+                <label class="checkbox-item" style="margin-top:var(--spacing-05)">
+                  <input type="checkbox" id="bulk-nsd-format">
+                  <div><span>Wipe each disk before adding <code>wipefs -a</code></span><span class="label-desc">Permanently erases all filesystem, partition-table, and RAID signatures on each selected device before it is added. Data is unrecoverable.</span></div>
+                </label>
+                <div class="cmd-preview" style="margin-top:var(--spacing-04)"><div id="bulk-nsd-preview"></div></div>
                 <div style="display:flex; gap:var(--spacing-03); margin-top:var(--spacing-04)">
-                  <button class="btn btn-danger" id="format-disk-confirm-btn" onclick="confirmFormatDisk(this)">Format Disk</button>
-                  <button class="btn btn-ghost" onclick="cancelFormatDisk()">Cancel</button>
+                  <button class="btn btn-primary" id="bulk-nsd-apply-btn" onclick="applyBulkNsds(this)">Add NSDs</button>
+                  <button class="btn btn-ghost" onclick="cancelConfigureSelected()">Cancel</button>
                 </div>
-                <div class="terminal" id="format-disk-terminal" style="margin-top:var(--spacing-05); min-height:60px; max-height:200px; overflow-y:auto; display:none"></div>
+                <div class="terminal" id="bulk-nsd-terminal" style="margin-top:var(--spacing-05); min-height:60px; max-height:220px; overflow-y:auto; display:none"></div>
               </div>
             </div>
           </div>
@@ -3176,46 +3220,129 @@ function updateNSDServerList() {
 
 }
 
-function formatKb(sizeKb) {
-  const gb = sizeKb / 1024 / 1024;
+function humanBytes(b) {
+  const tb = b / 1024 ** 4, gb = b / 1024 ** 3, mb = b / 1024 ** 2;
+  if (tb >= 1) return `${tb.toFixed(tb >= 10 ? 0 : 1)} TB`;
   if (gb >= 1) return `${gb.toFixed(gb >= 10 ? 0 : 1)} GB`;
-  const mb = sizeKb / 1024;
   return `${mb.toFixed(0)} MB`;
 }
 
-let _lastPartitionList = [];
-let _selectedPartition = null;
-let _partitionSort = { col: null, dir: 1 };
+// Only disks at least this large are offered as NSD candidates by default.
+const MIN_NSD_BYTES = 32 * 1024 ** 3;
 
-function renderPartitionTable() {
-  const resultsBody = document.getElementById('partition-results-body');
-  resultsBody.innerHTML = _lastPartitionList.map((p, i) => `
-    <tr>
-      <td class="mono">${h(p.node)}</td>
-      <td class="mono">/dev/${h(p.name)}</td>
-      <td>${h(formatKb(p.sizeKb))}</td>
-      <td><button class="btn btn-sm btn-secondary" onclick="selectPartitionForFormat(${i})">Use &amp; Format</button></td>
-    </tr>`).join('');
+let _lastDeviceList = [];             // {node,name,sizeBytes,type,fstype,mountpoint,model,inUse}
+let _deviceSort = { col: null, dir: 1 };
+let _selectedDevices = new Set();     // keys: "node|name"
+let _showSmallDevices = false;
+let _bulkWired = false;
+
+function deviceKey(d) { return `${d.node}|${d.name}`; }
+function visibleDevices() {
+  return _lastDeviceList.filter(d => _showSmallDevices || d.sizeBytes >= MIN_NSD_BYTES);
+}
+function selectedDeviceObjects() {
+  return _lastDeviceList.filter(d => !d.inUse && _selectedDevices.has(deviceKey(d)));
+}
+
+function renderDeviceTable() {
+  const body = document.getElementById('partition-results-body');
+  const rows = visibleDevices();
+  if (!rows.length) {
+    const emptyMsg = _showSmallDevices ? 'No matching devices found.' : 'No matching devices ≥ 32 GB found.';
+    body.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--cds-text-secondary); padding:var(--spacing-05)">${h(emptyMsg)}</td></tr>`;
+  } else {
+    body.innerHTML = rows.map(d => {
+      const key = deviceKey(d);
+      const dev = `/dev/${h(d.name)}`;
+      const usable = !d.inUse;
+      const cb = usable
+        ? `<input type="checkbox" class="dev-select" data-key="${h(key)}" ${_selectedDevices.has(key) ? 'checked' : ''} onchange="onDeviceCheck(this)">`
+        : `<input type="checkbox" disabled title="Device is in use — carries a filesystem or is mounted">`;
+      const status = usable
+        ? '<span class="tag tag-green">Available</span>'
+        : '<span class="tag tag-red">In use</span>';
+      return `<tr>
+        <td style="text-align:center">${cb}</td>
+        <td class="mono">${h(d.node)}</td>
+        <td class="mono">${dev}</td>
+        <td>${h(humanBytes(d.sizeBytes))}</td>
+        <td>${h(d.type)}</td>
+        <td class="mono" style="font-size:12px">${d.fstype ? h(d.fstype) : '<span style="color:#6f6f6f">—</span>'}</td>
+        <td class="mono" style="font-size:12px">${d.mountpoint ? h(d.mountpoint) : '<span style="color:#6f6f6f">—</span>'}</td>
+        <td>${status}</td>
+      </tr>`;
+    }).join('');
+  }
   document.querySelectorAll('#partition-results .sort-arrow').forEach(arrow => {
     const col = arrow.dataset.sort;
-    arrow.textContent = _partitionSort.col === col ? (_partitionSort.dir === 1 ? '▲' : '▼') : '';
+    arrow.textContent = _deviceSort.col === col ? (_deviceSort.dir === 1 ? '▲' : '▼') : '';
   });
+  updateDeviceCountHelp();
+  updateSelectAllState();
+  updateSelectionBar();
 }
 
-function sortPartitionTable(col) {
-  _partitionSort.dir = _partitionSort.col === col ? -_partitionSort.dir : 1;
-  _partitionSort.col = col;
-  const dir = _partitionSort.dir;
-  _lastPartitionList.sort((a, b) => {
-    if (col === 'size') return (a.sizeKb - b.sizeKb) * dir;
-    const av = col === 'node' ? a.node : a.name;
-    const bv = col === 'node' ? b.node : b.name;
+function updateDeviceCountHelp() {
+  const el = document.getElementById('device-count-help');
+  if (!el) return;
+  const shown = visibleDevices().length;
+  const hidden = _lastDeviceList.length - shown;
+  el.textContent = `${shown} device(s) shown${hidden > 0 ? `, ${hidden} under 32 GB hidden` : ''}`;
+}
+
+function sortDeviceTable(col) {
+  _deviceSort.dir = _deviceSort.col === col ? -_deviceSort.dir : 1;
+  _deviceSort.col = col;
+  const dir = _deviceSort.dir;
+  _lastDeviceList.sort((a, b) => {
+    if (col === 'size') return (a.sizeBytes - b.sizeBytes) * dir;
+    const av = col === 'node' ? a.node : col === 'type' ? a.type : a.name;
+    const bv = col === 'node' ? b.node : col === 'type' ? b.type : b.name;
     return av.localeCompare(bv, undefined, { numeric: true }) * dir;
   });
-  renderPartitionTable();
+  renderDeviceTable();
 }
 
-async function listAllPartitions(btn) {
+function toggleShowSmallDevices(cb) {
+  _showSmallDevices = cb.checked;
+  renderDeviceTable();
+}
+
+function onDeviceCheck(cbEl) {
+  const key = cbEl.dataset.key;
+  if (cbEl.checked) _selectedDevices.add(key); else _selectedDevices.delete(key);
+  updateSelectAllState();
+  updateSelectionBar();
+}
+
+function toggleSelectAllDevices(cb) {
+  visibleDevices().filter(d => !d.inUse).forEach(d => {
+    const key = deviceKey(d);
+    if (cb.checked) _selectedDevices.add(key); else _selectedDevices.delete(key);
+  });
+  renderDeviceTable();
+}
+
+function updateSelectAllState() {
+  const el = document.getElementById('select-all-devices');
+  if (!el) return;
+  const usable = visibleDevices().filter(d => !d.inUse);
+  const selVisible = usable.filter(d => _selectedDevices.has(deviceKey(d)));
+  el.checked = usable.length > 0 && selVisible.length === usable.length;
+  el.indeterminate = selVisible.length > 0 && selVisible.length < usable.length;
+}
+
+function updateSelectionBar() {
+  const n = selectedDeviceObjects().length;
+  const btn = document.getElementById('configure-selected-btn');
+  const cnt = document.getElementById('device-select-count');
+  if (btn) btn.disabled = n === 0;
+  if (cnt) cnt.textContent = n === 0 ? 'No devices selected' : `${n} device(s) selected`;
+  const panel = document.getElementById('bulk-nsd-config');
+  if (panel && panel.style.display !== 'none') updateBulkNsdPreview();
+}
+
+async function listAllDevices(btn) {
   const nodes = state.nodes.filter(n => n.roles.includes('nsd'));
   const term = document.getElementById('partition-terminal');
   const resultsWrap = document.getElementById('partition-results');
@@ -3224,7 +3351,8 @@ async function listAllPartitions(btn) {
   term.innerHTML = '';
   resultsWrap.style.display = 'none';
   resultsBody.innerHTML = '';
-  cancelFormatDisk();
+  cancelConfigureSelected();
+  _selectedDevices.clear();
   term.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
   if (!nodes.length) {
@@ -3247,16 +3375,16 @@ async function listAllPartitions(btn) {
   }
 
   if (btn) btn.disabled = true;
-  const allPartitions = [];
+  const allDevices = [];
 
   async function queryNode(node) {
     const headerDiv = document.createElement('div');
     headerDiv.className = 'terminal-line info';
-    headerDiv.innerHTML = `<span class="cmd-prompt">$ </span>sudo ssh ${h(node)} cat /proc/partitions`;
+    headerDiv.innerHTML = `<span class="cmd-prompt">$ </span>sudo ssh ${h(node)} lsblk`;
     term.appendChild(headerDiv);
 
     const params = new URLSearchParams({ node });
-    const url = `${getBackendUrl()}/api/stream/list-partitions?${params}`;
+    const url = `${getBackendUrl()}/api/stream/list-devices?${params}`;
     try {
       const resp = await fetch(url);
       const reader = resp.body.getReader();
@@ -3274,9 +3402,9 @@ async function listAllPartitions(btn) {
           let msg;
           try { msg = JSON.parse(dataLine.slice(5)); } catch { continue; }
           if (msg.type === 'done') continue;
-          if (msg.type === 'partitions') {
+          if (msg.type === 'devices') {
             try {
-              JSON.parse(msg.line).forEach(p => allPartitions.push({ node, name: p.name, sizeKb: p.sizeKb }));
+              JSON.parse(msg.line).forEach(d => allDevices.push({ ...d, node }));
             } catch {}
             continue;
           }
@@ -3298,68 +3426,151 @@ async function listAllPartitions(btn) {
 
   await Promise.all(nodes.map(n => queryNode(n.hostname)));
 
-  _lastPartitionList = allPartitions;
-  _partitionSort = { col: null, dir: 1 };
-  if (allPartitions.length) {
+  _lastDeviceList = allDevices;
+  _deviceSort = { col: null, dir: 1 };
+  if (allDevices.length) {
     resultsWrap.style.display = 'block';
-    renderPartitionTable();
+    renderDeviceTable();
   }
 
   if (btn) btn.disabled = false;
 }
 
-function selectPartitionForFormat(i) {
-  const p = _lastPartitionList[i];
-  if (!p) return;
-  _selectedPartition = p;
-  const device = `/dev/${p.name}`;
-  document.getElementById('format-disk-target').textContent = `${device} on ${p.node}`;
-  document.getElementById('format-disk-preview').innerHTML =
-    `<div><span class="cmd-prompt">$ </span>sudo ssh ${h(p.node)} wipefs -a ${h(device)}</div>`;
-  const confirmBox = document.getElementById('format-disk-confirm');
-  confirmBox.style.display = 'block';
-  const fterm = document.getElementById('format-disk-terminal');
-  fterm.style.display = 'none';
-  fterm.innerHTML = '';
-  confirmBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+// ── Bulk configure selected devices as NSDs ──────────────────────────────
+function wireBulkInputs() {
+  if (_bulkWired) return;
+  _bulkWired = true;
+  ['bulk-nsd-usage', 'bulk-nsd-fg', 'bulk-nsd-pool', 'bulk-nsd-filesystem', 'bulk-nsd-format'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', updateBulkNsdPreview);
+    el.addEventListener('change', updateBulkNsdPreview);
+  });
 }
 
-function cancelFormatDisk() {
-  const confirmBox = document.getElementById('format-disk-confirm');
-  if (confirmBox) confirmBox.style.display = 'none';
-  _selectedPartition = null;
+function updateBulkFgMode() {
+  const manual = document.querySelector('input[name="bulk-fg-mode"]:checked')?.value === 'manual';
+  document.getElementById('bulk-nsd-fg').disabled = !manual;
+  updateBulkNsdPreview();
 }
 
-async function confirmFormatDisk(btn) {
-  const p = _selectedPartition;
-  if (!p) return;
-  const device = `/dev/${p.name}`;
-  const termId = 'format-disk-terminal';
+// Map each distinct node in the selection to a failure group. Auto mode
+// assigns one FG per node (node1→1, node2→2, …); manual applies one value
+// to every device.
+function bulkFgForSelection(devs) {
+  const mode = document.querySelector('input[name="bulk-fg-mode"]:checked')?.value;
+  const map = {};
+  if (mode === 'manual') {
+    const v = document.getElementById('bulk-nsd-fg').value || '1';
+    devs.forEach(d => { map[d.node] = v; });
+    return map;
+  }
+  [...new Set(devs.map(d => d.node))]
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+    .forEach((node, i) => { map[node] = String(i + 1); });
+  return map;
+}
+
+function buildBulkNsds() {
+  const devs = selectedDeviceObjects();
+  const usage = document.getElementById('bulk-nsd-usage').value;
+  const pool = document.getElementById('bulk-nsd-pool').value.trim();
+  const filesystem = document.getElementById('bulk-nsd-filesystem').value.trim();
+  const fgMap = bulkFgForSelection(devs);
+  return devs.map(d => ({
+    server: d.node,
+    disk: `/dev/${d.name}`,
+    backups: [],
+    failureGroup: fgMap[d.node],
+    usage, pool, filesystem,
+    size: '',                        // real disks: let the toolkit detect size
+    sizeDisplay: humanBytes(d.sizeBytes),
+    discovered: true,
+  }));
+}
+
+function updateBulkNsdPreview() {
+  const el = document.getElementById('bulk-nsd-preview');
+  if (!el) return;
+  const devs = selectedDeviceObjects();
+  const countEl = document.getElementById('bulk-nsd-count');
+  if (countEl) countEl.textContent = devs.length;
+  if (!devs.length) { el.innerHTML = '<span style="color:#6f6f6f"># No devices selected</span>'; return; }
+  const tp = state.toolkitPath || 'spectrumscale';
+  const format = document.getElementById('bulk-nsd-format').checked;
+  const lines = [];
+  buildBulkNsds().forEach(n => {
+    if (format) lines.push(`<div><span class="cmd-prompt">$ </span>sudo ssh ${h(n.server)} wipefs -a ${h(n.disk)}</div>`);
+    lines.push(`<div><span class="cmd-prompt">$ </span>${h(nsdAddCmd(tp, n))}</div>`);
+  });
+  el.innerHTML = lines.join('');
+}
+
+function openConfigureSelected() {
+  if (!selectedDeviceObjects().length) return;
+  wireBulkInputs();
+  const panel = document.getElementById('bulk-nsd-config');
+  panel.style.display = 'block';
+  updateBulkNsdPreview();
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function cancelConfigureSelected() {
+  const panel = document.getElementById('bulk-nsd-config');
+  if (panel) panel.style.display = 'none';
+}
+
+function commitBulkNsds(nsds) {
+  nsds.forEach(n => state.nsds.push(n));
+  _selectedDevices.clear();
+  cancelConfigureSelected();
+  renderDeviceTable();
+  updateNSDDisplay();
+  updateAllPreviews();
+}
+
+async function applyBulkNsds(btn) {
+  const nsds = buildBulkNsds();
+  if (!nsds.length) { alert('No devices selected.'); return; }
+  const format = document.getElementById('bulk-nsd-format').checked;
+  const termId = 'bulk-nsd-terminal';
   const term = document.getElementById(termId);
-  term.style.display = 'block';
-  term.innerHTML = '';
+  const tp = state.toolkitPath || 'spectrumscale';
 
   if (state.dryRun) {
-    appendToTerminal(termId, `$ sudo ssh ${p.node} wipefs -a ${device}  # (dry run)`, 'info');
-    appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
+    term.style.display = 'block';
+    term.innerHTML = '';
+    nsds.forEach(n => {
+      if (format) appendToTerminal(termId, `$ sudo ssh ${n.server} wipefs -a ${n.disk}  # (dry run)`, 'info');
+      appendToTerminal(termId, `$ ${nsdAddCmd(tp, n)}  # (dry run)`, 'info');
+    });
+    appendToTerminal(termId, '[DRY RUN] Commands previewed only — NSDs added to the configuration below.', 'muted');
+    commitBulkNsds(nsds);
     return;
   }
 
-  if (!confirm(`This will PERMANENTLY ERASE all data on ${device} on ${p.node}. This cannot be undone. Continue?`)) return;
+  if (format && !confirm(`This will PERMANENTLY ERASE all data on ${nsds.length} device(s). This cannot be undone. Continue?`)) return;
 
   btn.disabled = true;
-  await streamToTerminalPost(termId, `${getBackendUrl()}/api/stream/format-disk`, { node: p.node, device }, (ok) => {
-    btn.disabled = false;
-    if (!ok) return;
-    const serverSel = document.getElementById('nsd-server');
-    if (serverSel) serverSel.value = p.node;
-    const diskInput = document.getElementById('nsd-disk');
-    if (diskInput) {
-      diskInput.value = device;
-      diskInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      diskInput.focus();
+  if (format) {
+    term.style.display = 'block';
+    term.innerHTML = '';
+    const added = [];
+    for (const n of nsds) {
+      let ok = false;
+      await streamToTerminalPost(termId, `${getBackendUrl()}/api/stream/format-disk`,
+        { node: n.server, device: n.disk }, (good) => { ok = good; });
+      if (ok) added.push(n);
+      else appendToTerminal(termId, `[WARN] Skipping ${n.disk} on ${n.server} — wipe failed; not added.`, 'warn');
     }
-  });
+    if (added.length) {
+      commitBulkNsds(added);
+      appendToTerminal(termId, `[OK] Added ${added.length} NSD(s) to the configuration.`, 'success');
+    }
+  } else {
+    commitBulkNsds(nsds);
+  }
+  btn.disabled = false;
 }
 
 // ===== NSD MANAGEMENT =====
@@ -3570,7 +3781,7 @@ function updateNSDDisplay() {
         <td>${h(n.failureGroup)}</td>
         <td><span class="tag tag-blue">${h(n.usage)}</span></td>
         <td>${n.pool ? h(n.pool) : '<span style="color:#6f6f6f">system</span>'}</td>
-        <td>${h(n.size)}</td>
+        <td>${h(n.sizeDisplay || n.size)}</td>
         <td style="display:flex;gap:4px">
           <button class="btn btn-sm btn-secondary" onclick="editNSD(${i})">Edit</button>
           <button class="btn btn-sm btn-danger" onclick="removeNSD(${i})">Remove</button>

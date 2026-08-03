@@ -1684,14 +1684,25 @@ def stream_nsd_add():
 
 
 # ---------------------------------------------------------------------------
-# List partitions on a remote node via SSH
+# List block devices on a remote node via SSH (lsblk)
 # ---------------------------------------------------------------------------
 
-_PARTITION_LINE_RE = re.compile(r'^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s*$')
+# lsblk -P emits one line of KEY="value" pairs per device; parse them safely
+# without shelling out to eval. Values never contain a literal '"'.
+_LSBLK_PAIR_RE = re.compile(r'(\w+)="([^"]*)"')
+
+# Device types worth offering as NSD candidates. Whole disks and partitions;
+# never loop/rom/lvm system volumes.
+_NSD_CANDIDATE_TYPES = frozenset({"disk", "part"})
 
 
-@app.route("/api/stream/list-partitions")
-def stream_list_partitions():
+def _parse_lsblk_line(line):
+    """Parse one `lsblk -P` line of KEY="value" pairs into a dict."""
+    return {m.group(1): m.group(2) for m in _LSBLK_PAIR_RE.finditer(line)}
+
+
+@app.route("/api/stream/list-devices")
+def stream_list_devices():
     node = request.args.get("node", "").strip()
 
     def generate():
@@ -1705,11 +1716,15 @@ def stream_list_partitions():
             # sudo elevates the local ssh client to root before it connects —
             # GPFS clusters rely on passwordless root-to-root SSH trust, and
             # the webserver's own user generally isn't authorized on target
-            # nodes, only root's key is.
-            cmd = ["sudo", "-n", "ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS, node, "cat", "/proc/partitions"]
-            yield sse("info", f"$ sudo ssh {node} cat /proc/partitions")
-            # Run synchronously rather than streaming — /proc/partitions is a
-            # handful of short lines, and the full output is parsed below.
+            # nodes, only root's key is. Running lsblk as root also fills in
+            # FSTYPE/MODEL that are hidden from unprivileged callers.
+            lsblk_args = ["lsblk", "-b", "-P", "-o",
+                          "NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,MODEL"]
+            cmd = ["sudo", "-n", "ssh", "-o", "StrictHostKeyChecking=accept-new",
+                   *_SSH_OPTS, node, *lsblk_args]
+            yield sse("info", f"$ sudo ssh {node} {' '.join(lsblk_args)}")
+            # Run synchronously — lsblk output is a handful of short lines,
+            # fully parsed below into structured device records.
             stdout, rc = _run_cmd(cmd, timeout=25)
             for line in stdout.splitlines():
                 if line.strip():
@@ -1717,12 +1732,32 @@ def stream_list_partitions():
             if rc != 0:
                 yield sse("error", f"[ERROR] SSH to {node} failed with code {rc}.")
                 return
-            partitions = []
+            devices = []
             for line in stdout.splitlines():
-                m = _PARTITION_LINE_RE.match(line)
-                if m:
-                    partitions.append({"name": m.group(4), "sizeKb": int(m.group(3))})
-            yield sse("partitions", json.dumps(partitions))
+                if not line.strip():
+                    continue
+                d = _parse_lsblk_line(line)
+                if d.get("TYPE") not in _NSD_CANDIDATE_TYPES:
+                    continue
+                try:
+                    size_bytes = int(d.get("SIZE", "0") or "0")
+                except ValueError:
+                    size_bytes = 0
+                fstype = d.get("FSTYPE", "")
+                mount  = d.get("MOUNTPOINT", "")
+                devices.append({
+                    "name":       d.get("NAME", ""),
+                    "sizeBytes":  size_bytes,
+                    "type":       d.get("TYPE", ""),
+                    "fstype":     fstype,
+                    "mountpoint": mount,
+                    "model":      d.get("MODEL", "").strip(),
+                    # A device carrying a filesystem or an active mount is in
+                    # use — the client marks these unselectable so a running
+                    # OS/data disk can't be wiped by accident.
+                    "inUse":      bool(fstype or mount),
+                })
+            yield sse("devices", json.dumps(devices))
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
         finally:
@@ -1748,7 +1783,7 @@ def stream_format_disk():
                 yield sse("error", f"[ERROR] Invalid device path: {device!r}")
                 return
             # sudo elevates the local ssh client to root before it connects —
-            # see stream_list_partitions for why.
+            # see stream_list_devices for why.
             cmd = ["sudo", "-n", "ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS,
                    node, "wipefs", "-a", device]
             yield sse("info", f"$ {' '.join(cmd)}")
