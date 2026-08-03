@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.20] — 2026-08-02
+
 ### Fixed
 - "Back to app" link in `help.html` 404'd when the app was loaded through the backend server (`http://127.0.0.1:5001/`) — the relative link resolves to `/Scale-GUInstall.html`, but only `/` had a route. Added `/Scale-GUInstall.html` as an alias route serving the same content.
 
@@ -307,7 +311,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - `start.sh` Python detection when system `python3` is below 3.10
 - RPM version field: hyphens replaced with `.` to satisfy RPM version format rules
 
-[Unreleased]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.19...HEAD
+[Unreleased]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.20...HEAD
+[1.0.20]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.19...v1.0.20
 [1.0.19]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.18...v1.0.19
 [1.0.18]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.17...v1.0.18
 [1.0.15]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.14...v1.0.15
