@@ -664,7 +664,7 @@
     <button class="toggle toggle-sm on dry-run-toggle-btn" id="header-dry-run-toggle" onclick="event.stopPropagation(); toggleDryRun(this)" aria-label="Toggle Dry Run mode"></button>
     <span class="header-dryrun-label" id="header-dry-run-label">Dry Run</span>
   </div>
-  <a class="btn btn-sm btn-ghost" href="help.html" target="_blank" rel="noopener noreferrer">
+  <a class="btn btn-sm btn-ghost" href="help.html" target="scaleGuiHelp" rel="opener" onclick="return openHelp(event)">
     <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm0 24a10 10 0 1110-10 10 10 0 01-10 10z"/><path d="M17 22h-2v2h2zm3.5-9.5c0-2.5-2-4.5-4.5-4.5s-4.5 2-4.5 4.5h2c0-1.4 1.1-2.5 2.5-2.5s2.5 1.1 2.5 2.5c0 1.1-.5 1.7-1.4 2.4-.3.2-.6.5-.9.7-.9.8-1.2 1.6-1.2 3.2v.2h2v-.2c0-1 .2-1.3.7-1.7.2-.2.5-.4.8-.6 1-.8 2-1.7 2-3.5z"/></svg>
     Help
   </a>
@@ -1524,6 +1524,7 @@
                       <th class="sortable" onclick="sortDeviceTable('device')">Device <span class="sort-arrow" data-sort="device"></span></th>
                       <th class="sortable" onclick="sortDeviceTable('size')">Size <span class="sort-arrow" data-sort="size"></span></th>
                       <th class="sortable" onclick="sortDeviceTable('type')">Type <span class="sort-arrow" data-sort="type"></span></th>
+                      <th>Model</th>
                       <th>Filesystem</th>
                       <th>Mount</th>
                       <th>Status</th>
@@ -2999,6 +3000,15 @@ function h(str) {
     .replace(/'/g, '&#39;');
 }
 
+// Open Help in a named tab, keeping an opener reference so its "Back to
+// app" link can return focus to this tab instead of loading a second copy
+// of the app. Falls back to the plain href if window.open is blocked.
+function openHelp(e) {
+  const win = window.open('help.html', 'scaleGuiHelp');
+  if (win) { if (e) e.preventDefault(); win.focus(); return false; }
+  return true; // popup blocked — let the anchor navigate normally
+}
+
 // ===== COLLAPSIBLE =====
 function toggleCollapsible(header) {
   const body = header.nextElementSibling;
@@ -3249,7 +3259,7 @@ function renderDeviceTable() {
   const rows = visibleDevices();
   if (!rows.length) {
     const emptyMsg = _showSmallDevices ? 'No matching devices found.' : 'No matching devices ≥ 32 GB found.';
-    body.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--cds-text-secondary); padding:var(--spacing-05)">${h(emptyMsg)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--cds-text-secondary); padding:var(--spacing-05)">${h(emptyMsg)}</td></tr>`;
   } else {
     body.innerHTML = rows.map(d => {
       const key = deviceKey(d);
@@ -3267,6 +3277,7 @@ function renderDeviceTable() {
         <td class="mono">${dev}</td>
         <td>${h(humanBytes(d.sizeBytes))}</td>
         <td>${h(d.type)}</td>
+        <td style="font-size:12px">${d.model ? h(d.model) : '<span style="color:#6f6f6f">—</span>'}</td>
         <td class="mono" style="font-size:12px">${d.fstype ? h(d.fstype) : '<span style="color:#6f6f6f">—</span>'}</td>
         <td class="mono" style="font-size:12px">${d.mountpoint ? h(d.mountpoint) : '<span style="color:#6f6f6f">—</span>'}</td>
         <td>${status}</td>
