@@ -13,9 +13,11 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Block-device discovery on NSD Storage now runs `lsblk` (via `/api/stream/list-devices`, `sudo -n ssh <node> lsblk -b -P -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,MODEL`) across every NSD-role node in parallel, returning structured records (new `devices` SSE event) with size, type, filesystem, mount point, and model. Sudo elevates the local ssh client to root before it connects, since GPFS clusters rely on passwordless root-to-root SSH trust.
 - Discovered devices are shown in a selectable table (checkbox per row, select-all, sortable Node/Device/Size/Type columns). Only disks ≥ 32 GB are listed by default, with a "Show devices under 32 GB" toggle. Devices that carry a filesystem or are mounted are flagged **In use** and cannot be selected, so a running OS/data disk can't be wiped by accident.
 - Multi-select devices and configure them all at once into NSDs: usage type, failure group (**Auto** assigns one per node, or a manual value), storage pool, filesystem, and an optional `wipefs -a` format step (reuses `/api/stream/format-disk`, gated by Dry Run and a confirmation dialog). Configured NSDs are pushed into the Configured NSDs table; the manual Add NSD Disk form remains for backup-server assignment and edits. Discovered disks omit the `-s` size flag so the toolkit auto-detects real device size.
+- Model column in the NSD Storage device discovery table (from `lsblk` MODEL)
 
 ### Changed
 - `/api/stream/list-partitions` (which parsed `/proc/partitions`) is replaced by `/api/stream/list-devices`; the per-row "Use & Format" action is replaced by the multi-select bulk-configure flow.
+- Help opens in a named tab and its "Back to app" link now returns to the existing app tab (closing the Help tab) instead of loading a second copy of the app inside the Help tab; falls back to normal navigation when Help was opened directly.
 
 ---
 
