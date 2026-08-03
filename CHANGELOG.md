@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.19] — 2026-08-02
+
 ### Added
 - CI `security-guard` job and a matching local pre-commit check: fails the build on `shell=True`, unsafe `pickle`/`yaml.load`/`eval`, bare `except:` (silent-failure regression), or an `innerHTML` template literal that interpolates a value without routing it through the `h()` escape helper
 - Always-visible Dry Run toggle in the top header, synchronized with the existing Settings-page toggle; turns red with a **LIVE** label when disabled
@@ -300,7 +304,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - `start.sh` Python detection when system `python3` is below 3.10
 - RPM version field: hyphens replaced with `.` to satisfy RPM version format rules
 
-[Unreleased]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.18...HEAD
+[Unreleased]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.19...HEAD
+[1.0.19]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.18...v1.0.19
 [1.0.18]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.17...v1.0.18
 [1.0.15]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.14...v1.0.15
 [1.0.2]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.1...v1.0.2
