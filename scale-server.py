@@ -1672,7 +1672,7 @@ def stream_nsd_add():
                 if backups:
                     cmd += ["-s", ",".join(backups)]
                 cmd += ["-u", usage, "-fg", failure_group]
-                if pool:
+                if pool and pool.lower() != "system":  # system is the default pool
                     cmd += ["-po", pool]
                 if filesystem:
                     cmd += ["-fs", filesystem]
