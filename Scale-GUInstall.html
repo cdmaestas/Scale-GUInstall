@@ -348,24 +348,6 @@
   .checkbox-item .label-desc { font-size: 12px; color: var(--cds-text-secondary); display: block; }
 
   /* ===== NODE CARDS ===== */
-  .node-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--spacing-04); }
-  .node-card {
-    background: var(--cds-layer-02); border: 1px solid var(--cds-border-subtle-01);
-    padding: var(--spacing-05); cursor: pointer; transition: all 0.15s;
-    position: relative;
-  }
-  .node-card:hover { border-color: var(--cds-border-strong-01); }
-  .node-card.selected { border-color: var(--cds-button-primary); background: rgba(15,98,254,0.08); }
-  .node-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--spacing-04); }
-  .node-card-hostname { font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
-  .node-card-ip { font-family: var(--font-mono); font-size: 11px; color: var(--cds-text-secondary); margin-bottom: var(--spacing-04); }
-  .node-card-roles { display: flex; flex-wrap: wrap; gap: var(--spacing-02); }
-  .node-selected-check {
-    position: absolute; top: var(--spacing-03); right: var(--spacing-03);
-    width: 20px; height: 20px; background: var(--cds-button-primary);
-    display: none; align-items: center; justify-content: center;
-  }
-  .node-card.selected .node-selected-check { display: flex; }
 
   /* ===== NSD DISK CARDS ===== */
   .disk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--spacing-04); }
@@ -1130,69 +1112,66 @@
         <p>Add nodes and assign roles. SSH must be configured from the installer node to all target nodes.</p>
       </div>
 
-      <!-- Add Single Node + Bulk Import -->
-      <div id="tab-add-nodes">
-
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--spacing-06)">
-          <div class="panel">
-            <div class="panel-header"><div><h3>Add Single Node</h3></div></div>
-            <div class="panel-body">
-              <div class="form-group">
-                <label class="form-label">Hostname <span class="required">*</span></label>
-                <input type="text" class="form-input" id="node-hostname" placeholder="e.g. gpfs-node01 or 192.168.1.10">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Node Roles <span class="required">*</span></label>
-                <div class="checkbox-group">
-                  <label class="checkbox-item">
-                    <input type="checkbox" id="role-nsd"> <div><span>NSD Server <code>-n</code></span><span class="label-desc">Owns and serves block devices as Network Shared Disks to the rest of the cluster.</span></div>
-                  </label>
-                  <label class="checkbox-item">
-                    <input type="checkbox" id="role-manager"> <div><span>Manager <code>-m</code></span><span class="label-desc">Eligible to be elected as cluster manager or filesystem manager.</span></div>
-                  </label>
-                  <label class="checkbox-item">
-                    <input type="checkbox" id="role-quorum"> <div><span>Quorum <code>-q</code></span><span class="label-desc">Participates in quorum voting. Recommend 3–7 quorum nodes.</span></div>
-                  </label>
-                  <label class="checkbox-item">
-                    <input type="checkbox" id="role-admin"> <div><span>Admin <code>-a</code></span><span class="label-desc">Designated admin node for the cluster.</span></div>
-                  </label>
-                  <label class="checkbox-item">
-                    <input type="checkbox" id="role-protocol"> <div><span>Protocol (CES) <code>-p</code></span><span class="label-desc">Runs Cluster Export Services — NFS, SMB, and/or Object. Requires ≥ 2 nodes.</span></div>
-                  </label>
-                  <label class="checkbox-item">
-                    <input type="checkbox" id="role-gui"> <div><span>GUI Server <code>-g</code></span><span class="label-desc">Hosts the IBM Storage Scale GUI dashboard. Typically 1–2 nodes.</span></div>
-                  </label>
-                  <label class="checkbox-item">
-                    <input type="checkbox" id="role-ems"> <div><span>EMS <code>-e</code></span><span class="label-desc">Erasure Management Server node.</span></div>
-                  </label>
-                  <label class="checkbox-item">
-                    <input type="checkbox" id="role-callhome"> <div><span>Call Home <code>-c</code></span><span class="label-desc">Designated node for IBM call home reporting.</span></div>
-                  </label>
-                  <label class="checkbox-item">
-                    <input type="checkbox" id="role-archive-ee"> <div><span>Archive EE</span><span class="label-desc">IBM Storage Archive Enterprise Edition node. Requires separate Archive EE installation workflow after cluster setup.</span></div>
-                  </label>
-                  <label class="checkbox-item" style="border-top:0.5px solid var(--cds-border-subtle-01); margin-top:var(--spacing-03); padding-top:var(--spacing-03)">
-                    <input type="checkbox" id="role-client" onchange="onClientRoleChange(this.checked)"> <div><span>Client Only</span><span class="label-desc">Mount-only node. Restricts selectable roles to Admin, Manager, and Quorum.</span></div>
-                  </label>
-                </div>
-              </div>
-              <div class="btn-group">
-                <button class="btn btn-primary" onclick="addNode()">
-                  <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M17 15V8h-2v7H8v2h7v7h2v-7h7v-2z"/></svg>
-                  Add Node
-                </button>
-              </div>
+      <!-- Configured Nodes — current state first, with a prominent Load action -->
+      <div class="panel">
+        <div class="panel-header">
+          <div><h3>Configured Nodes</h3><p id="node-count-label">0 nodes configured</p></div>
+          <div style="display:flex; gap:var(--spacing-03)">
+            <button class="btn btn-primary" onclick="loadNodesFromCluster(this)">
+              <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M22 16A6 6 0 1116 22v-2a4 4 0 100-8 4 4 0 000-4h2a6 6 0 014 10zm-6-8V2l-6 6 6 6V8a8 8 0 110 16 8 8 0 010-16z"/></svg>
+              Load from cluster
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="clearAllNodes()">Clear All</button>
+          </div>
+        </div>
+        <div class="panel-body" style="padding-top:0">
+          <p class="form-help" style="margin:0 0 var(--spacing-04)">Roles are edited inline in the table. Click <strong>Load from cluster</strong> to pull the current node list from a running cluster, or add nodes below.</p>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>GPFS Node</th>
+                <th style="text-align:center">Quorum</th>
+                <th style="text-align:center">Manager</th>
+                <th style="text-align:center">Admin</th>
+                <th style="text-align:center">NSD Server</th>
+                <th style="text-align:center">Protocol</th>
+                <th style="text-align:center">GUI Server</th>
+                <th style="text-align:center">EMS</th>
+                <th style="text-align:center">Call Home</th>
+                <th style="text-align:center">Archive EE</th>
+                <th style="text-align:center">Client Only</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="nodes-table-body">
+              <tr><td colspan="12" style="color:var(--cds-text-secondary); text-align:center; padding:var(--spacing-07)">No nodes configured yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="nodes-load-log" class="load-log" style="margin:0 var(--spacing-06)"></div>
+        <div class="panel-body" style="border-top:1px solid var(--cds-border-subtle-01)">
+          <div class="notification notification-info" style="margin:0">
+            <svg width="20" height="20" viewBox="0 0 32 32" fill="currentColor" style="color:var(--cds-support-info)"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm-1 6h2v9h-2zm1 14a1.5 1.5 0 111.5-1.5A1.5 1.5 0 0116 22z"/></svg>
+            <div class="notification-content">
+              <p>IBM Storage Scale recommends at least 3 quorum nodes for high availability. Protocol nodes require at least 2 for redundancy. Manager nodes should be odd-numbered.</p>
             </div>
           </div>
+        </div>
+      </div>
 
-          <div class="panel">
-            <div class="panel-header"><div><h3>Bulk Import</h3><p>Import multiple nodes from a hostlist file or paste directly</p></div></div>
-            <div class="panel-body">
-              <div class="form-group">
-                <label class="form-label">Paste Hostlist (one per line)</label>
-                <textarea class="form-textarea" id="bulk-hosts" rows="6" placeholder="gpfs-node01&#10;gpfs-node02&#10;gpfs-node03&#10;192.168.1.20"></textarea>
-                <div class="form-help">Format: hostname or IP, one per line</div>
-              </div>
+      <!-- Bulk Import -->
+      <div class="panel" style="margin-top:var(--spacing-06)">
+        <div class="panel-header"><div><h3>Bulk Import</h3><p>Import multiple nodes from a hostlist file or paste directly</p></div></div>
+        <div class="panel-body">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--spacing-06); align-items:start">
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Paste Hostlist (one per line)</label>
+              <textarea class="form-textarea" id="bulk-hosts" rows="6" placeholder="gpfs-node01&#10;gpfs-node02&#10;gpfs-node03&#10;192.168.1.20"></textarea>
+              <div class="form-help">Format: hostname or IP, one per line</div>
+            </div>
+            <div>
               <div class="form-group">
                 <label class="form-label">Default Role for Imported Nodes</label>
                 <select class="form-select" id="bulk-role">
@@ -1207,60 +1186,68 @@
                   <option value="callhome">Call Home</option>
                   <option value="archive-ee">Archive EE</option>
                 </select>
+                <div class="form-help">Applied to every imported node; fine-tune per node in the table above afterwards.</div>
               </div>
-              <button class="btn btn-secondary" onclick="bulkImport()">
+              <button class="btn btn-primary" onclick="bulkImport()">
                 <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M26 24v4H6v-4H4v4a2 2 0 002 2h20a2 2 0 002-2v-4zm-2-5.586L16 26.414 8 18.414 9.414 17 15 22.586V2h2v20.586L22.586 17z"/></svg>
                 Import Nodes
               </button>
             </div>
           </div>
         </div>
-
       </div>
 
-      <!-- Combined Node List & Role Assignment -->
+      <!-- Add Single Node (collapsed by default — bulk import is the primary path) -->
       <div class="panel" style="margin-top:var(--spacing-06)">
-        <div class="panel-header">
-          <div><h3>Configured Nodes</h3><p id="node-count-label">0 nodes configured</p></div>
-          <div style="display:flex; gap:var(--spacing-03)">
-            <button class="btn btn-sm btn-secondary" onclick="loadNodesFromCluster(this)">
-              <svg width="14" height="14" viewBox="0 0 32 32" fill="currentColor"><path d="M22 16A6 6 0 1116 22v-2a4 4 0 100-8 4 4 0 000-4h2a6 6 0 014 10zm-6-8V2l-6 6 6 6V8a8 8 0 110 16 8 8 0 010-16z"/></svg>
-              Load from cluster
-            </button>
-            <button class="btn btn-sm btn-danger" onclick="clearAllNodes()">Clear All</button>
+        <div class="panel-header collapsible-header" onclick="toggleCollapsible(this)">
+          <div><h3>Add a Single Node</h3><p>Add one node with specific roles</p></div>
+          <svg class="chevron" width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M16 22L6 12l1.414-1.414L16 19.172l8.586-8.586L26 12z"/></svg>
+        </div>
+        <div class="collapsible-body">
+          <div class="form-group">
+            <label class="form-label">Hostname <span class="required">*</span></label>
+            <input type="text" class="form-input" id="node-hostname" placeholder="e.g. gpfs-node01 or 192.168.1.10">
           </div>
-        </div>
-        <div style="overflow-x:auto">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>GPFS Node</th>
-                <th style="text-align:center">Quorum</th>
-                <th style="text-align:center">Manager</th>
-                <th style="text-align:center">Admin</th>
-                <th style="text-align:center">NSD Server</th>
-                <th style="text-align:center">Protocol</th>
-                <th style="text-align:center">GUI Server</th>
-                <th style="text-align:center">Client Only</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="nodes-table-body">
-              <tr><td colspan="9" style="color:var(--cds-text-secondary); text-align:center; padding:var(--spacing-07)">No nodes configured yet</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div id="nodes-load-log" class="load-log" style="margin:0 var(--spacing-06)"></div>
-        <div style="padding:var(--spacing-05) var(--spacing-06); border-top:1px solid var(--cds-border-subtle-01)">
-          <div style="font-size:13px; font-weight:500; color:var(--cds-text-secondary); margin-bottom:var(--spacing-04); text-transform:uppercase; letter-spacing:0.06em; font-size:11px">Role Assignment</div>
-          <div class="notification notification-info" style="margin-bottom:var(--spacing-05)">
-            <svg width="20" height="20" viewBox="0 0 32 32" fill="currentColor" style="color:var(--cds-support-info)"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm-1 6h2v9h-2zm1 14a1.5 1.5 0 111.5-1.5A1.5 1.5 0 0116 22z"/></svg>
-            <div class="notification-content">
-              <p>IBM Storage Scale recommends at least 3 quorum nodes for high availability. Protocol nodes require at least 2 for redundancy. Manager nodes should be odd-numbered.</p>
+          <div class="form-group">
+            <label class="form-label">Node Roles <span class="required">*</span></label>
+            <div class="checkbox-group">
+              <label class="checkbox-item">
+                <input type="checkbox" id="role-nsd"> <div><span>NSD Server <code>-n</code></span><span class="label-desc">Owns and serves block devices as Network Shared Disks to the rest of the cluster.</span></div>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" id="role-manager"> <div><span>Manager <code>-m</code></span><span class="label-desc">Eligible to be elected as cluster manager or filesystem manager.</span></div>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" id="role-quorum"> <div><span>Quorum <code>-q</code></span><span class="label-desc">Participates in quorum voting. Recommend 3–7 quorum nodes.</span></div>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" id="role-admin"> <div><span>Admin <code>-a</code></span><span class="label-desc">Designated admin node for the cluster.</span></div>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" id="role-protocol"> <div><span>Protocol (CES) <code>-p</code></span><span class="label-desc">Runs Cluster Export Services — NFS, SMB, and/or Object. Requires ≥ 2 nodes.</span></div>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" id="role-gui"> <div><span>GUI Server <code>-g</code></span><span class="label-desc">Hosts the IBM Storage Scale GUI dashboard. Typically 1–2 nodes.</span></div>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" id="role-ems"> <div><span>EMS <code>-e</code></span><span class="label-desc">Erasure Management Server node.</span></div>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" id="role-callhome"> <div><span>Call Home <code>-c</code></span><span class="label-desc">Designated node for IBM call home reporting.</span></div>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" id="role-archive-ee"> <div><span>Archive EE</span><span class="label-desc">IBM Storage Archive Enterprise Edition node. Requires separate Archive EE installation workflow after cluster setup.</span></div>
+              </label>
+              <label class="checkbox-item" style="border-top:0.5px solid var(--cds-border-subtle-01); margin-top:var(--spacing-03); padding-top:var(--spacing-03)">
+                <input type="checkbox" id="role-client" onchange="onClientRoleChange(this.checked)"> <div><span>Client Only</span><span class="label-desc">Mount-only node. Restricts selectable roles to Admin, Manager, and Quorum.</span></div>
+              </label>
             </div>
           </div>
-          <div class="node-grid" id="role-assign-grid">
-            <div style="color:var(--cds-text-secondary); grid-column:1/-1; text-align:center; padding:var(--spacing-07)">Add nodes first to assign roles here</div>
+          <div class="btn-group">
+            <button class="btn btn-primary" onclick="addNode()">
+              <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M17 15V8h-2v7H8v2h7v7h2v-7h7v-2z"/></svg>
+              Add Node
+            </button>
           </div>
         </div>
       </div>
@@ -3130,27 +3117,12 @@ function toggleNodeRole(index, role, enabled) {
   } else {
     node.roles = node.roles.filter(r => r !== role);
   }
-  // Re-render the role-assign card grid and previews without re-rendering
-  // the whole table (which would reset checkbox focus)
-  updateRoleAssignGrid();
+  // Toggling Client changes which other roles are disabled/unchecked in the
+  // row, so the whole table must re-render; other role toggles only affect
+  // the command previews and the NSD server dropdown.
+  if (role === 'client') updateNodeDisplay();
+  updateNSDServerList();
   updateAllPreviews();
-}
-
-function updateRoleAssignGrid() {
-  const roleTagColors = { nsd:'cyan', client:'teal', manager:'purple', quorum:'gray', protocol:'green', gui:'blue', 'archive-ee':'teal', ems:'gray', callhome:'gray' };
-  const grid = document.getElementById('role-assign-grid');
-  if (!grid) return;
-  if (state.nodes.length === 0) {
-    grid.innerHTML = '<div style="color:var(--cds-text-secondary); grid-column:1/-1; text-align:center; padding:var(--spacing-07)">Add nodes first to assign roles here</div>';
-    return;
-  }
-  grid.innerHTML = state.nodes.map((n, i) => `
-    <div class="node-card">
-      <div class="node-card-header"><span class="node-card-hostname">${h(n.hostname)}</span></div>
-      <div class="node-card-roles">${n.roles.length
-        ? n.roles.map(r => `<span class="tag tag-${h(roleTagColors[r]||'gray')}">${r === 'nsd' ? 'NSD Server' : r === 'gui' ? 'GUI Server' : r === 'archive-ee' ? 'Archive EE' : r === 'ems' ? 'EMS' : r === 'callhome' ? 'Call Home' : h(r)}</span>`).join(' ')
-        : '<span style="color:var(--cds-text-disabled);font-size:12px">No roles assigned</span>'}</div>
-    </div>`).join('');
 }
 
 function removeNode(index) {
@@ -3177,13 +3149,9 @@ function updateNodeDisplay() {
   document.getElementById('node-count-label').textContent = count + ' node' + (count !== 1 ? 's' : '') + ' configured';
 
   if (count === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" style="color:var(--cds-text-secondary); text-align:center; padding:var(--spacing-07)">No nodes configured yet</td></tr>';
-    document.getElementById('role-assign-grid').innerHTML = '<div style="color:var(--cds-text-secondary); grid-column:1/-1; text-align:center; padding:var(--spacing-07)">Add nodes first to assign roles here</div>';
+    tbody.innerHTML = '<tr><td colspan="12" style="color:var(--cds-text-secondary); text-align:center; padding:var(--spacing-07)">No nodes configured yet</td></tr>';
     return;
   }
-
-  const roleTagColors = { nsd:'cyan', client:'teal', manager:'purple', quorum:'gray', protocol:'green', gui:'blue', 'archive-ee':'teal', ems:'gray', callhome:'gray' };
-  const tableRoles = ['quorum','manager','nsd','protocol','gui','client'];
 
   const chk = (idx, role, checked) => {
     const isClient = state.nodes[idx]?.roles.includes('client');
@@ -3202,13 +3170,14 @@ function updateNodeDisplay() {
       <td style="text-align:center">${chk(i,'nsd',     n.roles.includes('nsd'))}</td>
       <td style="text-align:center">${chk(i,'protocol',n.roles.includes('protocol'))}</td>
       <td style="text-align:center">${chk(i,'gui',     n.roles.includes('gui'))}</td>
+      <td style="text-align:center">${chk(i,'ems',     n.roles.includes('ems'))}</td>
+      <td style="text-align:center">${chk(i,'callhome',n.roles.includes('callhome'))}</td>
+      <td style="text-align:center">${chk(i,'archive-ee', n.roles.includes('archive-ee'))}</td>
       <td style="text-align:center">${chk(i,'client',  n.roles.includes('client'))}</td>
       <td><div class="table-actions">
         <button class="btn btn-sm btn-danger" onclick="removeNode(${i})">Remove</button>
       </div></td>
     </tr>`).join('');
-
-  updateRoleAssignGrid();
 }
 
 function updateNSDServerList() {
@@ -3804,12 +3773,17 @@ function updateNSDDisplay() {
 }
 
 function nsdAddCmd(tp, n) {
+  // spectrumscale nsd add flags: -p primary, -s secondary (comma list),
+  // -u usage, -fg failure group, -po pool, -fs filesystem, positional device.
+  // NOTE: there is no size flag — the toolkit reads the device size itself;
+  // -f/-t are rejected as ambiguous (-f matches -fs/-fg), and -s means
+  // secondary server, not size.
   const backups = n.backups || (n.backup ? [n.backup] : []);
   const parts = ['sudo', tp, 'nsd', 'add', '-p', n.server];
-  if (backups.length) parts.push('-b', backups.join(','));
-  parts.push('-u', n.usage, '-f', n.failureGroup);
-  if (n.pool) parts.push('-t', n.pool);
-  if (n.size && n.size !== 'Unknown') parts.push('-s', n.size.replace(' ', ''));
+  if (backups.length) parts.push('-s', backups.join(','));
+  parts.push('-u', n.usage, '-fg', n.failureGroup);
+  if (n.pool) parts.push('-po', n.pool);
+  if (n.filesystem) parts.push('-fs', n.filesystem);
   parts.push(n.disk);
   return parts.join(' ');
 }
