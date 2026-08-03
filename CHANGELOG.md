@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.22] — 2026-08-03
+
 ### Added
 - "Configure the filesystem in the IBM Storage Scale GUI" toggle at the top of the NSD Storage page (default **on**). When on, this installer adds bare NSDs — no storage pool, failure group, or filesystem — and skips its own Filesystem step (the Filesystem nav item is hidden and the NSD page's Next button goes straight to Protocol Services). The filesystem is created later in the Scale management GUI. Turn it off to configure pool/failure group and use the installer's Filesystem step. `spectrumscale nsd add` omits `-fg`/`-po`/`-fs` in this mode, the backend treats the failure group as optional, and the Configured NSDs table shows `—` for pool and failure group (rather than implying a `system` pool) when neither is set.
 - The Add NSD Disk form now auto-suggests the next failure group as the next multiple of 10 above the highest one already configured (1 for the first NSD) — so new disks land in a fresh failure group (e.g. after 1 and 2 it suggests 10, then 20) instead of reusing or sitting adjacent to an existing one. The value is still editable.
