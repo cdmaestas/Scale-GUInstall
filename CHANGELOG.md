@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.21] — 2026-08-02
+
 ### Fixed
 - "List Partitions" on the NSD Storage page could hang indefinitely — the SSH call only bounded the initial TCP connect phase (`ConnectTimeout=10`), not authentication or a connection that goes silent after being established (e.g. a slow reverse-DNS lookup on the remote `sshd`, or a dropped connection with no FIN/RST). Added `BatchMode=yes` (fail fast instead of waiting on a prompt) and `ServerAliveInterval=5`/`ServerAliveCountMax=2` (detect and kill a stalled connection within ~10s) to this and the two other SSH call sites in `scale-server.py` (NSD file-backed disk creation, node identity certificate push), which had the same gap.
 
@@ -314,7 +318,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - `start.sh` Python detection when system `python3` is below 3.10
 - RPM version field: hyphens replaced with `.` to satisfy RPM version format rules
 
-[Unreleased]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.20...HEAD
+[Unreleased]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.21...HEAD
+[1.0.21]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.20...v1.0.21
 [1.0.20]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.19...v1.0.20
 [1.0.19]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.18...v1.0.19
 [1.0.18]: https://github.com/cdmaestas/Scale-GUInstall/compare/v1.0.17...v1.0.18
