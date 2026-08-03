@@ -82,6 +82,12 @@ _SSH_OPTS = [
     "-o", "ServerAliveCountMax=2",
 ]
 
+# Block device path passed to wipefs on a remote node — must start with
+# /dev/ (rules out flag injection via a leading '-') and stay within a
+# conservative character set. wipefs itself validates that the target is
+# an actual block device.
+_VALID_DEVICE_PATH_RE = re.compile(r'^/dev/[A-Za-z0-9/_-]{1,128}$')
+
 
 def resolve_path(path):
     """
@@ -1681,6 +1687,9 @@ def stream_nsd_add():
 # List partitions on a remote node via SSH
 # ---------------------------------------------------------------------------
 
+_PARTITION_LINE_RE = re.compile(r'^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s*$')
+
+
 @app.route("/api/stream/list-partitions")
 def stream_list_partitions():
     node = request.args.get("node", "").strip()
@@ -1695,9 +1704,53 @@ def stream_list_partitions():
                 return
             cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS, node, "cat", "/proc/partitions"]
             yield sse("info", f"$ ssh {node} cat /proc/partitions")
-            rc = yield from stream_process(cmd)
+            # Run synchronously rather than streaming — /proc/partitions is a
+            # handful of short lines, and the full output is parsed below.
+            stdout, rc = _run_cmd(cmd, timeout=25)
+            for line in stdout.splitlines():
+                if line.strip():
+                    yield sse("normal", line)
             if rc != 0:
                 yield sse("error", f"[ERROR] SSH to {node} failed with code {rc}.")
+                return
+            partitions = []
+            for line in stdout.splitlines():
+                m = _PARTITION_LINE_RE.match(line)
+                if m:
+                    partitions.append({"name": m.group(4), "sizeKb": int(m.group(3))})
+            yield sse("partitions", json.dumps(partitions))
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+        finally:
+            yield sse("done", "")
+
+    return sse_response(generate())
+
+
+@app.route("/api/stream/format-disk", methods=["POST", "OPTIONS"])
+def stream_format_disk():
+    if request.method == "OPTIONS":
+        return "", 204
+    body = request.get_json(silent=True) or {}
+    node = (body.get("node") or "").strip()
+    device = (body.get("device") or "").strip()
+
+    def generate():
+        try:
+            if not node or not _VALID_HOSTNAME_RE.fullmatch(node):
+                yield sse("error", f"[ERROR] Invalid node: {node!r}")
+                return
+            if not device or not _VALID_DEVICE_PATH_RE.fullmatch(device):
+                yield sse("error", f"[ERROR] Invalid device path: {device!r}")
+                return
+            cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS,
+                   node, "sudo", "wipefs", "-a", device]
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd)
+            if rc == 0:
+                yield sse("success", f"[OK] {device} on {node} wiped — ready for NSD use.")
+            else:
+                yield sse("error", f"[ERROR] wipefs failed on {node}:{device} (exit {rc}).")
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
         finally:

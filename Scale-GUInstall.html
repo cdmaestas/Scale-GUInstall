@@ -1493,20 +1493,41 @@
 
           <!-- List Partitions section -->
           <div id="disk-mode-list">
-            <div style="display:flex; gap:var(--spacing-04); align-items:flex-end; flex-wrap:wrap">
-              <div class="form-group" style="flex:1; min-width:200px; margin:0">
-                <label class="form-label">Node</label>
-                <select class="form-select" id="nsd-partition-node">
-                  <option value="">Select node...</option>
-                </select>
-              </div>
-              <button class="btn btn-secondary" onclick="listPartitions(this)" style="flex-shrink:0">
+            <div style="display:flex; gap:var(--spacing-04); align-items:center; flex-wrap:wrap">
+              <button class="btn btn-secondary" onclick="listAllPartitions(this)" style="flex-shrink:0">
                 <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M28 6H4a2 2 0 00-2 2v16a2 2 0 002 2h24a2 2 0 002-2V8a2 2 0 00-2-2zm0 18H4V8h24zM8 14h16v2H8zm0 4h10v2H8z"/></svg>
-                List Partitions
+                List Partitions on All NSD Nodes
               </button>
+              <span class="form-help" style="margin:0">Queries every node with the NSD Server role, in parallel</span>
             </div>
             <div class="terminal" id="partition-terminal" style="margin-top:var(--spacing-05); min-height:120px; max-height:260px; overflow-y:auto; display:none">
               <div class="terminal-line muted"># cat /proc/partitions output will appear here</div>
+            </div>
+
+            <div id="partition-results" style="margin-top:var(--spacing-05); display:none">
+              <div style="overflow-x:auto">
+                <table class="data-table">
+                  <thead>
+                    <tr><th>Node</th><th>Device</th><th>Size</th><th>Action</th></tr>
+                  </thead>
+                  <tbody id="partition-results-body"></tbody>
+                </table>
+              </div>
+              <div id="format-disk-confirm" style="display:none; margin-top:var(--spacing-05)">
+                <div class="notification notification-warning">
+                  <svg width="20" height="20" viewBox="0 0 32 32" fill="currentColor" style="color:var(--cds-support-warning)"><path d="M29 26H3L16 3zm-13-4h2v-8h-2zm0 4h2v-2h-2z"/></svg>
+                  <div class="notification-content">
+                    <h4>Format <span id="format-disk-target"></span>?</h4>
+                    <p>This permanently erases all filesystem, partition table, and RAID signatures on the device — any data on it is unrecoverable. Only proceed if the disk contains no important data.</p>
+                  </div>
+                </div>
+                <div class="cmd-preview" style="margin-top:var(--spacing-04)"><div id="format-disk-preview"></div></div>
+                <div style="display:flex; gap:var(--spacing-03); margin-top:var(--spacing-04)">
+                  <button class="btn btn-danger" id="format-disk-confirm-btn" onclick="confirmFormatDisk(this)">Format Disk</button>
+                  <button class="btn btn-ghost" onclick="cancelFormatDisk()">Cancel</button>
+                </div>
+                <div class="terminal" id="format-disk-terminal" style="margin-top:var(--spacing-05); min-height:60px; max-height:200px; overflow-y:auto; display:none"></div>
+              </div>
             </div>
           </div>
 
@@ -3145,26 +3166,37 @@ function updateNSDServerList() {
     if (curVal) sel.value = curVal;
   });
 
-  // Populate partition node dropdown from NSD-role nodes only
-  const partSel = document.getElementById('nsd-partition-node');
-  if (partSel) {
-    const curVal = partSel.value;
-    partSel.innerHTML = '<option value="">Select NSD node...</option>';
-    servers.forEach(n => {
-      partSel.innerHTML += `<option value="${h(n.hostname)}">${h(n.hostname)}</option>`;
-    });
-    if (curVal) partSel.value = curVal;
-  }
 }
 
-async function listPartitions(btn) {
-  const node = document.getElementById('nsd-partition-node')?.value;
-  if (!node) { alert('Select a node first.'); return; }
+function formatKb(sizeKb) {
+  const gb = sizeKb / 1024 / 1024;
+  if (gb >= 1) return `${gb.toFixed(gb >= 10 ? 0 : 1)} GB`;
+  const mb = sizeKb / 1024;
+  return `${mb.toFixed(0)} MB`;
+}
 
+let _lastPartitionList = [];
+let _selectedPartition = null;
+
+async function listAllPartitions(btn) {
+  const nodes = state.nodes.filter(n => n.roles.includes('nsd'));
   const term = document.getElementById('partition-terminal');
+  const resultsWrap = document.getElementById('partition-results');
+  const resultsBody = document.getElementById('partition-results-body');
   term.style.display = 'block';
-  term.innerHTML = `<div class="terminal-line info"><span class="cmd-prompt">$ </span>ssh ${h(node)} cat /proc/partitions</div>`;
+  term.innerHTML = '';
+  resultsWrap.style.display = 'none';
+  resultsBody.innerHTML = '';
+  cancelFormatDisk();
   term.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  if (!nodes.length) {
+    const errDiv = document.createElement('div');
+    errDiv.className = 'terminal-line error';
+    errDiv.textContent = '[ERROR] No NSD Server nodes configured. Add nodes with the NSD Server role in Node Configuration first.';
+    term.appendChild(errDiv);
+    return;
+  }
 
   try {
     const ping = await fetch(getBackendUrl() + '/api/ping', { signal: AbortSignal.timeout(2000) });
@@ -3178,34 +3210,124 @@ async function listPartitions(btn) {
   }
 
   if (btn) btn.disabled = true;
-  const params = new URLSearchParams({ node });
-  const url = `${getBackendUrl()}/api/stream/list-partitions?${params}`;
-  const resp = await fetch(url);
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const parts = buf.split('\n\n');
-    buf = parts.pop();
-    for (const part of parts) {
-      const dataLine = part.split('\n').find(l => l.startsWith('data:'));
-      if (!dataLine) continue;
-      try {
-        const msg = JSON.parse(dataLine.slice(5));
-        if (msg.type === 'done') break;
-        const cls = msg.type === 'error' ? 'error' : 'normal';
-        const lineDiv = document.createElement('div');
-        lineDiv.className = `terminal-line ${cls}`;
-        lineDiv.textContent = msg.line;
-        term.appendChild(lineDiv);
-        term.scrollTop = term.scrollHeight;
-      } catch {}
+  const allPartitions = [];
+
+  async function queryNode(node) {
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'terminal-line info';
+    headerDiv.innerHTML = `<span class="cmd-prompt">$ </span>ssh ${h(node)} cat /proc/partitions`;
+    term.appendChild(headerDiv);
+
+    const params = new URLSearchParams({ node });
+    const url = `${getBackendUrl()}/api/stream/list-partitions?${params}`;
+    try {
+      const resp = await fetch(url);
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split('\n\n');
+        buf = parts.pop();
+        for (const part of parts) {
+          const dataLine = part.split('\n').find(l => l.startsWith('data:'));
+          if (!dataLine) continue;
+          let msg;
+          try { msg = JSON.parse(dataLine.slice(5)); } catch { continue; }
+          if (msg.type === 'done') continue;
+          if (msg.type === 'partitions') {
+            try {
+              JSON.parse(msg.line).forEach(p => allPartitions.push({ node, name: p.name, sizeKb: p.sizeKb }));
+            } catch {}
+            continue;
+          }
+          const cls = msg.type === 'error' ? 'error' : 'normal';
+          const lineDiv = document.createElement('div');
+          lineDiv.className = `terminal-line ${cls}`;
+          lineDiv.textContent = `[${node}] ${msg.line}`;
+          term.appendChild(lineDiv);
+          term.scrollTop = term.scrollHeight;
+        }
+      }
+    } catch (err) {
+      const errDiv = document.createElement('div');
+      errDiv.className = 'terminal-line error';
+      errDiv.textContent = `[ERROR] ${node}: ${err.message}`;
+      term.appendChild(errDiv);
     }
   }
+
+  await Promise.all(nodes.map(n => queryNode(n.hostname)));
+
+  _lastPartitionList = allPartitions;
+  if (allPartitions.length) {
+    resultsWrap.style.display = 'block';
+    resultsBody.innerHTML = allPartitions.map((p, i) => `
+      <tr>
+        <td class="mono">${h(p.node)}</td>
+        <td class="mono">/dev/${h(p.name)}</td>
+        <td>${h(formatKb(p.sizeKb))}</td>
+        <td><button class="btn btn-sm btn-secondary" onclick="selectPartitionForFormat(${i})">Use &amp; Format</button></td>
+      </tr>`).join('');
+  }
+
   if (btn) btn.disabled = false;
+}
+
+function selectPartitionForFormat(i) {
+  const p = _lastPartitionList[i];
+  if (!p) return;
+  _selectedPartition = p;
+  const device = `/dev/${p.name}`;
+  document.getElementById('format-disk-target').textContent = `${device} on ${p.node}`;
+  document.getElementById('format-disk-preview').innerHTML =
+    `<div><span class="cmd-prompt">$ </span>ssh ${h(p.node)} sudo wipefs -a ${h(device)}</div>`;
+  const confirmBox = document.getElementById('format-disk-confirm');
+  confirmBox.style.display = 'block';
+  const fterm = document.getElementById('format-disk-terminal');
+  fterm.style.display = 'none';
+  fterm.innerHTML = '';
+  confirmBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function cancelFormatDisk() {
+  const confirmBox = document.getElementById('format-disk-confirm');
+  if (confirmBox) confirmBox.style.display = 'none';
+  _selectedPartition = null;
+}
+
+async function confirmFormatDisk(btn) {
+  const p = _selectedPartition;
+  if (!p) return;
+  const device = `/dev/${p.name}`;
+  const termId = 'format-disk-terminal';
+  const term = document.getElementById(termId);
+  term.style.display = 'block';
+  term.innerHTML = '';
+
+  if (state.dryRun) {
+    appendToTerminal(termId, `$ ssh ${p.node} sudo wipefs -a ${device}  # (dry run)`, 'info');
+    appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
+    return;
+  }
+
+  if (!confirm(`This will PERMANENTLY ERASE all data on ${device} on ${p.node}. This cannot be undone. Continue?`)) return;
+
+  btn.disabled = true;
+  await streamToTerminalPost(termId, `${getBackendUrl()}/api/stream/format-disk`, { node: p.node, device }, (ok) => {
+    btn.disabled = false;
+    if (!ok) return;
+    const serverSel = document.getElementById('nsd-server');
+    if (serverSel) serverSel.value = p.node;
+    const diskInput = document.getElementById('nsd-disk');
+    if (diskInput) {
+      diskInput.value = device;
+      diskInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      diskInput.focus();
+    }
+  });
 }
 
 // ===== NSD MANAGEMENT =====
@@ -4190,17 +4312,18 @@ async function streamToTerminalPost(termId, url, body, onDone) {
     });
   } catch (err) {
     appendToTerminal(termId, `[ERROR] Could not reach backend: ${err.message}`, 'error');
-    if (onDone) onDone();
+    if (onDone) onDone(false);
     return;
   }
   if (!response.ok) {
     appendToTerminal(termId, `[ERROR] Server returned HTTP ${response.status}`, 'error');
-    if (onDone) onDone();
+    if (onDone) onDone(false);
     return;
   }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let sawError = false;
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -4213,14 +4336,16 @@ async function streamToTerminalPost(termId, url, body, onDone) {
         if (!dataLine) continue;
         let msg;
         try { msg = JSON.parse(dataLine.slice(6)); } catch { continue; }
-        if (msg.type === 'done') { if (onDone) onDone(); return; }
+        if (msg.type === 'done') { if (onDone) onDone(!sawError); return; }
+        if (msg.type === 'error') sawError = true;
         appendToTerminal(termId, msg.line, sseTypeToTerminalType(msg.type));
       }
     }
   } catch (err) {
     appendToTerminal(termId, `[ERROR] Stream interrupted: ${err.message}`, 'error');
+    sawError = true;
   }
-  if (onDone) onDone();
+  if (onDone) onDone(!sawError);
 }
 
 async function runPrepare(phase, btn) {
