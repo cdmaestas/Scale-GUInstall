@@ -297,6 +297,9 @@
   .data-table tr:hover td { background: var(--cds-layer-hover-01); }
   .data-table .mono { font-family: var(--font-mono); font-size: 12px; }
   .table-actions { display: flex; gap: var(--spacing-02); }
+  .data-table th.sortable { cursor: pointer; user-select: none; }
+  .data-table th.sortable:hover { color: var(--cds-text-primary); }
+  .data-table th.sortable .sort-arrow { display: inline-block; width: 10px; font-size: 10px; color: var(--cds-link-primary); }
 
   /* ===== NOTIFICATIONS ===== */
   .notification {
@@ -1508,7 +1511,12 @@
               <div style="overflow-x:auto">
                 <table class="data-table">
                   <thead>
-                    <tr><th>Node</th><th>Device</th><th>Size</th><th>Action</th></tr>
+                    <tr>
+                      <th class="sortable" onclick="sortPartitionTable('node')">Node <span class="sort-arrow" data-sort="node"></span></th>
+                      <th class="sortable" onclick="sortPartitionTable('device')">Device <span class="sort-arrow" data-sort="device"></span></th>
+                      <th class="sortable" onclick="sortPartitionTable('size')">Size <span class="sort-arrow" data-sort="size"></span></th>
+                      <th>Action</th>
+                    </tr>
                   </thead>
                   <tbody id="partition-results-body"></tbody>
                 </table>
@@ -3177,6 +3185,35 @@ function formatKb(sizeKb) {
 
 let _lastPartitionList = [];
 let _selectedPartition = null;
+let _partitionSort = { col: null, dir: 1 };
+
+function renderPartitionTable() {
+  const resultsBody = document.getElementById('partition-results-body');
+  resultsBody.innerHTML = _lastPartitionList.map((p, i) => `
+    <tr>
+      <td class="mono">${h(p.node)}</td>
+      <td class="mono">/dev/${h(p.name)}</td>
+      <td>${h(formatKb(p.sizeKb))}</td>
+      <td><button class="btn btn-sm btn-secondary" onclick="selectPartitionForFormat(${i})">Use &amp; Format</button></td>
+    </tr>`).join('');
+  document.querySelectorAll('#partition-results .sort-arrow').forEach(arrow => {
+    const col = arrow.dataset.sort;
+    arrow.textContent = _partitionSort.col === col ? (_partitionSort.dir === 1 ? '▲' : '▼') : '';
+  });
+}
+
+function sortPartitionTable(col) {
+  _partitionSort.dir = _partitionSort.col === col ? -_partitionSort.dir : 1;
+  _partitionSort.col = col;
+  const dir = _partitionSort.dir;
+  _lastPartitionList.sort((a, b) => {
+    if (col === 'size') return (a.sizeKb - b.sizeKb) * dir;
+    const av = col === 'node' ? a.node : a.name;
+    const bv = col === 'node' ? b.node : b.name;
+    return av.localeCompare(bv, undefined, { numeric: true }) * dir;
+  });
+  renderPartitionTable();
+}
 
 async function listAllPartitions(btn) {
   const nodes = state.nodes.filter(n => n.roles.includes('nsd'));
@@ -3262,15 +3299,10 @@ async function listAllPartitions(btn) {
   await Promise.all(nodes.map(n => queryNode(n.hostname)));
 
   _lastPartitionList = allPartitions;
+  _partitionSort = { col: null, dir: 1 };
   if (allPartitions.length) {
     resultsWrap.style.display = 'block';
-    resultsBody.innerHTML = allPartitions.map((p, i) => `
-      <tr>
-        <td class="mono">${h(p.node)}</td>
-        <td class="mono">/dev/${h(p.name)}</td>
-        <td>${h(formatKb(p.sizeKb))}</td>
-        <td><button class="btn btn-sm btn-secondary" onclick="selectPartitionForFormat(${i})">Use &amp; Format</button></td>
-      </tr>`).join('');
+    renderPartitionTable();
   }
 
   if (btn) btn.disabled = false;
