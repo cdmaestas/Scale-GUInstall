@@ -17,11 +17,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - EMS, Call Home, and Archive EE are now editable inline as columns in the Configured Nodes table (previously only settable when first adding a node)
 
 ### Changed
+- NSD Storage page: the run action is split into its own **Apply NSDs to Cluster** panel (command preview + button + terminal, always visible), and the **Stanza File Preview** is now a collapsible panel — collapsed by default and moved to the bottom as an informational reference.
 - `/api/stream/list-partitions` (which parsed `/proc/partitions`) is replaced by `/api/stream/list-devices`; the per-row "Use & Format" action is replaced by the multi-select bulk-configure flow.
 - Help opens in a named tab and its "Back to app" link now returns to the existing app tab (closing the Help tab) instead of loading a second copy of the app inside the Help tab; falls back to normal navigation when Help was opened directly.
 - Node Configuration redesigned: the Configured Nodes table (with a prominent **Load from cluster** button) is now at the top so current state is visible first, followed by Bulk Import, with Add Single Node collapsed at the bottom. The redundant read-only "Role Assignment" card grid is removed — roles are edited only inline in the table.
 
 ### Fixed
+- NSD pool/usage validation: metadata can only live in the `system` pool, so a non-system storage pool may only hold `dataOnly` NSDs. The app now blocks this invalid combination (in the manual Add NSD form, the bulk-configure flow, and the backend) with a clear message, instead of letting the toolkit fail with `FATAL: An NSD cannot be used for dataAndMetadata and be in the <pool> pool`.
 - `spectrumscale nsd add` used the wrong option flags and failed with `error: ambiguous option: -f could match -fs, -fg`. Corrected to the toolkit's actual flags: `-fg` (failure group, was `-f`), `-po` (pool, was `-t`), `-fs` (filesystem, previously stanza-only), and `-s` (secondary/backup servers, was `-b`). The bogus size flag is dropped entirely — the toolkit reads the device size itself, and `-s` had meant secondary server, not size. Both the backend command and the frontend preview are fixed.
 
 ---
