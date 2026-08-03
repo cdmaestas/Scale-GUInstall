@@ -39,6 +39,7 @@ mkdir -p "$STAGE"
 
 cp "$ROOT/scale-server.py"        "$STAGE/scale-server.py"
 cp "$ROOT/Scale-GUInstall.html"   "$STAGE/Scale-GUInstall.html"
+cp "$ROOT/help.html"              "$STAGE/help.html"
 cp "$ROOT/README.md"              "$STAGE/README.md"
 cp "$ROOT/CHANGELOG.md"           "$STAGE/CHANGELOG.md"
 cp "$PKG_DIR/scale-guinstall-wrapper"  "$STAGE/scale-guinstall"
@@ -94,6 +95,7 @@ build_deb() {
     # Copy files
     cp "$STAGE/scale-server.py"          "$deb_root/$deb_name/usr/lib/scale-guinstall/"
     cp "$STAGE/Scale-GUInstall.html"     "$deb_root/$deb_name/usr/lib/scale-guinstall/"
+    cp "$STAGE/help.html"                "$deb_root/$deb_name/usr/lib/scale-guinstall/"
     cp "$STAGE/scale-guinstall"          "$deb_root/$deb_name/usr/bin/scale-guinstall"
     cp "$STAGE/scale-guinstall.service"  "$deb_root/$deb_name/usr/lib/systemd/system/"
     cp "$STAGE/scale-guinstall-mmfs.sh"  "$deb_root/$deb_name/etc/profile.d/"
@@ -106,6 +108,7 @@ build_deb() {
     chmod 0755 "$deb_root/$deb_name/usr/bin/scale-guinstall"
     chmod 0644 "$deb_root/$deb_name/usr/lib/scale-guinstall/scale-server.py"
     chmod 0644 "$deb_root/$deb_name/usr/lib/scale-guinstall/Scale-GUInstall.html"
+    chmod 0644 "$deb_root/$deb_name/usr/lib/scale-guinstall/help.html"
     chmod 0644 "$deb_root/$deb_name/usr/lib/systemd/system/scale-guinstall.service"
     chmod 0644 "$deb_root/$deb_name/etc/profile.d/scale-guinstall-mmfs.sh"
     chmod 0755 "$deb_root/$deb_name/usr/lib/scale-guinstall/enable-ssh-forwarding.sh"

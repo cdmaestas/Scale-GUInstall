@@ -26,14 +26,13 @@ jobs:
               tree = ast.parse(f.read())
           # Verify key routes are present
           routes = [
-              d.args[0].s
+              node.args[0].value
               for node in ast.walk(tree)
               if isinstance(node, ast.Call)
               and isinstance(node.func, ast.Attribute)
               and node.func.attr == "route"
               and node.args
               and isinstance(node.args[0], ast.Constant)
-              for d in [node]
           ]
           required = ["/api/ping", "/api/stream/phase", "/api/stream/check-ansible"]
           missing = [r for r in required if r not in routes]
@@ -147,8 +146,10 @@ jobs:
               "streamToTerminalPost": "async function streamToTerminalPost",
               "127.0.0.1 backend default": "127.0.0.1:5001",
               "dry run toggle": "dry-run-toggle",
+              "header dry run toggle": "header-dry-run-toggle",
               "install page": 'id="page-install"',
               "settings page": 'id="page-settings"',
+              "help link": 'href="help.html"',
           }
           failed = [name for name, marker in checks.items() if marker not in html]
           if failed:
@@ -157,6 +158,26 @@ jobs:
           print(f"OK: all {len(checks)} markers present")
           size_kb = len(html.encode()) // 1024
           print(f"OK: file size {size_kb} KB")
+          EOF
+
+      - name: Check help.html markers
+        run: |
+          python3 - <<'EOF'
+          import sys
+          with open("help.html") as f:
+              html = f.read()
+          checks = {
+              "title": "<title>Help",
+              "back to app link": 'href="Scale-GUInstall.html"',
+              "dry run section": 'id="dry-run"',
+              "troubleshooting section": 'id="troubleshooting"',
+              "remote access section": 'id="remote-access"',
+          }
+          failed = [name for name, marker in checks.items() if marker not in html]
+          if failed:
+              print(f"FAIL: missing markers: {failed}", file=sys.stderr)
+              sys.exit(1)
+          print(f"OK: all {len(checks)} markers present")
           EOF
 
   # ── Build DEB ─────────────────────────────────────────────────────────────

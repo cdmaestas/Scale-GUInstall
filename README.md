@@ -6,6 +6,25 @@ A single-file web frontend for the IBM Storage Scale Installation Toolkit (`spec
 
 ---
 
+## Screenshots
+
+| Dashboard | Node Configuration |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Node Configuration](docs/screenshots/node-configuration.png) |
+
+| NSD Storage | Install & Deploy |
+|---|---|
+| ![NSD Storage](docs/screenshots/nsd-storage.png) | ![Install & Deploy](docs/screenshots/install-deploy.png) |
+
+<details>
+<summary>Settings — SSH tunnel helper</summary>
+
+![Settings](docs/screenshots/settings.png)
+
+</details>
+
+---
+
 ## Installing via Package (RPM / DEB)
 
 For production installer nodes, use the pre-built packages instead of running from source. The package installs Flask into a self-contained virtual environment — no manual pip, no cloning, no Python version hunting.
@@ -190,7 +209,7 @@ Node role flags: `-n` NSD server, `-m` Manager, `-q` Quorum, `-a` Admin, `-p` Pr
 
 ## Dry Run Mode
 
-Dry Run is enabled by default. In this mode every button generates and displays the command that *would* run — nothing is sent to the cluster. Disable it in **Settings** once the command previews look correct.
+Dry Run is enabled by default. In this mode every button generates and displays the command that *would* run — nothing is sent to the cluster. Toggle it from the always-visible switch in the top header, or from **Settings**. Turning it off requires confirmation, and the header badge turns red with a **LIVE** label as a persistent reminder that commands will execute for real.
 
 > NSD creation and filesystem operations are **destructive and irreversible**. Always run pre-checks before disabling Dry Run.
 
@@ -299,10 +318,12 @@ ssh -L 5001:127.0.0.1:5001 user@installer-node echo "tunnel OK"
 ```
 Scale-GUInstall/
 ├── Scale-GUInstall.html        # Self-contained single-file app (HTML + CSS + JS)
+├── help.html                   # Standalone help/reference page, linked from the app header
 ├── scale-server.py             # Backend server (Flask) for live command execution
 ├── start.sh                    # Convenience script: finds Python, installs Flask, starts server
 ├── CHANGELOG.md                # Release history (Keep a Changelog format)
 ├── .githooks/                  # Local git hooks (pre-commit, pre-push) mirroring CI
+├── docs/screenshots/           # README screenshots
 └── packaging/
     ├── build-pkg.sh            # Builds RPM and DEB packages into dist/
     ├── scale-guinstall.spec    # RPM spec
@@ -325,4 +346,5 @@ git config core.hooksPath .githooks
 
 - The GUI uses IBM Carbon Design System tokens and IBM Plex fonts for a native-looking IBM interface.
 - The tool targets IBM Storage Scale 6.0.1 and the `spectrumscale` Installation Toolkit.
+- Click **Help** in the top header (or open [help.html](help.html) directly) for an in-app quick reference and troubleshooting guide.
 - Official IBM documentation: [IBM Storage Scale 6.0.1 docs →](https://www.ibm.com/docs/en/storage-scale/6.0.1)

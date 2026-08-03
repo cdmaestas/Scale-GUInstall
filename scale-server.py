@@ -87,15 +87,24 @@ def resolve_path(path):
 # Serve the frontend HTML
 # ---------------------------------------------------------------------------
 
-@app.route("/")
-def index():
-    """Serve Scale-GUInstall.html from the same directory as this script."""
-    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Scale-GUInstall.html")
-    if not os.path.isfile(html_path):
-        return "Scale-GUInstall.html not found next to scale-server.py", 404
-    with open(html_path, encoding="utf-8") as f:
+def _serve_sibling_html(filename):
+    """Serve a static HTML file from the same directory as this script."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+    if not os.path.isfile(path):
+        return f"{filename} not found next to scale-server.py", 404
+    with open(path, encoding="utf-8") as f:
         content = f.read()
     return content, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/")
+def index():
+    return _serve_sibling_html("Scale-GUInstall.html")
+
+
+@app.route("/help.html")
+def help_page():
+    return _serve_sibling_html("help.html")
 
 
 # ---------------------------------------------------------------------------
