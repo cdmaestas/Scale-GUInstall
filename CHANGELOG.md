@@ -9,6 +9,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- "Back to app" link in `help.html` 404'd when the app was loaded through the backend server (`http://127.0.0.1:5001/`) — the relative link resolves to `/Scale-GUInstall.html`, but only `/` had a route. Added `/Scale-GUInstall.html` as an alias route serving the same content.
+
 ---
 
 ## [1.0.19] — 2026-08-02

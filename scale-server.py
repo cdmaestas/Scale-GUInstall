@@ -98,6 +98,7 @@ def _serve_sibling_html(filename):
 
 
 @app.route("/")
+@app.route("/Scale-GUInstall.html")
 def index():
     return _serve_sibling_html("Scale-GUInstall.html")
 
