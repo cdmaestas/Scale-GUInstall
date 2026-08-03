@@ -10,8 +10,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- "List Partitions" on NSD Storage now queries every NSD-role node in parallel (instead of one node at a time) and shows all discovered devices in a single table with node, device path, and size
-- Selecting a partition shows a "Use & Format" action that wipes the device (`wipefs -a`, via a new `/api/stream/format-disk` endpoint) and auto-fills the Server Node and Disk Path fields in Add NSD Disk on success. Gated by Dry Run and a native confirmation dialog before executing.
+- "List Partitions" on NSD Storage now queries every NSD-role node in parallel (instead of one node at a time) and shows all discovered devices in a single table with node, device path, and size. Runs as `sudo -n cat /proc/partitions` over SSH, matching the app-wide convention that every privileged command is invoked non-interactively via `sudo -n`.
+- Selecting a partition shows a "Use & Format" action that wipes the device (`sudo -n wipefs -a`, via a new `/api/stream/format-disk` endpoint) and auto-fills the Server Node and Disk Path fields in Add NSD Disk on success. Gated by Dry Run and a native confirmation dialog before executing.
 - `stream_list_partitions` now also parses `/proc/partitions` into structured `{name, sizeKb}` data (new `partitions` SSE event type), reusable by the frontend without a second round-trip
 
 ---

@@ -1702,8 +1702,8 @@ def stream_list_partitions():
             if not _VALID_HOSTNAME_RE.fullmatch(node):
                 yield sse("error", f"[ERROR] Invalid node hostname: {node!r}")
                 return
-            cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS, node, "cat", "/proc/partitions"]
-            yield sse("info", f"$ ssh {node} cat /proc/partitions")
+            cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS, node, "sudo", "-n", "cat", "/proc/partitions"]
+            yield sse("info", f"$ ssh {node} sudo -n cat /proc/partitions")
             # Run synchronously rather than streaming — /proc/partitions is a
             # handful of short lines, and the full output is parsed below.
             stdout, rc = _run_cmd(cmd, timeout=25)
@@ -1744,7 +1744,7 @@ def stream_format_disk():
                 yield sse("error", f"[ERROR] Invalid device path: {device!r}")
                 return
             cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS,
-                   node, "sudo", "wipefs", "-a", device]
+                   node, "sudo", "-n", "wipefs", "-a", device]
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd)
             if rc == 0:
