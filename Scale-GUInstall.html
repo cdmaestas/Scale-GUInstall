@@ -3041,7 +3041,7 @@ function navigateTo(page) {
   closeSidebar();
   updateAllPreviews();
   if (page === 'prepare') checkPrepareBackend();
-  if (page === 'storage') { updateNSDServerList(); updateFakeNsdNodeList(); syncNsdPoolField(); }
+  if (page === 'storage') { updateNSDServerList(); updateFakeNsdNodeList(); syncNsdPoolField(); document.getElementById('nsd-fg').value = nextFailureGroup(); }
   if (page === 'install') {
     // Auto-fill cluster name in Node Identity panel from cluster settings
     const niCn = document.getElementById('ni-cluster-name');
@@ -3727,6 +3727,16 @@ function _normalizePool(v) {
   return p.toLowerCase() === 'system' ? '' : p;
 }
 
+// Suggest a failure group for the next NSD: the next multiple of 10 above the
+// highest one already configured (1 for the very first). New disks land in a
+// fresh failure group instead of reusing or sitting right next to an existing
+// one — e.g. after 1 and 2, the next suggestion is 10, then 20.
+function nextFailureGroup() {
+  const maxFg = state.nsds.reduce((m, n) => Math.max(m, parseInt(n.failureGroup, 10) || 0), 0);
+  if (maxFg <= 0) return 1;
+  return (Math.floor(maxFg / 10) + 1) * 10;
+}
+
 function addNSD() {
   const server = document.getElementById('nsd-server').value;
   const disk = document.getElementById('nsd-disk').value.trim();
@@ -3758,6 +3768,7 @@ function addNSD() {
   updateNSDServerList();
   document.querySelector('[onclick="addBackupRow()"]').style.display = '';
   updateNSDDisplay();
+  document.getElementById('nsd-fg').value = nextFailureGroup();
   updateAllPreviews();
 }
 
