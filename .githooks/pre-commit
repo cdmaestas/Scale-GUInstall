@@ -40,6 +40,36 @@ else
   echo "pre-commit: WARN — node not installed, skipping JS syntax check" >&2
 fi
 
+echo "pre-commit: security guard"
+sg_hits=0
+sg_check() {
+  # $1 = ERE pattern, $2 = file, $3 = description
+  if grep -nE "$1" "$2" >/tmp/scale-guinstall-precommit-sg; then
+    echo "pre-commit: FAIL — $3 in $2:" >&2
+    cat /tmp/scale-guinstall-precommit-sg >&2
+    sg_hits=1
+  fi
+}
+sg_check 'shell\s*=\s*True' scale-server.py "shell=True (command injection risk)"
+sg_check '\bpickle\.(load|loads)\(' scale-server.py "unsafe pickle deserialization"
+sg_check '\byaml\.load\(' scale-server.py "unsafe yaml.load without SafeLoader"
+sg_check '\beval\(' scale-server.py "eval() of untrusted input"
+sg_check 'except\s*(Exception)?\s*:\s*$' scale-server.py "bare except with no body — silent-failure regression"
+# innerHTML interpolations must route through h(); data-backup="${idx}" (loop
+# index) and ${removeBtn} (locally-built trusted markup) are reviewed-safe.
+sg_candidates=$(grep -nE '\.innerHTML\s*=.*\$\{' Scale-GUInstall.html || true)
+sg_unescaped=$(echo "$sg_candidates" \
+  | grep -vF 'h(' \
+  | grep -vF 'data-backup="${idx}"' \
+  | grep -vF '${removeBtn}' \
+  || true)
+if [ -n "$sg_unescaped" ]; then
+  echo "pre-commit: FAIL — innerHTML interpolation without h():" >&2
+  echo "$sg_unescaped" >&2
+  sg_hits=1
+fi
+[ "$sg_hits" -eq 0 ] || fail "security guard found issues (see above)"
+
 echo "pre-commit: HTML markers"
 python3 - <<'EOF' || exit 1
 import sys

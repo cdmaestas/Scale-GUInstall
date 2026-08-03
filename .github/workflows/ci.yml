@@ -64,6 +64,53 @@ jobs:
             .githooks/pre-commit \
             .githooks/pre-push
 
+  # ── Security regression guard ─────────────────────────────────────────────
+  security-guard:
+    name: Security guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Forbidden patterns
+        run: |
+          fail=0
+          check() {
+            # $1 = grep pattern, $2 = file, $3 = human description
+            if grep -nE "$1" "$2" >/tmp/hits; then
+              echo "FAIL: $3 in $2:"; cat /tmp/hits; fail=1
+            fi
+          }
+          check 'shell\s*=\s*True' scale-server.py "shell=True (command injection risk)"
+          check '\bpickle\.(load|loads)\(' scale-server.py "unsafe pickle deserialization"
+          check '\byaml\.load\(' scale-server.py "unsafe yaml.load without SafeLoader"
+          check '\beval\(' scale-server.py "eval() of untrusted input"
+          check 'except\s*(Exception)?\s*:\s*$' scale-server.py "bare except with no body — silent-failure regression"
+          exit "$fail"
+
+      - name: innerHTML assignments must route through h()
+        run: |
+          # Flag single-line `.innerHTML = ...` template literals that
+          # interpolate a value without ever calling h() on that line — a
+          # regression on the app's one XSS defense. This is a fast
+          # heuristic, not a full parser: multi-line literals and cases
+          # where h() is called elsewhere in the expression aren't caught.
+          #
+          # Known-safe exceptions, reviewed and excluded below:
+          #   data-backup="${idx}"   — idx is a numeric loop index, never user input
+          #   ${removeBtn}           — a locally-built constant markup string, no user data inside it
+          candidates=$(grep -nE '\.innerHTML\s*=.*\$\{' Scale-GUInstall.html || true)
+          unescaped=$(echo "$candidates" \
+            | grep -vF 'h(' \
+            | grep -vF 'data-backup="${idx}"' \
+            | grep -vF '${removeBtn}' \
+            || true)
+          if [ -n "$unescaped" ]; then
+            echo "FAIL: innerHTML assignment(s) with a \${...} interpolation and no h() call on the same line:"
+            echo "$unescaped"
+            exit 1
+          fi
+          echo "OK: no unescaped innerHTML interpolations found"
+
   # ── JavaScript syntax check ───────────────────────────────────────────────
   js-check:
     name: JS syntax

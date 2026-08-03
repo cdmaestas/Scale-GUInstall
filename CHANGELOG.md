@@ -9,6 +9,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- CI `security-guard` job and a matching local pre-commit check: fails the build on `shell=True`, unsafe `pickle`/`yaml.load`/`eval`, bare `except:` (silent-failure regression), or an `innerHTML` template literal that interpolates a value without routing it through the `h()` escape helper
+
 ---
 
 ## [1.0.18] — 2026-08-02
