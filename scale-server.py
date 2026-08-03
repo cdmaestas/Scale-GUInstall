@@ -69,6 +69,19 @@ _ALLOWED_GUI_ROLES = frozenset({"SecurityAdmin", "SystemAdmin", "CopyAdmin", "Da
 
 _ALLOWED_AFM_MODES = frozenset({"ro", "rw", "sw", "iw", "lg"})
 
+# Shared SSH options for all remote commands: bound the TCP connect phase,
+# refuse interactive auth prompts (stdin is already /dev/null, but BatchMode
+# also stops ssh itself from trying and waiting), and detect a connection
+# that went silent after being established (e.g. slow/broken reverse-DNS
+# lookup on the remote sshd, a dropped connection with no FIN/RST) rather
+# than hanging indefinitely.
+_SSH_OPTS = [
+    "-o", "ConnectTimeout=10",
+    "-o", "BatchMode=yes",
+    "-o", "ServerAliveInterval=5",
+    "-o", "ServerAliveCountMax=2",
+]
+
 
 def resolve_path(path):
     """
@@ -1544,7 +1557,7 @@ def stream_fake_nsd():
                        if tool == "truncate"
                        else f"sudo fallocate -l {shlex.quote(size)} {shlex.quote(filepath)}")
                 )
-                cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new",
+                cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS,
                        f"{ssh_user}@{node}", remote_cmd]
                 yield sse("info", f"$ ssh {ssh_user}@{node} \"{remote_cmd}\"")
                 rc = yield from stream_process(cmd)
@@ -1680,7 +1693,7 @@ def stream_list_partitions():
             if not _VALID_HOSTNAME_RE.fullmatch(node):
                 yield sse("error", f"[ERROR] Invalid node hostname: {node!r}")
                 return
-            cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10", node, "cat", "/proc/partitions"]
+            cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS, node, "cat", "/proc/partitions"]
             yield sse("info", f"$ ssh {node} cat /proc/partitions")
             rc = yield from stream_process(cmd)
             if rc != 0:
@@ -2328,7 +2341,8 @@ def stream_node_identity():
                         f"--key {q_key} "
                         f"--chain {q_ca}"
                     )
-                    cmd = ["ssh", f"{ssh_user}@{hostname}", remote_cmd]
+                    cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS,
+                           f"{ssh_user}@{hostname}", remote_cmd]
                     yield sse("info", f"$ {' '.join(cmd)}")
                     rc = yield from stream_process(cmd)
                     if rc != 0:
