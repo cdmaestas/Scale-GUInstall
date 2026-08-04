@@ -421,6 +421,21 @@
   }
   .header-dryrun.live .header-dryrun-label { color: var(--cds-button-danger); font-weight: 600; }
 
+  /* ===== HEADER ACTIVITY INDICATOR ===== */
+  .header-activity {
+    display: none; align-items: center; gap: var(--spacing-03);
+    padding: 4px var(--spacing-04); font-size: 12px; white-space: nowrap;
+    border: 1px solid var(--cds-border-subtle-01);
+  }
+  .header-activity-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .header-activity.running .header-activity-dot { background: var(--cds-support-warning); animation: activity-pulse 1s ease-in-out infinite; }
+  .header-activity.running .header-activity-label { color: var(--cds-support-warning); }
+  .header-activity.done .header-activity-dot { background: var(--cds-support-success); }
+  .header-activity.done .header-activity-label { color: var(--cds-support-success); }
+  .header-activity.error .header-activity-dot { background: var(--cds-button-danger); }
+  .header-activity.error .header-activity-label { color: var(--cds-button-danger); }
+  @keyframes activity-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
   /* ===== PATH EDITOR ===== */
   .toolkit-path-bar {
     background: var(--cds-layer-01); border: 1px solid var(--cds-border-subtle-01);
@@ -641,6 +656,10 @@
   <div class="header-cluster-badge">
     <span class="cluster-status-dot" id="cluster-dot"></span>
     <span id="cluster-name-display">No cluster configured</span>
+  </div>
+  <div class="header-activity" id="header-activity" title="Command activity">
+    <span class="header-activity-dot"></span>
+    <span class="header-activity-label" id="header-activity-label"></span>
   </div>
   <div class="header-dryrun" id="header-dryrun-badge" title="Toggle Dry Run mode" onclick="toggleDryRun(document.getElementById('header-dry-run-toggle'))">
     <button class="toggle toggle-sm on dry-run-toggle-btn" id="header-dry-run-toggle" onclick="event.stopPropagation(); toggleDryRun(this)" aria-label="Toggle Dry Run mode"></button>
@@ -3429,7 +3448,12 @@ async function listAllDevices(btn) {
     }
   }
 
-  await Promise.all(nodes.map(n => queryNode(n.hostname)));
+  beginActivity();
+  try {
+    await Promise.all(nodes.map(n => queryNode(n.hostname)));
+  } finally {
+    endActivity(!allDevices.length);
+  }
 
   _lastDeviceList = allDevices;
   _deviceSort = { col: null, dir: 1 };
@@ -4598,112 +4622,157 @@ function sseTypeToTerminalType(type) {
   return 'normal';
 }
 
+// Global "something is running / done" indicator in the header. A counter
+// handles overlapping streams; the badge shows Running while any stream is
+// active, then Done (or Error, if any stream reported an error) briefly.
+let _activeStreams = 0, _activityError = false, _activityHideTimer = null;
+function setHeaderActivity(stateName) {
+  const el = document.getElementById('header-activity');
+  const label = document.getElementById('header-activity-label');
+  if (!el || !label) return;
+  clearTimeout(_activityHideTimer);
+  if (stateName === 'idle') { el.style.display = 'none'; el.className = 'header-activity'; return; }
+  el.style.display = 'flex';
+  el.className = 'header-activity ' + stateName;
+  label.textContent = stateName === 'running' ? 'Running…' : stateName === 'error' ? 'Error' : 'Done';
+  if (stateName !== 'running') {
+    _activityHideTimer = setTimeout(() => setHeaderActivity('idle'), stateName === 'error' ? 6000 : 3500);
+  }
+}
+function beginActivity() {
+  if (_activeStreams === 0) _activityError = false;
+  _activeStreams++;
+  setHeaderActivity('running');
+}
+function endActivity(hadError) {
+  if (hadError) _activityError = true;
+  _activeStreams = Math.max(0, _activeStreams - 1);
+  if (_activeStreams === 0) setHeaderActivity(_activityError ? 'error' : 'done');
+}
+
 async function streamToTerminal(termId, url, onDone, onEvent) {
   document.getElementById(termId)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  let response;
+  beginActivity();
+  let sawError = false;
   try {
-    response = await fetch(url);
-  } catch (err) {
-    appendToTerminal(termId, `[ERROR] Could not reach backend: ${err.message}`, 'error');
-    if (onDone) onDone();
-    return;
-  }
-
-  if (!response.ok) {
-    appendToTerminal(termId, `[ERROR] Server returned HTTP ${response.status}`, 'error');
-    if (onDone) onDone();
-    return;
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      // SSE events are separated by double newlines
-      const events = buffer.split('\n\n');
-      buffer = events.pop(); // keep any incomplete trailing event
-
-      for (const event of events) {
-        const dataLine = event.split('\n').find(l => l.startsWith('data: '));
-        if (!dataLine) continue;
-        let msg;
-        try { msg = JSON.parse(dataLine.slice(6)); } catch { continue; }
-
-        if (msg.type === 'done') {
-          if (onDone) onDone();
-          return;
-        }
-        if (msg.type === 'hint') {
-          const el = document.getElementById('prepare-installer-path');
-          if (el) { el.value = msg.line; updatePreparePreviews(); }
-          continue;
-        }
-        if (msg.type === 'nsd-path') {
-          _lastFakeNsdPath = msg.line;
-          continue;
-        }
-        if (onEvent) onEvent(msg.type, msg.line);
-        appendToTerminal(termId, msg.line, sseTypeToTerminalType(msg.type));
-      }
+    let response;
+    try {
+      response = await fetch(url);
+    } catch (err) {
+      appendToTerminal(termId, `[ERROR] Could not reach backend: ${err.message}`, 'error');
+      sawError = true;
+      if (onDone) onDone();
+      return;
     }
-  } catch (err) {
-    appendToTerminal(termId, `[ERROR] Stream interrupted: ${err.message}`, 'error');
+
+    if (!response.ok) {
+      appendToTerminal(termId, `[ERROR] Server returned HTTP ${response.status}`, 'error');
+      sawError = true;
+      if (onDone) onDone();
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // SSE events are separated by double newlines
+        const events = buffer.split('\n\n');
+        buffer = events.pop(); // keep any incomplete trailing event
+
+        for (const event of events) {
+          const dataLine = event.split('\n').find(l => l.startsWith('data: '));
+          if (!dataLine) continue;
+          let msg;
+          try { msg = JSON.parse(dataLine.slice(6)); } catch { continue; }
+
+          if (msg.type === 'done') {
+            if (onDone) onDone();
+            return;
+          }
+          if (msg.type === 'hint') {
+            const el = document.getElementById('prepare-installer-path');
+            if (el) { el.value = msg.line; updatePreparePreviews(); }
+            continue;
+          }
+          if (msg.type === 'nsd-path') {
+            _lastFakeNsdPath = msg.line;
+            continue;
+          }
+          if (msg.type === 'error') sawError = true;
+          if (onEvent) onEvent(msg.type, msg.line);
+          appendToTerminal(termId, msg.line, sseTypeToTerminalType(msg.type));
+        }
+      }
+    } catch (err) {
+      appendToTerminal(termId, `[ERROR] Stream interrupted: ${err.message}`, 'error');
+      sawError = true;
+    }
+    if (onDone) onDone();
+  } finally {
+    endActivity(sawError);
   }
-  if (onDone) onDone();
 }
 
 async function streamToTerminalPost(termId, url, body, onDone) {
   document.getElementById(termId)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  let response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-  } catch (err) {
-    appendToTerminal(termId, `[ERROR] Could not reach backend: ${err.message}`, 'error');
-    if (onDone) onDone(false);
-    return;
-  }
-  if (!response.ok) {
-    appendToTerminal(termId, `[ERROR] Server returned HTTP ${response.status}`, 'error');
-    if (onDone) onDone(false);
-    return;
-  }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
+  beginActivity();
   let sawError = false;
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const events = buffer.split('\n\n');
-      buffer = events.pop();
-      for (const event of events) {
-        const dataLine = event.split('\n').find(l => l.startsWith('data: '));
-        if (!dataLine) continue;
-        let msg;
-        try { msg = JSON.parse(dataLine.slice(6)); } catch { continue; }
-        if (msg.type === 'done') { if (onDone) onDone(!sawError); return; }
-        if (msg.type === 'error') sawError = true;
-        appendToTerminal(termId, msg.line, sseTypeToTerminalType(msg.type));
-      }
+    let response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    } catch (err) {
+      appendToTerminal(termId, `[ERROR] Could not reach backend: ${err.message}`, 'error');
+      sawError = true;
+      if (onDone) onDone(false);
+      return;
     }
-  } catch (err) {
-    appendToTerminal(termId, `[ERROR] Stream interrupted: ${err.message}`, 'error');
-    sawError = true;
+    if (!response.ok) {
+      appendToTerminal(termId, `[ERROR] Server returned HTTP ${response.status}`, 'error');
+      sawError = true;
+      if (onDone) onDone(false);
+      return;
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop();
+        for (const event of events) {
+          const dataLine = event.split('\n').find(l => l.startsWith('data: '));
+          if (!dataLine) continue;
+          let msg;
+          try { msg = JSON.parse(dataLine.slice(6)); } catch { continue; }
+          if (msg.type === 'done') { if (onDone) onDone(!sawError); return; }
+          if (msg.type === 'error') sawError = true;
+          appendToTerminal(termId, msg.line, sseTypeToTerminalType(msg.type));
+        }
+      }
+    } catch (err) {
+      appendToTerminal(termId, `[ERROR] Stream interrupted: ${err.message}`, 'error');
+      sawError = true;
+    }
+    if (onDone) onDone(!sawError);
+  } finally {
+    endActivity(sawError);
   }
-  if (onDone) onDone(!sawError);
 }
 
 async function runPrepare(phase, btn) {
