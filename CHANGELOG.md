@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.23] — 2026-08-04
+
 ### Changed
 - In "Configure the filesystem in the IBM Storage Scale GUI" mode, the NSD `usage` is now also deferred to the Scale GUI (which sets usage/pool when it builds the filesystem): the Usage field is hidden and `spectrumscale nsd add` omits `-u`, so the command is the bare `nsd add -p <server> <device>`. The Usage column shows `—` in the Configured NSDs table, and the backend/stanza treat usage as optional. Turning the mode off restores full usage/pool/failure-group control.
 
