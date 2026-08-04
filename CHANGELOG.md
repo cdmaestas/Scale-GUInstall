@@ -9,6 +9,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Header activity indicator: a badge in the top bar shows **Running…** (amber, pulsing) while any command is streaming and **Done** (green) or **Error** (red) briefly when it finishes, then auto-hides. A counter keeps it accurate across overlapping/parallel commands (e.g. the multi-node device scan). Wired into the shared streaming paths, so it covers prepare steps, node add, NSD add, format, populate, cluster config, and device discovery.
+
 ---
 
 ## [1.0.23] — 2026-08-04
