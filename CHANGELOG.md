@@ -9,6 +9,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Clearer NSD button/heading wording to distinguish the two "add" steps: the form's **Add NSD** button is now **Add to Configured NSDs** (stages an NSD into the local list) under a **Define NSD Disk** heading, and the apply action is **Apply to Cluster Definition** (runs `spectrumscale nsd add`). The flow now reads Disk Discovery → Define NSD Disk → Configured NSDs → Apply to Cluster Definition.
+
 ### Added
 - Header activity indicator: a badge in the top bar shows **Running…** (amber, pulsing) while any command is streaming and **Done** (green) or **Error** (red) briefly when it finishes, then auto-hides. A counter keeps it accurate across overlapping/parallel commands (e.g. the multi-node device scan). Wired into the shared streaming paths, so it covers prepare steps, node add, NSD add, format, populate, cluster config, and device discovery.
 

@@ -1654,7 +1654,7 @@
 
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--spacing-06)">
         <div class="panel">
-          <div class="panel-header"><div><h3>Add NSD Disk</h3></div></div>
+          <div class="panel-header"><div><h3>Define NSD Disk</h3><p>Configure one NSD, then add it to the Configured NSDs list</p></div></div>
           <div class="panel-body">
             <div class="form-group">
               <label class="form-label">Server Node <span class="required">*</span></label>
@@ -1714,7 +1714,7 @@
             </div>
             <button class="btn btn-primary" onclick="addNSD()">
               <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M17 15V8h-2v7H8v2h7v7h2v-7h7v-2z"/></svg>
-              Add NSD
+              Add to Configured NSDs
             </button>
           </div>
         </div>
@@ -1741,10 +1741,10 @@
         </div>
       </div>
 
-      <!-- Apply NSDs — primary action, always visible -->
+      <!-- Apply to Cluster Definition — primary action, always visible -->
       <div class="panel" style="margin-top:var(--spacing-06)">
         <div class="panel-header">
-          <div><h3>Apply NSDs to Cluster</h3><p>Run <code>spectrumscale nsd add</code> for each configured NSD</p></div>
+          <div><h3>Apply to Cluster Definition</h3><p>Runs <code>spectrumscale nsd add</code> for each NSD above, writing them to the cluster definition file</p></div>
         </div>
         <div class="panel-body">
           <div class="cmd-preview" style="margin-bottom:var(--spacing-04)">
@@ -1752,7 +1752,7 @@
           </div>
           <button class="btn btn-secondary" id="nsd-add-btn" onclick="runNsdAdd(this)">
             <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M16 2a14 14 0 1 0 14 14A14 14 0 0 0 16 2zm8 15h-7v7h-2v-7H8v-2h7V8h2v7h7z"/></svg>
-            Add NSDs to Cluster
+            Apply to Cluster Definition
           </button>
           <div class="terminal" id="nsd-add-terminal" style="margin-top:var(--spacing-05); min-height:120px; max-height:300px; overflow-y:auto; display:none">
             <div class="terminal-line muted"># spectrumscale nsd add output will appear here</div>
@@ -3982,7 +3982,7 @@ function updateNSDStanza() {
 async function runNsdAdd(btn) {
   const tp = state.toolkitPath;
   if (!tp) { alert('Toolkit path not set. Configure it in Prepare Software or Settings.'); return; }
-  if (state.nsds.length === 0) { alert('No NSDs configured. Add at least one NSD above.'); return; }
+  if (state.nsds.length === 0) { alert('No NSDs configured. Define at least one NSD and add it to the Configured NSDs list above.'); return; }
 
   const term = document.getElementById('nsd-add-terminal');
   term.style.display = 'block';
