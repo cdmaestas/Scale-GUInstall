@@ -773,6 +773,10 @@
         <p>Automated installation, deployment, and upgrade of IBM Storage Scale clusters using the <code>spectrumscale</code> installation toolkit.</p>
       </div>
 
+      <div style="margin-bottom:var(--spacing-05)">
+        <span class="tag tag-red" id="dash-setup-status" title="Based on setup runs completed through this app, remembered in this browser only">Install Service: Not Run</span>
+      </div>
+
       <div class="overview-grid">
         <div class="stat-card">
           <div class="stat-label">CONFIGURED NODES</div>
@@ -3066,6 +3070,7 @@ function navigateTo(page) {
   document.getElementById('nav-' + page)?.classList.add('active');
   closeSidebar();
   updateAllPreviews();
+  if (page === 'overview') renderDashboardSetupStatus();
   if (page === 'prepare') { checkPrepareBackend(); renderSetupLastRun(); }
   if (page === 'storage') { updateNSDServerList(); updateFakeNsdNodeList(); syncNsdPoolField(); document.getElementById('nsd-fg').value = nextFailureGroup(); applyFsViaGuiMode(); }
   if (page === 'install') {
@@ -4419,6 +4424,19 @@ function recordSetupRun(ip, toolkit, success) {
   hist[ip] = { success, ts: Date.now(), toolkit };
   try { localStorage.setItem(SETUP_HISTORY_KEY, JSON.stringify(hist)); } catch { /* storage unavailable — history just won't persist */ }
   renderSetupLastRun();
+  renderDashboardSetupStatus();
+}
+
+// Dashboard-level summary: green if setup has succeeded at least once for
+// ANY installer IP in this browser's history, red otherwise. Deliberately
+// simple/binary — per-IP detail lives on Prepare Software Step 4.
+function renderDashboardSetupStatus() {
+  const el = document.getElementById('dash-setup-status');
+  if (!el) return;
+  const hist = loadSetupHistory();
+  const ranOk = Object.values(hist).some(e => e.success);
+  el.className = 'tag ' + (ranOk ? 'tag-green' : 'tag-red');
+  el.textContent = ranOk ? 'Install Service: Run' : 'Install Service: Not Run';
 }
 
 function renderSetupLastRun() {
@@ -5685,6 +5703,7 @@ function setDryRunState(enabled) {
 updateAllPreviews();
 setDryRunState(true);
 applyFsViaGuiMode();  // default ON: hide the Filesystem nav item + skip its step
+renderDashboardSetupStatus();  // Dashboard is the default active page on load
 // Tooltips for the collapsed icon-rail sidebar. Native `title` is kept as
 // an accessibility fallback; the visible tooltip is a single shared element
 // positioned via JS so it isn't clipped by the sidebar's overflow-x:hidden.
