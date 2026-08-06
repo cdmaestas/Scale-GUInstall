@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.24] — 2026-08-05
+
 ### Changed
 - Clearer NSD button/heading wording to distinguish the two "add" steps: the form's **Add NSD** button is now **Add to Configured NSDs** (stages an NSD into the local list) under a **Define NSD Disk** heading, and the apply action is **Apply to Cluster Definition** (runs `spectrumscale nsd add`). The flow now reads Disk Discovery → Define NSD Disk → Configured NSDs → Apply to Cluster Definition.
 
