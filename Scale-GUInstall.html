@@ -1082,6 +1082,7 @@
                 <label style="display:block; font-size:12px; color:var(--cds-text-secondary); margin-bottom:var(--spacing-02)">Installer Node IP Address</label>
                 <input type="text" class="path-input" id="prepare-server-ip" value="" placeholder="e.g. 192.168.1.10" style="width:100%" oninput="updatePreparePreviews()">
                 <div id="prepare-ip-chips" style="display:none; margin-top:var(--spacing-02); display:flex; gap:6px; flex-wrap:wrap; align-items:center"></div>
+                <div id="setup-last-run" class="form-help" style="display:none; margin-top:var(--spacing-02)"></div>
               </div>
               <div class="btn-group">
                 <button class="btn btn-secondary" onclick="runPrepare('checkpython', this)">
@@ -3065,7 +3066,7 @@ function navigateTo(page) {
   document.getElementById('nav-' + page)?.classList.add('active');
   closeSidebar();
   updateAllPreviews();
-  if (page === 'prepare') checkPrepareBackend();
+  if (page === 'prepare') { checkPrepareBackend(); renderSetupLastRun(); }
   if (page === 'storage') { updateNSDServerList(); updateFakeNsdNodeList(); syncNsdPoolField(); document.getElementById('nsd-fg').value = nextFailureGroup(); applyFsViaGuiMode(); }
   if (page === 'install') {
     // Auto-fill cluster name in Node Identity panel from cluster settings
@@ -4399,7 +4400,42 @@ function getBackendUrl() {
   return 'http://127.0.0.1:5001';
 }
 
+// ===== SETUP RUN HISTORY (tracked locally, not detected on the node) =====
+// spectrumscale setup is a one-shot config command with no persistent
+// process to check — see CHANGELOG. Instead of guessing at node state,
+// remember whether *this app* has completed a setup run for a given
+// installer IP, and when. This only reflects runs made through this app in
+// this browser; it says nothing about configuration done outside it.
+const SETUP_HISTORY_KEY = 'scale-guinstall-setup-history';
+
+function loadSetupHistory() {
+  try { return JSON.parse(localStorage.getItem(SETUP_HISTORY_KEY) || '{}'); }
+  catch { return {}; }
+}
+
+function recordSetupRun(ip, toolkit, success) {
+  if (!ip) return;
+  const hist = loadSetupHistory();
+  hist[ip] = { success, ts: Date.now(), toolkit };
+  try { localStorage.setItem(SETUP_HISTORY_KEY, JSON.stringify(hist)); } catch { /* storage unavailable — history just won't persist */ }
+  renderSetupLastRun();
+}
+
+function renderSetupLastRun() {
+  const el = document.getElementById('setup-last-run');
+  if (!el) return;
+  const ip = document.getElementById('prepare-server-ip')?.value.trim();
+  const entry = ip ? loadSetupHistory()[ip] : null;
+  if (!entry) { el.style.display = 'none'; return; }
+  const when = new Date(entry.ts).toLocaleString();
+  el.style.display = 'block';
+  el.innerHTML = entry.success
+    ? `<span style="color:var(--cds-support-success)">✓ Setup ran successfully on ${h(ip)}</span> — ${h(when)} <span style="color:var(--cds-text-disabled)">(remembered in this browser only)</span>`
+    : `<span style="color:var(--cds-button-danger)">✗ Last setup attempt on ${h(ip)} failed</span> — ${h(when)} <span style="color:var(--cds-text-disabled)">(remembered in this browser only)</span>`;
+}
+
 function updatePreparePreviews() {
+  renderSetupLastRun();
   const zip       = document.getElementById('prepare-zip-path').value       || '/path/to/scale-developer.zip';
   const dir       = document.getElementById('prepare-work-dir').value       || '/tmp/scale-pkg';
   const installer = document.getElementById('prepare-installer-path').value || `${dir}/Storage_Scale_Developer-x.x.x.x-x86_64-Linux-install`;
@@ -4609,14 +4645,14 @@ async function streamToTerminal(termId, url, onDone, onEvent) {
     } catch (err) {
       appendToTerminal(termId, `[ERROR] Could not reach backend: ${err.message}`, 'error');
       sawError = true;
-      if (onDone) onDone();
+      if (onDone) onDone(false);
       return;
     }
 
     if (!response.ok) {
       appendToTerminal(termId, `[ERROR] Server returned HTTP ${response.status}`, 'error');
       sawError = true;
-      if (onDone) onDone();
+      if (onDone) onDone(false);
       return;
     }
 
@@ -4642,7 +4678,7 @@ async function streamToTerminal(termId, url, onDone, onEvent) {
           try { msg = JSON.parse(dataLine.slice(6)); } catch { continue; }
 
           if (msg.type === 'done') {
-            if (onDone) onDone();
+            if (onDone) onDone(!sawError);
             return;
           }
           if (msg.type === 'hint') {
@@ -4663,7 +4699,7 @@ async function streamToTerminal(termId, url, onDone, onEvent) {
       appendToTerminal(termId, `[ERROR] Stream interrupted: ${err.message}`, 'error');
       sawError = true;
     }
-    if (onDone) onDone();
+    if (onDone) onDone(!sawError);
   } finally {
     endActivity(sawError);
   }
@@ -4836,7 +4872,10 @@ async function runPrepare(phase, btn) {
     const params = new URLSearchParams({ dir, ip });
     if (toolkitBin) params.set('bin', toolkitBin);
     const url = `${getBackendUrl()}/api/stream/setup?${params}`;
-    streamToTerminal(termId, url, () => { btn.disabled = false; });
+    streamToTerminal(termId, url, (ok) => {
+      btn.disabled = false;
+      recordSetupRun(ip, toolkitBin || dir, ok);
+    });
   }
 }
 
