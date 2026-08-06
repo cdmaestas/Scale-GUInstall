@@ -9,6 +9,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Local setup-run history on Prepare Software Step 4: `spectrumscale setup` is a one-shot config command with no persistent process to check status of (it writes config and exits, on the Ansible-based toolkit), so rather than detect node state, the app now remembers whether *it* has completed a setup run for a given installer IP — success/failure and when — shown just below the IP field. Tracked per-IP in `localStorage`, clearly labeled "remembered in this browser only" since it reflects runs made through this app in this browser, not configuration state on the node itself.
+
 ---
 
 ## [1.0.24] — 2026-08-05
