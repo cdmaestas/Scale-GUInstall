@@ -434,6 +434,8 @@
   .header-activity.done .header-activity-label { color: var(--cds-support-success); }
   .header-activity.error .header-activity-dot { background: var(--cds-button-danger); }
   .header-activity.error .header-activity-label { color: var(--cds-button-danger); }
+  .header-activity.unknown .header-activity-dot { background: var(--cds-text-disabled); }
+  .header-activity.unknown .header-activity-label { color: var(--cds-text-disabled); }
   @keyframes activity-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 
   /* ===== PATH EDITOR ===== */
@@ -660,6 +662,10 @@
   <div class="header-activity" id="header-activity" title="Command activity">
     <span class="header-activity-dot"></span>
     <span class="header-activity-label" id="header-activity-label"></span>
+  </div>
+  <div class="header-activity" id="header-setup-svc-badge" style="display:none; cursor:pointer" onclick="checkSetupService(null)" title="Click to re-check the toolkit setup service">
+    <span class="header-activity-dot"></span>
+    <span class="header-activity-label" id="header-setup-svc-label"></span>
   </div>
   <div class="header-dryrun" id="header-dryrun-badge" title="Toggle Dry Run mode" onclick="toggleDryRun(document.getElementById('header-dry-run-toggle'))">
     <button class="toggle toggle-sm on dry-run-toggle-btn" id="header-dry-run-toggle" onclick="event.stopPropagation(); toggleDryRun(this)" aria-label="Toggle Dry Run mode"></button>
@@ -4453,25 +4459,53 @@ function _mmfsToolkitForVersion(ver) {
   return map[ver] ?? `/usr/lpp/mmfs/${ver}/installer/spectrumscale`;
 }
 
+// Updates the Step 4 pill badge (small, standalone) and the header badge
+// (dot + label, shares styling with the command-activity indicator) from
+// the same /api/setup-service/status result, so both stay in sync.
+function _renderSetupSvcPill(data) {
+  if (data.error) {
+    return `<span style="background:var(--cds-text-disabled);color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500" title="${h(data.error)}">Unknown</span>`;
+  } else if (data.running) {
+    const pids = (data.processes || []).map(p => p.pid).join(', ');
+    return `<span style="background:var(--cds-support-success);color:#000;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500" title="PID ${h(pids)}">● Running</span>`;
+  }
+  return '<span style="background:var(--cds-support-error);color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500">● Not running</span>';
+}
+
+function _renderSetupSvcHeader(data) {
+  const el = document.getElementById('header-setup-svc-badge');
+  const label = document.getElementById('header-setup-svc-label');
+  if (!el || !label) return;
+  el.style.display = 'flex';
+  if (data.error) {
+    el.className = 'header-activity unknown';
+    label.textContent = 'Setup Service: Unknown';
+    el.title = `${data.error} — click to re-check`;
+  } else if (data.running) {
+    el.className = 'header-activity done';
+    label.textContent = 'Setup Service: Running';
+    const pids = (data.processes || []).map(p => p.pid).join(', ');
+    el.title = `PID ${pids} — click to re-check`;
+  } else {
+    el.className = 'header-activity error';
+    label.textContent = 'Setup Service: Not Running';
+    el.title = 'Click to re-check';
+  }
+}
+
 async function checkSetupService(btn) {
-  const badge = document.getElementById('setup-svc-badge');
-  if (!badge) return;
+  const stepBadge = document.getElementById('setup-svc-badge');
+  const headerBadge = document.getElementById('header-setup-svc-badge');
+  if (!stepBadge && !headerBadge) return;
   if (btn) btn.disabled = true;
   try {
     const res  = await fetch(`${getBackendUrl()}/api/setup-service/status`, { signal: AbortSignal.timeout(5000) });
     const data = await res.json();
-    badge.style.display = 'inline-block';
-    if (data.error) {
-      badge.innerHTML = `<span style="background:var(--cds-text-disabled);color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500" title="${h(data.error)}">Unknown</span>`;
-    } else if (data.running) {
-      const pids = (data.processes || []).map(p => p.pid).join(', ');
-      badge.innerHTML = `<span style="background:var(--cds-support-success);color:#000;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500" title="PID ${h(pids)}">● Running</span>`;
-    } else {
-      badge.innerHTML = '<span style="background:var(--cds-support-error);color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500">● Not running</span>';
-    }
+    if (stepBadge) { stepBadge.style.display = 'inline-block'; stepBadge.innerHTML = _renderSetupSvcPill(data); }
+    _renderSetupSvcHeader(data);
   } catch {
-    badge.style.display = 'inline-block';
-    badge.innerHTML = '<span style="background:var(--cds-text-disabled);color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500">Unknown</span>';
+    if (stepBadge) { stepBadge.style.display = 'inline-block'; stepBadge.innerHTML = _renderSetupSvcPill({ error: 'Backend not reachable' }); }
+    _renderSetupSvcHeader({ error: 'Backend not reachable' });
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -5698,6 +5732,16 @@ function setDryRunState(enabled) {
 updateAllPreviews();
 setDryRunState(true);
 applyFsViaGuiMode();  // default ON: hide the Filesystem nav item + skip its step
+// Show the setup-service badge immediately (grey "Checking…") so it's
+// discoverable from any page, then resolve it against the backend. If no
+// backend is running yet this settles into "Unknown" rather than staying
+// silent — click it anytime afterward to re-check.
+(() => {
+  const el = document.getElementById('header-setup-svc-badge');
+  const label = document.getElementById('header-setup-svc-label');
+  if (el && label) { el.style.display = 'flex'; el.className = 'header-activity unknown'; label.textContent = 'Setup Service: Checking…'; }
+})();
+checkSetupService(null);
 // Tooltips for the collapsed icon-rail sidebar. Native `title` is kept as
 // an accessibility fallback; the visible tooltip is a single shared element
 // positioned via JS so it isn't clipped by the sidebar's overflow-x:hidden.

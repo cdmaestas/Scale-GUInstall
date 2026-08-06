@@ -9,6 +9,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Toolkit setup-service status badge in the header, next to the Dry Run toggle — visible from every page, not just Prepare Software Step 4. Shows **Setup Service: Running** (green), **Not Running** (red), or **Unknown** (grey) with the same `/api/setup-service/status` check Step 4 already used; click it anytime to re-check. Checked on app load, when visiting Prepare Software, and after Start/Restart Service, so both badges (header and Step 4) always agree.
+
 ---
 
 ## [1.0.24] — 2026-08-05
