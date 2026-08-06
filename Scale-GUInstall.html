@@ -657,6 +657,10 @@
     <span class="cluster-status-dot" id="cluster-dot"></span>
     <span id="cluster-name-display">No cluster configured</span>
   </div>
+  <div class="header-activity error" id="header-install-status" style="display:flex" title="Based on setup runs completed through this app, remembered in this browser only">
+    <span class="header-activity-dot"></span>
+    <span class="header-activity-label" id="header-install-status-label">Install Service: Not Run</span>
+  </div>
   <div class="header-activity" id="header-activity" title="Command activity">
     <span class="header-activity-dot"></span>
     <span class="header-activity-label" id="header-activity-label"></span>
@@ -771,10 +775,6 @@
       <div class="page-header">
         <h1>IBM Storage Scale Toolkit</h1>
         <p>Automated installation, deployment, and upgrade of IBM Storage Scale clusters using the <code>spectrumscale</code> installation toolkit.</p>
-      </div>
-
-      <div style="margin-bottom:var(--spacing-05)">
-        <span class="tag tag-red" id="dash-setup-status" title="Based on setup runs completed through this app, remembered in this browser only">Install Service: Not Run</span>
       </div>
 
       <div class="overview-grid">
@@ -3070,7 +3070,6 @@ function navigateTo(page) {
   document.getElementById('nav-' + page)?.classList.add('active');
   closeSidebar();
   updateAllPreviews();
-  if (page === 'overview') renderDashboardSetupStatus();
   if (page === 'prepare') { checkPrepareBackend(); renderSetupLastRun(); }
   if (page === 'storage') { updateNSDServerList(); updateFakeNsdNodeList(); syncNsdPoolField(); document.getElementById('nsd-fg').value = nextFailureGroup(); applyFsViaGuiMode(); }
   if (page === 'install') {
@@ -4427,16 +4426,18 @@ function recordSetupRun(ip, toolkit, success) {
   renderDashboardSetupStatus();
 }
 
-// Dashboard-level summary: green if setup has succeeded at least once for
-// ANY installer IP in this browser's history, red otherwise. Deliberately
-// simple/binary — per-IP detail lives on Prepare Software Step 4.
+// Header-level summary (visible from every page, next to the cluster
+// badge): green if setup has succeeded at least once for ANY installer IP
+// in this browser's history, red otherwise. Deliberately simple/binary —
+// per-IP detail with timestamps lives on Prepare Software Step 4.
 function renderDashboardSetupStatus() {
-  const el = document.getElementById('dash-setup-status');
-  if (!el) return;
+  const el = document.getElementById('header-install-status');
+  const label = document.getElementById('header-install-status-label');
+  if (!el || !label) return;
   const hist = loadSetupHistory();
   const ranOk = Object.values(hist).some(e => e.success);
-  el.className = 'tag ' + (ranOk ? 'tag-green' : 'tag-red');
-  el.textContent = ranOk ? 'Install Service: Run' : 'Install Service: Not Run';
+  el.className = 'header-activity ' + (ranOk ? 'done' : 'error');
+  label.textContent = ranOk ? 'Install Service: Run' : 'Install Service: Not Run';
 }
 
 function renderSetupLastRun() {
