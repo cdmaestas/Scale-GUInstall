@@ -4915,6 +4915,24 @@ async function runPrepare(phase, btn) {
       btn.disabled = false;
       return;
     }
+
+    // Check whether the setup service is already running before starting a
+    // second one — don't blindly re-run `spectrumscale setup`.
+    let status = null;
+    try {
+      const statusRes = await fetch(`${getBackendUrl()}/api/setup-service/status`, { signal: AbortSignal.timeout(5000) });
+      status = await statusRes.json();
+    } catch { /* status check failed — fall through and let the start attempt itself report any problem */ }
+
+    if (status && status.running) {
+      const pids = (status.processes || []).map(p => p.pid).join(', ');
+      appendToTerminal(termId, `[INFO] Setup service is already running (PID ${pids}).`, 'info');
+      appendToTerminal(termId, '[INFO] Use "Restart Service" to stop it and start fresh with this IP, or "Check" to just refresh status.', 'muted');
+      btn.disabled = false;
+      checkSetupService(null);
+      return;
+    }
+
     const mmfsOverride = document.getElementById('mmfs-toolkit-override')?.value.trim();
     const toolkitBin = (mmfsOverride && _mmfsProbeResult?.found)
       ? mmfsOverride
