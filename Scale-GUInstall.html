@@ -3204,7 +3204,7 @@ function updateNodeDisplay() {
 
   tbody.innerHTML = state.nodes.map((n, i) => `
     <tr>
-      <td class="mono">${h(n.hostname)}</td>
+      <td class="mono">${h(n.hostname)}${n.inLiveCluster ? ' <span class="tag tag-green" style="margin-left:6px" title="This node is already a member of the live GPFS cluster (checked via mmlscluster)">In cluster</span>' : ''}</td>
       <td style="text-align:center">${chk(i,'quorum',  n.roles.includes('quorum'))}</td>
       <td style="text-align:center">${chk(i,'manager', n.roles.includes('manager'))}</td>
       <td style="text-align:center">${chk(i,'admin',   n.roles.includes('admin'))}</td>
@@ -4208,6 +4208,24 @@ async function loadNodesFromCluster(btn) {
     imported = fresh.length;
     const skipped = data.nodes.length - imported;
     _showLoadLog('nodes-load-log', `[OK] Imported ${imported} node(s)${skipped ? `, skipped ${skipped} duplicate(s)` : ''}.`, 'success');
+
+    // Cross-check against the live GPFS cluster (mmlscluster) so nodes that
+    // already belong to a running cluster are flagged in the table below —
+    // informational only, no action is offered on them.
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/probe/cluster-nodes`, { signal: AbortSignal.timeout(10000) });
+      const clusterData = await res.json();
+      if (clusterData.nodes) {
+        const live = new Set(clusterData.nodes);
+        let flagged = 0;
+        state.nodes.forEach(n => {
+          n.inLiveCluster = live.has(n.hostname);
+          if (n.inLiveCluster) flagged++;
+        });
+        if (flagged) _showLoadLog('nodes-load-log', `[INFO] ${flagged} node(s) are already members of the live cluster (mmlscluster) — flagged below.`, 'info');
+      }
+    } catch { /* best-effort — no live cluster reachable, or mmlscluster unavailable; skip flagging silently */ }
+
     updateNodeDisplay();
     updateNSDServerList();
     updateAllPreviews();
