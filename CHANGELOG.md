@@ -9,6 +9,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Bulk NSD wipe (`wipefs` over SSH) could hang indefinitely after a disk finished wiping successfully, never moving on to the next disk. Root cause: `ssh` doesn't close stdout until every process that inherited the file descriptor exits — not just the remote command it ran — so if the remote `wipefs` triggers something (e.g. a udev worker reacting to the device change) that inherits and holds the connection open, the local `ssh` client (and the backend's blocking read loop) waits forever even though `wipefs` itself already succeeded. `stream_process()` gained an optional `timeout` parameter (a bounded read loop via `select()`, killing the process if the deadline is hit); applied to the wipefs, TLS-identity `scalectl` import, and fake-NSD `truncate`/`fallocate` SSH calls, the three places this class of hang could occur. The timeout error message distinguishes "the command itself is still stuck" from "it already exited but something it left running is holding the connection open" (checked via `proc.poll()`), matching this exact failure mode. Existing callers without a timeout keep the original unbounded behavior.
+
 ---
 
 ## [1.0.25] — 2026-08-07
