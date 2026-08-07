@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.26] — 2026-08-07
+
 ### Fixed
 - Bulk NSD wipe (`wipefs` over SSH) hung after the first disk finished successfully, never moving on to the next one. The actual cause: every SSE streaming response explicitly set `Connection: keep-alive`, and Werkzeug's development server (which this backend always runs on) can get stuck servicing the *next* request on a reused persistent connection after a chunked streaming response — the previous request completes cleanly server-side, but the following one on the same connection never gets serviced, which looks exactly like a hang from the browser's side. Reproduced directly: with `keep-alive`, a second back-to-back request to the same SSE endpoint reliably hung; switching to `Connection: close` (a fresh TCP connection per request — free on loopback, negligible over an SSH tunnel) fixed it in six consecutive test requests. `stream_process()` also gained an optional `timeout` parameter (bounded read via `select()`, killing the process if the deadline is hit) as defense-in-depth against the separate, real risk that `ssh` doesn't close stdout until everything a remote command left running exits too — applied to the wipefs, TLS-identity `scalectl` import, and fake-NSD `truncate`/`fallocate` calls. Existing `stream_process()` callers without a timeout keep the original unbounded behavior.
 
