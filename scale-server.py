@@ -354,7 +354,20 @@ def sse_response(generator):
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
+            # Force a fresh TCP connection per request instead of reusing a
+            # persistent one. Werkzeug's dev server (what this backend always
+            # runs on) can end up in a stuck state reusing a keep-alive
+            # connection for a rapid back-to-back sequence of chunked
+            # streaming responses — e.g. the bulk-wipe loop, which issues one
+            # SSE request per disk in immediate succession. The prior request
+            # completes cleanly server-side (confirmed: its final SSE events
+            # do render in the terminal), but the next request on the same
+            # reused connection never gets serviced, which looks exactly like
+            # a hang from the browser's side. Connection: close sidesteps it
+            # entirely at the cost of a new TCP handshake per request — free
+            # on loopback, negligible over an SSH tunnel for a human-driven
+            # admin GUI.
+            "Connection": "close",
         },
     )
 
