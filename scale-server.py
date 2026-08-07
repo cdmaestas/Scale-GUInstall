@@ -14,6 +14,7 @@ import glob
 import json
 import os
 import re
+import select
 import shlex
 import subprocess
 import tempfile
@@ -385,7 +386,7 @@ def _running_spectrumscale():
     return procs
 
 
-def stream_process(cmd, cwd=None, stdin_text=None):
+def stream_process(cmd, cwd=None, stdin_text=None, timeout=None):
     """
     Run *cmd* as a subprocess and yield SSE lines from stdout/stderr.
     Does NOT yield a done event — the caller is responsible for that.
@@ -394,6 +395,18 @@ def stream_process(cmd, cwd=None, stdin_text=None):
     stdin is /dev/null by default so an interactive prompt in the child
     reads EOF and fails visibly instead of hanging the stream forever.
     Pass stdin_text to answer a known prompt (e.g. "y\\n").
+
+    timeout: optional wall-clock seconds. Without it, a read blocks
+    indefinitely until the child's stdout hits EOF — normally when the
+    child exits, but an ssh session in particular does not close stdout
+    until every process that inherited the fd exits, including anything
+    the remote command spawned and left behind. A remote command can
+    therefore leave the local ssh client (and this generator) hanging
+    forever even though it "finished". Pass timeout for any ssh-based
+    command where that risk matters; the process is killed and a timeout
+    error reported instead of hanging the caller (and, transitively, any
+    UI loop awaiting it) forever. None (default) preserves the original
+    unbounded behavior for existing callers.
 
     If cmd invokes the spectrumscale toolkit and another toolkit command is
     already running, refuses to start and returns 1 — concurrent toolkit
@@ -426,10 +439,42 @@ def stream_process(cmd, cwd=None, stdin_text=None):
             proc.stdin.close()
         except BrokenPipeError:
             pass  # child exited before reading — its output/rc tell the story
-    for raw_line in iter(proc.stdout.readline, b""):
-        line = raw_line.decode("utf-8", errors="replace").rstrip()
-        if line:
-            yield sse("normal", line)
+
+    if timeout is None:
+        for raw_line in iter(proc.stdout.readline, b""):
+            line = raw_line.decode("utf-8", errors="replace").rstrip()
+            if line:
+                yield sse("normal", line)
+    else:
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                # Distinguish the two ways this can happen: the command
+                # itself is still running (proc.poll() is None), vs. it
+                # already exited but something it spawned inherited the
+                # fd and is still holding the pipe open behind it.
+                already_exited = proc.poll() is not None
+                proc.kill()
+                proc.wait()
+                if already_exited:
+                    yield sse("error", f"[ERROR] Command exited, but the connection did not close within "
+                                       f"{timeout}s — something it left running on the remote side is "
+                                       "still holding it open (not a network drop). Killed the local side.")
+                else:
+                    yield sse("error", f"[ERROR] Command produced no output and did not exit within "
+                                       f"{timeout}s — killed it.")
+                return 124  # conventional shell timeout exit code
+            ready, _, _ = select.select([proc.stdout], [], [], remaining)
+            if not ready:
+                continue  # nothing to read yet — loop back and re-check the deadline
+            raw_line = proc.stdout.readline()
+            if raw_line == b"":
+                break  # real EOF
+            line = raw_line.decode("utf-8", errors="replace").rstrip()
+            if line:
+                yield sse("normal", line)
+
     proc.wait()
     return proc.returncode  # available to caller via: rc = yield from stream_process(...)
 
@@ -1470,7 +1515,7 @@ def stream_fake_nsd():
                 cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS,
                        f"{ssh_user}@{node}", remote_cmd]
                 yield sse("info", f"$ ssh {ssh_user}@{node} \"{remote_cmd}\"")
-                rc = yield from stream_process(cmd)
+                rc = yield from stream_process(cmd, timeout=60)
                 if rc != 0:
                     yield sse("error", f"[ERROR] Remote command failed (exit {rc}).")
                     return
@@ -1709,7 +1754,11 @@ def stream_format_disk():
             cmd = ["sudo", "-n", "ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS,
                    node, "wipefs", "-a", device]
             yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd)
+            # wipefs itself finishes in well under a second; the timeout guards
+            # against ssh not closing stdout because something the remote
+            # command triggered (e.g. a udev worker reacting to the device
+            # change) inherited the fd and is still running.
+            rc = yield from stream_process(cmd, timeout=60)
             if rc == 0:
                 yield sse("success", f"[OK] {device} on {node} wiped — ready for NSD use.")
             else:
@@ -2360,7 +2409,11 @@ def stream_node_identity():
                     cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS,
                            f"{ssh_user}@{hostname}", remote_cmd]
                     yield sse("info", f"$ {' '.join(cmd)}")
-                    rc = yield from stream_process(cmd)
+                    # scalectl may reload/restart a local service as part of
+                    # importing the identity — same "ssh won't close stdout
+                    # until everything it spawned exits" risk as wipefs, with
+                    # more headroom since a reload can legitimately take longer.
+                    rc = yield from stream_process(cmd, timeout=90)
                     if rc != 0:
                         yield sse("error", f"[ERROR] scalectl import failed on {hostname}.")
                     else:
