@@ -293,6 +293,29 @@ def check_file():
     return jsonify({"exists": _sudo_isfile(path), "path": path})
 
 
+@app.route("/api/browse/files")
+def browse_files():
+    """
+    List filenames in a directory, optionally filtered by extension. Backs
+    the "Find here" pickers in the UI so users can pick a file already on
+    the installer node without typing its full path — this app has no way
+    to browse the machine the browser itself is running on (typically a
+    workstation over an SSH tunnel, not the installer node), so this is a
+    directory listing on the server side, not an <input type="file">.
+    """
+    directory, err = resolve_path(request.args.get("dir", "").strip())
+    ext = request.args.get("ext", "").strip().lstrip(".").lower()
+    if err:
+        return jsonify({"error": err}), 400
+    if not _sudo_isdir(directory):
+        return jsonify({"error": _diagnose_path(directory)}), 400
+    entries = _sudo_listdir(directory)
+    if ext:
+        entries = [e for e in entries if e.lower().endswith("." + ext)]
+    entries.sort()
+    return jsonify({"dir": directory, "files": entries})
+
+
 # ---------------------------------------------------------------------------
 # Running toolkit processes: inspect and kill
 # ---------------------------------------------------------------------------
