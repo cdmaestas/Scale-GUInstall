@@ -9,6 +9,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- "Find .zip here" button next to the Zip Archive Path field on Prepare Software Step 1: lists `.zip` files already on the installer node in the directory portion of the current path, via a new `GET /api/browse/files?dir=&ext=` endpoint (reuses the existing `_sudo_listdir` helper). Selecting one fills the field with the full path. A native `<input type="file">` picker can't work here — this app is normally used from a workstation over an SSH tunnel, so the browser and the installer node running `unzip` are different filesystems; this lists the *remote* directory server-side instead.
+
 ---
 
 ## [1.0.26] — 2026-08-07
