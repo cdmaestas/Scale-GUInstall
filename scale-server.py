@@ -1715,6 +1715,79 @@ def stream_fake_nsd():
 # Add NSDs via stanza file
 # ---------------------------------------------------------------------------
 
+def _nsd_pool_usage_error(usage, pool):
+    """
+    GPFS rule: metadata can only live in the system pool, so a non-system
+    pool may only hold dataOnly NSDs. Returns a description of the
+    violation, or None if the combination is valid. Catches the invalid
+    combination up front rather than after the toolkit connects.
+    """
+    if pool and pool.lower() != "system" and usage != "dataOnly":
+        return (f"pool {pool!r} is not the system pool, so usage must be dataOnly "
+                f"(got {usage!r}). Metadata can only live in the system pool.")
+    return None
+
+
+def _build_nsd_add_cmd(toolkit, index, nsd):
+    """
+    Validate one NSD entry and build its `spectrumscale nsd add` argv.
+    index is 1-based, used only in error messages. Returns (cmd, None) on
+    success, or (None, error_message) if the entry fails validation.
+
+    spectrumscale nsd add flags: -p primary, -s secondary (comma list), -u
+    usage, -fg failure group, -po pool, -fs filesystem. There is NO size
+    flag — the toolkit reads the device itself. -f/-t are never emitted
+    (ambiguous with -fs/-fg), and -s is the secondary server list, not size.
+    """
+    disk          = str(nsd.get("disk", "")).strip()
+    server        = str(nsd.get("server", "")).strip()
+    backups       = [str(b).strip() for b in nsd.get("backups", []) if str(b).strip()]
+    usage         = str(nsd.get("usage", "dataAndMetadata")).strip()
+    failure_group = str(nsd.get("failureGroup", "1")).strip()
+    pool          = str(nsd.get("pool", "")).strip()
+    filesystem    = str(nsd.get("filesystem", "")).strip()
+
+    # Usage is optional (omitted in GUI-filesystem mode, where the Scale
+    # GUI sets usage/pool when it builds the filesystem).
+    if usage and usage not in _VALID_NSD_USAGE:
+        return None, f"NSD {index}: invalid usage {usage!r}. Must be one of: {', '.join(sorted(_VALID_NSD_USAGE))}"
+    if not disk or not _SAFE_PATH_RE.fullmatch(disk):
+        return None, f"NSD {index}: invalid disk path {disk!r}"
+    if not server or not _VALID_HOSTNAME_RE.fullmatch(server):
+        return None, f"NSD {index}: invalid server hostname {server!r}"
+    for b in backups:
+        if not _VALID_HOSTNAME_RE.fullmatch(b):
+            return None, f"NSD {index}: invalid backup server hostname {b!r}"
+    if len(backups) > 7:
+        return None, f"NSD {index}: maximum 7 backup servers allowed"
+    # Failure group is optional (omitted in GUI-filesystem mode); validate
+    # only when provided.
+    if failure_group and not re.fullmatch(r'\d+', failure_group):
+        return None, f"NSD {index}: invalid failure group {failure_group!r}"
+    if pool and not _VALID_GPFS_NAME_RE.fullmatch(pool):
+        return None, f"NSD {index}: invalid pool name {pool!r}"
+    if filesystem and not _VALID_GPFS_NAME_RE.fullmatch(filesystem):
+        return None, f"NSD {index}: invalid filesystem name {filesystem!r}"
+    pool_err = _nsd_pool_usage_error(usage, pool)
+    if pool_err:
+        return None, f"NSD {index}: {pool_err}"
+
+    cmd = ["sudo", "-n", toolkit, "nsd", "add", "-p", server]
+    if backups:
+        cmd += ["-s", ",".join(backups)]
+    if usage:
+        cmd += ["-u", usage]
+    if failure_group:
+        cmd += ["-fg", failure_group]
+    if pool and pool.lower() != "system":  # system is the default pool
+        cmd += ["-po", pool]
+    if filesystem:
+        cmd += ["-fs", filesystem]
+    cmd.append(disk)
+
+    return cmd, None
+
+
 @app.route("/api/stream/nsd-add", methods=["POST"])
 def stream_nsd_add():
     data    = request.get_json(force=True, silent=True) or {}
@@ -1734,71 +1807,15 @@ def stream_nsd_add():
                 return
 
             for i, nsd in enumerate(nsds):
-                disk          = str(nsd.get("disk", "")).strip()
-                server        = str(nsd.get("server", "")).strip()
-                backups       = [str(b).strip() for b in nsd.get("backups", []) if str(b).strip()]
-                usage         = str(nsd.get("usage", "dataAndMetadata")).strip()
-                failure_group = str(nsd.get("failureGroup", "1")).strip()
-                pool          = str(nsd.get("pool", "")).strip()
-                filesystem    = str(nsd.get("filesystem", "")).strip()
-
-                # Usage is optional (omitted in GUI-filesystem mode, where the
-                # Scale GUI sets usage/pool when it builds the filesystem).
-                if usage and usage not in _VALID_NSD_USAGE:
-                    yield sse("error", f"[ERROR] NSD {i+1}: invalid usage {usage!r}. Must be one of: {', '.join(sorted(_VALID_NSD_USAGE))}")
+                cmd, err = _build_nsd_add_cmd(toolkit, i + 1, nsd)
+                if err:
+                    yield sse("error", f"[ERROR] {err}")
                     return
-                if not disk or not _SAFE_PATH_RE.fullmatch(disk):
-                    yield sse("error", f"[ERROR] NSD {i+1}: invalid disk path {disk!r}")
-                    return
-                if not server or not _VALID_HOSTNAME_RE.fullmatch(server):
-                    yield sse("error", f"[ERROR] NSD {i+1}: invalid server hostname {server!r}")
-                    return
-                for b in backups:
-                    if not _VALID_HOSTNAME_RE.fullmatch(b):
-                        yield sse("error", f"[ERROR] NSD {i+1}: invalid backup server hostname {b!r}")
-                        return
-                if len(backups) > 7:
-                    yield sse("error", f"[ERROR] NSD {i+1}: maximum 7 backup servers allowed")
-                    return
-                # Failure group is optional (omitted in GUI-filesystem mode);
-                # validate only when provided.
-                if failure_group and not re.fullmatch(r'\d+', failure_group):
-                    yield sse("error", f"[ERROR] NSD {i+1}: invalid failure group {failure_group!r}")
-                    return
-                if pool and not _VALID_GPFS_NAME_RE.fullmatch(pool):
-                    yield sse("error", f"[ERROR] NSD {i+1}: invalid pool name {pool!r}")
-                    return
-                if filesystem and not _VALID_GPFS_NAME_RE.fullmatch(filesystem):
-                    yield sse("error", f"[ERROR] NSD {i+1}: invalid filesystem name {filesystem!r}")
-                    return
-                # GPFS rule: metadata can only live in the system pool, so a
-                # non-system pool may only hold dataOnly NSDs. Catch the invalid
-                # combination up front rather than after the toolkit connects.
-                if pool and pool.lower() != "system" and usage != "dataOnly":
-                    yield sse("error", f"[ERROR] NSD {i+1}: pool {pool!r} is not the system pool, so usage must be dataOnly (got {usage!r}). Metadata can only live in the system pool.")
-                    return
-
-                # spectrumscale nsd add flags: -p primary, -s secondary (comma
-                # list), -u usage, -fg failure group, -po pool, -fs filesystem.
-                # There is NO size flag — the toolkit reads the device itself.
-                # -f/-t are rejected as ambiguous (-f matches -fs/-fg), and -s
-                # is the secondary server, not size.
-                cmd = ["sudo", "-n", toolkit, "nsd", "add", "-p", server]
-                if backups:
-                    cmd += ["-s", ",".join(backups)]
-                if usage:
-                    cmd += ["-u", usage]
-                if failure_group:
-                    cmd += ["-fg", failure_group]
-                if pool and pool.lower() != "system":  # system is the default pool
-                    cmd += ["-po", pool]
-                if filesystem:
-                    cmd += ["-fs", filesystem]
-                cmd.append(disk)
 
                 yield sse("info", f"$ {' '.join(cmd)}")
                 rc = yield from stream_process(cmd)
                 if rc != 0:
+                    disk = str(nsd.get("disk", "")).strip()
                     yield sse("error", f"[ERROR] nsd add failed for {disk} (exit {rc}).")
                     return
 

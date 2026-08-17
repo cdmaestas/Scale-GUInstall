@@ -10,6 +10,13 @@ cd "$ROOT"
 echo "pre-push: running pre-commit checks"
 .githooks/pre-commit
 
+if python3 -c "import pytest" &>/dev/null; then
+  echo "pre-push: running pytest"
+  python3 -m pytest tests/ -q
+else
+  echo "pre-push: WARN — pytest not installed; tests left to CI" >&2
+fi
+
 if command -v dpkg-deb &>/dev/null || command -v rpmbuild &>/dev/null; then
   echo "pre-push: building packages"
   ./packaging/build-pkg.sh

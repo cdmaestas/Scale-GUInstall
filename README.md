@@ -329,6 +329,7 @@ Scale-GUInstall/
 ├── start.sh                    # Convenience script: finds Python, installs Flask/waitress, starts server
 ├── CHANGELOG.md                # Release history (Keep a Changelog format)
 ├── .githooks/                  # Local git hooks (pre-commit, pre-push) mirroring CI
+├── tests/                      # pytest unit tests for scale-server.py
 ├── docs/screenshots/           # README screenshots
 └── packaging/
     ├── build-pkg.sh            # Builds RPM and DEB packages into dist/
@@ -345,6 +346,15 @@ Scale-GUInstall/
 ```bash
 git config core.hooksPath .githooks
 ```
+
+Run the unit tests directly with:
+
+```bash
+pip install "flask>=3.0,<4" "waitress>=3.0,<4" pytest
+pytest
+```
+
+The pre-push hook runs them automatically if `pytest` is importable, and warns (without blocking) if it isn't — CI runs them either way.
 
 ---
 
