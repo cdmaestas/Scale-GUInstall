@@ -27,7 +27,7 @@ A single-file web frontend for the IBM Storage Scale Installation Toolkit (`spec
 
 ## Installing via Package (RPM / DEB)
 
-For production installer nodes, use the pre-built packages instead of running from source. The package installs Flask into a self-contained virtual environment — no manual pip, no cloning, no Python version hunting.
+For production installer nodes, use the pre-built packages instead of running from source. The package installs Flask and waitress into a self-contained virtual environment — no manual pip, no cloning, no Python version hunting.
 
 Download the package from the [GitHub Releases page](https://github.com/cdmaestas/Scale-GUInstall/releases) and install it on the installer node:
 
@@ -53,7 +53,7 @@ sudo dnf install --nogpgcheck ./scale-guinstall-<version>-1.noarch.rpm
 sudo apt install ./scale-guinstall_<version>-1_all.deb
 ```
 
-The post-install script automatically creates a virtual environment at `/usr/lib/scale-guinstall/venv` and installs Flask into it — no additional steps needed.
+The post-install script automatically creates a virtual environment at `/usr/lib/scale-guinstall/venv` and installs Flask and waitress into it — no additional steps needed.
 
 Both packages also install `/etc/profile.d/scale-guinstall-mmfs.sh`, which adds `/usr/lpp/mmfs/bin` to `$PATH` so GPFS `mm*` commands work in interactive shells (log out/in or `source /etc/profile.d/scale-guinstall-mmfs.sh` to pick it up). The backend itself always uses full `/usr/lpp/mmfs/bin/...` paths and does not depend on this.
 
@@ -85,8 +85,10 @@ The GUI has two components: the HTML file (runs in your browser) and a lightweig
 On the installer node (the machine that will run `spectrumscale`):
 
 ```bash
-pip install "flask>=3.0,<4"
+pip install "flask>=3.0,<4" "waitress>=3.0,<4"
 ```
+
+`waitress` is optional — the server falls back to Flask's own development server if it isn't installed — but it's the production-grade WSGI server this backend is meant to run under, so install it unless you have a reason not to.
 
 ### 2. Start the backend server
 
@@ -163,6 +165,7 @@ Prepare Software → Node Configuration → Cluster Settings → NSD Storage →
 - **`spectrumscale` toolkit** — installed and accessible (produced by the Prepare Software steps)
 - **Python 3.10+** — required for the setup service and the backend server
 - **Flask 3.x** — `pip install "flask>=3.0,<4"` (backend server only)
+- **waitress 3.x** (recommended) — `pip install "waitress>=3.0,<4"`; the production WSGI server the backend runs under, falls back to Flask's dev server if missing
 - **Passwordless sudo** — the backend runs all privileged commands with `sudo -n` (non-interactive); the user running `scale-guinstall` must have `NOPASSWD` sudo rights, or every toolkit and `mm*` command will fail with "sudo is not available without a password"
 - **SSH key-based auth** — from the installer node to all target nodes before running setup
 - **`unzip`** — needed for package extraction (`sudo apt install unzip` / `sudo yum install unzip`)
@@ -319,8 +322,8 @@ ssh -L 5001:127.0.0.1:5001 user@installer-node echo "tunnel OK"
 Scale-GUInstall/
 ├── Scale-GUInstall.html        # Self-contained single-file app (HTML + CSS + JS)
 ├── help.html                   # Standalone help/reference page, linked from the app header
-├── scale-server.py             # Backend server (Flask) for live command execution
-├── start.sh                    # Convenience script: finds Python, installs Flask, starts server
+├── scale-server.py             # Backend server (Flask, served by waitress) for live command execution
+├── start.sh                    # Convenience script: finds Python, installs Flask/waitress, starts server
 ├── CHANGELOG.md                # Release history (Keep a Changelog format)
 ├── .githooks/                  # Local git hooks (pre-commit, pre-push) mirroring CI
 ├── docs/screenshots/           # README screenshots

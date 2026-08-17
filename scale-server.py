@@ -22,6 +22,12 @@ import time
 
 from flask import Flask, Response, jsonify, request, stream_with_context
 
+try:
+    import waitress as _waitress  # noqa: F401
+    _RUNNING_UNDER_WAITRESS = True
+except ImportError:
+    _RUNNING_UNDER_WAITRESS = False
+
 app = Flask(__name__)
 
 
@@ -49,6 +55,7 @@ def mmcmd(*args):
     return [os.path.join(MMFS_BIN, args[0])] + list(args[1:])
 
 _VALID_HOSTNAME_RE = re.compile(r'^[a-zA-Z0-9._-]{1,255}$')
+_VALID_SSH_USER_RE = re.compile(r'^[a-zA-Z0-9._-]{1,64}$')
 
 _ALLOWED_GPFS_FLAGS = frozenset({
     "-c", "-p", "-r", "-rc", "-e", "--gplbin_dir", "--list",
@@ -371,27 +378,33 @@ def sse(type_, line):
 
 def sse_response(generator):
     """Wrap a generator in a streaming Response with correct SSE headers."""
+    headers = {
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+    }
+    if not _RUNNING_UNDER_WAITRESS:
+        # Force a fresh TCP connection per request instead of reusing a
+        # persistent one. On Werkzeug's dev server, reusing a keep-alive
+        # connection for a rapid back-to-back sequence of chunked streaming
+        # responses — e.g. the bulk-wipe loop, which issues one SSE request
+        # per disk in immediate succession — could leave the next request on
+        # that connection unserviced, looking exactly like a hang from the
+        # browser's side, even though the prior request completed cleanly
+        # server-side. Only reproduced against a real multi-node cluster,
+        # not in a synthetic local test, so this stays as a precaution on
+        # the Werkzeug fallback path. It can't be applied under waitress at
+        # all: waitress is a strict WSGI server and PEP 3333 forbids an
+        # application from setting hop-by-hop headers like Connection —
+        # doing so raises AssertionError on every request. Waitress manages
+        # its own connection lifecycle instead, and as a real production
+        # WSGI server is far less likely to share this dev-server-specific
+        # bug — but that hasn't been (and, without the original hardware,
+        # can't be) directly verified here.
+        headers["Connection"] = "close"
     return Response(
         stream_with_context(generator),
         mimetype="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            # Force a fresh TCP connection per request instead of reusing a
-            # persistent one. Werkzeug's dev server (what this backend always
-            # runs on) can end up in a stuck state reusing a keep-alive
-            # connection for a rapid back-to-back sequence of chunked
-            # streaming responses — e.g. the bulk-wipe loop, which issues one
-            # SSE request per disk in immediate succession. The prior request
-            # completes cleanly server-side (confirmed: its final SSE events
-            # do render in the terminal), but the next request on the same
-            # reused connection never gets serviced, which looks exactly like
-            # a hang from the browser's side. Connection: close sidesteps it
-            # entirely at the cost of a new TCP handshake per request — free
-            # on loopback, negligible over an SSH tunnel for a human-driven
-            # admin GUI.
-            "Connection": "close",
-        },
+        headers=headers,
     )
 
 
@@ -1687,6 +1700,58 @@ def stream_nsd_add():
 
 
 # ---------------------------------------------------------------------------
+# Test SSH connectivity + GPFS state on a remote node
+# ---------------------------------------------------------------------------
+
+@app.route("/api/stream/test-connection")
+def stream_test_connection():
+    node = request.args.get("node", "").strip()
+    user = request.args.get("user", "root").strip() or "root"
+    port = request.args.get("port", "22").strip() or "22"
+
+    def generate():
+        try:
+            if not node:
+                yield sse("error", "[ERROR] Node is required.")
+                return
+            if not _VALID_HOSTNAME_RE.fullmatch(node):
+                yield sse("error", f"[ERROR] Invalid node hostname: {node!r}")
+                return
+            if not _VALID_SSH_USER_RE.fullmatch(user):
+                yield sse("error", f"[ERROR] Invalid SSH user: {user!r}")
+                return
+            if not port.isdigit() or not (1 <= int(port) <= 65535):
+                yield sse("error", f"[ERROR] Invalid port: {port!r}")
+                return
+            # sudo elevates the local ssh client to root before it connects —
+            # see stream_list_devices for why. The target login is still
+            # whatever was entered (root by default, matching GPFS's
+            # root-to-root SSH trust); sudo just unlocks root's own key.
+            target = f"{user}@{node}"
+            cmd = ["sudo", "-n", "ssh", "-o", "StrictHostKeyChecking=accept-new",
+                   *_SSH_OPTS, "-p", port, target, "mmgetstate", "-a"]
+            yield sse("info", f"$ sudo ssh -p {port} {target} mmgetstate -a")
+            stdout, rc = _run_cmd(cmd, timeout=15)
+            for line in stdout.splitlines():
+                if line.strip():
+                    yield sse("normal", line)
+            if rc != 0:
+                yield sse("error", f"[ERROR] SSH connection to {node} failed (exit {rc}).")
+                return
+            yield sse("success", f"[OK] SSH connection to {node} successful.")
+            if "active" in stdout.lower():
+                yield sse("success", "[OK] GPFS is running on target node.")
+            else:
+                yield sse("warn", "[WARN] GPFS does not appear to be active on target node.")
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+        finally:
+            yield sse("done", "")
+
+    return sse_response(generate())
+
+
+# ---------------------------------------------------------------------------
 # List block devices on a remote node via SSH (lsblk)
 # ---------------------------------------------------------------------------
 
@@ -2037,6 +2102,15 @@ PHASE_CMDS = {
     "precheck-deploy":   ["deploy", "--precheck"],
     "deploy":            ["deploy"],
     "postcheck-deploy":  ["deploy", "--postcheck"],
+    # `spectrumscale upgrade` takes a positional subcommand, not flags —
+    # confirmed against `spectrumscale upgrade -h`:
+    #   {config,run,precheck,postcheck,showversions}
+    # There is no --upgrade-protocols flag; `run` already upgrades GPFS,
+    # S3, NFS, SMB, HDFS, and Performance Monitoring together.
+    "upgrade-precheck":     ["upgrade", "precheck"],
+    "upgrade-run":          ["upgrade", "run"],
+    "upgrade-postcheck":    ["upgrade", "postcheck"],
+    "upgrade-showversions": ["upgrade", "showversions"],
 }
 
 _SKIP_SSH_PHASES = {p for p in PHASE_CMDS if "install" in p or "deploy" in p}
@@ -2489,4 +2563,10 @@ if __name__ == "__main__":
     print("IBM Storage Scale Toolkit — backend server")
     print(f"Listening on http://127.0.0.1:{port}  (loopback only)")
     print("Press Ctrl+C to stop.\n")
-    app.run(host="127.0.0.1", port=port, debug=False, threaded=True, use_reloader=False)
+    try:
+        from waitress import serve
+        serve(app, host="127.0.0.1", port=port)
+    except ImportError:
+        print("waitress not installed — falling back to Flask's development server.")
+        print("Install waitress for production-grade serving: pip install waitress\n")
+        app.run(host="127.0.0.1", port=port, debug=False, threaded=True, use_reloader=False)

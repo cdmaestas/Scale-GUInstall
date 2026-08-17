@@ -68,8 +68,8 @@ fi
 echo "scale-guinstall: creating virtual environment with $PYTHON..."
 "$PYTHON" -m venv "$VENV"
 "$VENV/bin/pip" install --quiet --upgrade pip
-"$VENV/bin/pip" install --quiet "flask>=3.0,<4"
-echo "scale-guinstall: Flask installed. Start with: scale-guinstall"
+"$VENV/bin/pip" install --quiet "flask>=3.0,<4" "waitress>=3.0,<4"
+echo "scale-guinstall: Flask and waitress installed. Start with: scale-guinstall"
 
 %preun
 # Stop and disable the service if it's running before removal

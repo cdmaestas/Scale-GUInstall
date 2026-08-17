@@ -2591,7 +2591,7 @@
                 <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M22 16h-2v-5a1 1 0 00-1-1h-5V8h5a3 3 0 013 3z"/></svg>
                 Populate Configuration
               </button>
-              <button class="btn btn-secondary" onclick="testConnection()">Test Connection</button>
+              <button class="btn btn-secondary" onclick="testConnection(this)">Test Connection</button>
             </div>
 
             <div class="cmd-preview" style="margin-top:var(--spacing-06)" id="pop-cmd-preview">
@@ -2638,7 +2638,7 @@
       </div>
 
       <div class="panel">
-        <div class="panel-header"><div><h3>Target Version</h3></div></div>
+        <div class="panel-header"><div><h3>Target Version</h3><p>Reference only — not sent to the command. <code>spectrumscale upgrade run</code> takes no target-version or package-path arguments; stage packages per the toolkit's own docs first.</p></div></div>
         <div class="panel-body">
           <div class="form-row">
             <div class="form-group">
@@ -2660,7 +2660,7 @@
       </div>
 
       <div class="panel">
-        <div class="panel-header"><div><h3>Upgrade Method</h3></div></div>
+        <div class="panel-header"><div><h3>Upgrade Method</h3><p>Reference only — not sent to the command. <code>spectrumscale upgrade run</code> is invoked with no arguments; online/offline, node order, and pause/drain behavior are controlled by <code>spectrumscale upgrade config</code>, not by this GUI yet.</p></div></div>
         <div class="panel-body">
           <div class="upgrade-type-cards">
             <div class="upgrade-type-card selected" id="ug-online" onclick="selectUpgradeType('online')">
@@ -2735,32 +2735,28 @@
             </div>
             <div class="progress-step" id="ug-ps2">
               <div class="step-circle">2</div>
-              <div class="step-label">Upgrade GPFS</div>
+              <div class="step-label">Run Upgrade</div>
             </div>
             <div class="progress-step" id="ug-ps3">
               <div class="step-circle">3</div>
-              <div class="step-label">Upgrade Protocols</div>
-            </div>
-            <div class="progress-step" id="ug-ps4">
-              <div class="step-circle">4</div>
               <div class="step-label">Post-upgrade Check</div>
             </div>
           </div>
 
           <div style="display:grid; grid-template-columns:auto 1fr; gap:var(--spacing-06)">
             <div style="display:flex; flex-direction:column; gap:var(--spacing-04)">
-              <button class="btn btn-secondary" onclick="runUpgradePhase('precheck')">
+              <button class="btn btn-secondary" onclick="runUpgradePhase('precheck', this)">
                 <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm-2 19.59l-5-5L10.41 15 14 18.59 21.59 11 23 12.41z"/></svg>
                 Pre-upgrade Check
               </button>
-              <button class="btn btn-primary" onclick="runUpgradePhase('upgrade')">
+              <button class="btn btn-primary" onclick="runUpgradePhase('upgrade', this)">
                 <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor"><path d="M16 4l-8 8h6v8h4v-8h6zm6 22H10v-2h12z"/></svg>
                 Run Upgrade
               </button>
-              <button class="btn btn-secondary" onclick="runUpgradePhase('upgrade-protocols')">
-                Upgrade Protocols
+              <button class="btn btn-secondary" onclick="runUpgradePhase('showversions', this)">
+                Show Versions
               </button>
-              <button class="btn btn-secondary" onclick="runUpgradePhase('postcheck')">
+              <button class="btn btn-secondary" onclick="runUpgradePhase('postcheck', this)">
                 Post-upgrade Check
               </button>
             </div>
@@ -2775,7 +2771,7 @@
 
           <div class="cmd-preview" style="margin-top:var(--spacing-05)">
             <div id="upgrade-cmd-preview">
-              <span class="cmd-prompt">$ </span>sudo <span id="ug-path-display">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> upgrade --precheck
+              <span class="cmd-prompt">$ </span>sudo <span id="ug-path-display">/usr/lpp/mmfs/5.x/installer/spectrumscale</span> upgrade {precheck|run|postcheck|showversions}
             </div>
           </div>
         </div>
@@ -5210,26 +5206,54 @@ async function runPhase(phase, btn) {
   if (btn) btn.disabled = false;
 }
 
-function runUpgradePhase(phase) {
+async function runUpgradePhase(phase, btn) {
   const tp = state.toolkitPath;
   const termId = 'upgrade-terminal';
+  const backendPhase = {
+    precheck:     'upgrade-precheck',
+    upgrade:      'upgrade-run',
+    postcheck:    'upgrade-postcheck',
+    showversions: 'upgrade-showversions',
+  }[phase];
+  if (!backendPhase) return;
+
   const cmdMap = {
-    precheck: `sudo ${tp} upgrade --precheck${state.dryRun ? ' --dry-run' : ''}`,
-    upgrade: `sudo ${tp} upgrade${state.dryRun ? ' --dry-run' : ''}`,
-    'upgrade-protocols': `sudo ${tp} upgrade --upgrade-protocols${state.dryRun ? ' --dry-run' : ''}`,
-    postcheck: `sudo ${tp} upgrade --postcheck${state.dryRun ? ' --dry-run' : ''}`
+    precheck:     `sudo ${tp} upgrade precheck`,
+    upgrade:      `sudo ${tp} upgrade run`,
+    postcheck:    `sudo ${tp} upgrade postcheck`,
+    showversions: `sudo ${tp} upgrade showversions`,
   };
-  appendToTerminal(termId, `$ ${cmdMap[phase] || 'sudo ' + tp + ' upgrade'}`, 'info');
-  
-  const msgs = {
-    precheck: [[400,'[INFO] Checking upgrade prerequisites...','normal'],[1000,'[OK] Current version detected','success'],[1600,'[OK] Target packages available','success'],[2200,'[OK] Pre-upgrade checks passed','success']],
-    upgrade: [[400,'[INFO] Starting rolling upgrade...','normal'],[1000,'[INFO] Quiescing node gpfs-node01...','normal'],[1800,'[INFO] Upgrading packages on gpfs-node01...','normal'],[2800,'[OK] gpfs-node01 upgraded successfully','success'],[3200,'[INFO] Starting gpfs-node01 back into cluster...','normal'],[4000,'[INFO] Repeating for remaining nodes...','normal'],[5000,'[OK] All nodes upgraded to target version','success']],
-    'upgrade-protocols': [[400,'[INFO] Upgrading protocol components...','normal'],[1200,'[OK] NFS components upgraded','success'],[1800,'[OK] SMB components upgraded','success'],[2400,'[OK] Protocol upgrade complete','success']],
-    postcheck: [[400,'[INFO] Running post-upgrade validation...','normal'],[800,'[OK] Cluster version: target version running','success'],[1200,'[OK] All nodes at target level','success'],[1600,'[OK] Filesystem healthy','success'],[2000,'[OK] Post-upgrade checks passed','success']]
-  };
-  
-  const steps = msgs[phase] || [[400,'[INFO] Running...','normal'],[1000,'[OK] Done','success']];
-  steps.forEach(([delay, msg, type]) => appendToTerminal(termId, msg, type, delay));
+
+  if (phase === 'upgrade' && !confirm('This upgrades GPFS, S3, NFS, SMB, HDFS, and Performance Monitoring on the cluster. It can disrupt running workloads. Continue?')) return;
+
+  if (state.dryRun) {
+    appendToTerminal(termId, `$ ${cmdMap[phase]}  # (dry run)`, 'info');
+    appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
+    return;
+  }
+
+  try {
+    const ping = await fetch(getBackendUrl() + '/api/ping', { signal: AbortSignal.timeout(2000) });
+    if (!ping.ok) throw new Error();
+  } catch {
+    appendToTerminal(termId, `[ERROR] Backend not reachable at ${getBackendUrl()}`, 'error');
+    appendToTerminal(termId, '[ERROR] Start it with: python3 scale-server.py', 'muted');
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  const params = new URLSearchParams({ toolkit: tp, phase: backendPhase });
+  await streamToTerminal(termId, `${getBackendUrl()}/api/stream/phase?${params}`);
+
+  const stepOrder = ['precheck', 'upgrade', 'postcheck'];
+  const stepIds = { precheck: 'ug-ps1', upgrade: 'ug-ps2', postcheck: 'ug-ps3' };
+  const idx = stepOrder.indexOf(phase);
+  if (idx >= 0) {
+    document.getElementById(stepIds[phase])?.classList.add('completed');
+    const next = stepOrder[idx + 1];
+    if (next) document.getElementById(stepIds[next])?.classList.add('active');
+  }
+  if (btn) btn.disabled = false;
 }
 
 // ===== POST CONFIGURATION =====
@@ -5534,14 +5558,32 @@ async function loadClusterNodes(btn) {
   }
 }
 
-function testConnection() {
-  const node = document.getElementById('pop-node').value;
+async function testConnection(btn) {
+  const node = document.getElementById('pop-node').value.trim();
+  const user = document.getElementById('pop-user')?.value.trim() || 'root';
+  const port = document.getElementById('pop-port')?.value.trim() || '22';
   const termId = 'pop-terminal';
   if (!node) { alert('Enter a cluster node first'); return; }
-  appendToTerminal(termId, `$ ssh ${document.getElementById('pop-user').value}@${node} 'mmgetstate -a'`, 'info');
-  appendToTerminal(termId, '[INFO] Testing connection...', 'normal', 300);
-  appendToTerminal(termId, '[OK] SSH connection successful', 'success', 1000);
-  appendToTerminal(termId, '[OK] GPFS is running on target node', 'success', 1600);
+
+  if (state.dryRun) {
+    appendToTerminal(termId, `$ sudo ssh -p ${port} ${user}@${node} mmgetstate -a  # (dry run)`, 'info');
+    appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
+    return;
+  }
+
+  try {
+    const ping = await fetch(getBackendUrl() + '/api/ping', { signal: AbortSignal.timeout(2000) });
+    if (!ping.ok) throw new Error();
+  } catch {
+    appendToTerminal(termId, `[ERROR] Backend not reachable at ${getBackendUrl()}`, 'error');
+    appendToTerminal(termId, '[ERROR] Start it with: python3 scale-server.py', 'muted');
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  const params = new URLSearchParams({ node, user, port });
+  await streamToTerminal(termId, `${getBackendUrl()}/api/stream/test-connection?${params}`);
+  if (btn) btn.disabled = false;
 }
 
 function updatePopulatePreview() {
