@@ -19,6 +19,7 @@ import select
 import shlex
 import subprocess
 import tempfile
+import threading
 import time
 
 from flask import Flask, Response, jsonify, request, stream_with_context
@@ -170,6 +171,81 @@ def index():
 @app.route("/help.html")
 def help_page():
     return _serve_sibling_html("help.html")
+
+
+# ---------------------------------------------------------------------------
+# Persisted GUI configuration (nodes/NSDs/filesystem/protocols/etc. — the
+# same shape as the frontend's `state` object and its existing manual
+# Export/Import Config feature). Autosaved by the frontend so work survives
+# a reload; optimistic locking via a revision counter stops one tab from
+# silently clobbering another's more recent save.
+# ---------------------------------------------------------------------------
+
+_CONFIG_DIR = "/var/lib/scale-guinstall"
+_CONFIG_PATH = os.path.join(_CONFIG_DIR, "config.json")
+_config_lock = threading.Lock()
+
+
+def _config_read_locked():
+    """Must be called while holding _config_lock. Returns (revision, data)."""
+    try:
+        with open(_CONFIG_PATH, encoding="utf-8") as f:
+            obj = json.load(f)
+        return int(obj.get("revision", 0)), obj.get("data")
+    except FileNotFoundError:
+        return 0, None
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return 0, None
+
+
+@app.route("/api/config", methods=["GET", "POST", "OPTIONS"])
+def config_endpoint():
+    if request.method == "OPTIONS":
+        return "", 204
+
+    if request.method == "GET":
+        with _config_lock:
+            revision, data = _config_read_locked()
+        return jsonify({"revision": revision, "data": data})
+
+    # POST
+    body = request.get_json(silent=True) or {}
+    data = body.get("data")
+    client_revision = body.get("revision")
+    if data is None or not isinstance(client_revision, int):
+        return jsonify({"error": "Request must include 'data' and an integer 'revision'."}), 400
+
+    with _config_lock:
+        current_revision, _ = _config_read_locked()
+        if client_revision != current_revision:
+            return jsonify({
+                "error": "Config changed elsewhere since you loaded it.",
+                "revision": current_revision,
+            }), 409
+
+        new_revision = current_revision + 1
+        try:
+            os.makedirs(_CONFIG_DIR, exist_ok=True)
+            os.chmod(_CONFIG_DIR, 0o700)  # cluster topology, not for other local users
+            fd, tmp_path = tempfile.mkstemp(dir=_CONFIG_DIR, prefix=".config.", suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump({"revision": new_revision, "data": data}, f)
+                os.replace(tmp_path, _CONFIG_PATH)
+            except OSError:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
+        except OSError as exc:
+            return jsonify({
+                "error": f"Could not write config: {exc}. Config persistence needs write access "
+                         f"to {_CONFIG_DIR} — the packaged service runs as root; from source, run "
+                         "as a user with access to that directory."
+            }), 500
+
+    return jsonify({"revision": new_revision})
 
 
 # ---------------------------------------------------------------------------

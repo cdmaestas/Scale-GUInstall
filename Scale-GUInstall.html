@@ -767,6 +767,13 @@
       <span><strong>Dry Run Mode is active.</strong> Commands are previewed only — nothing will be executed against the cluster. Disable in <button onclick="navigateTo('settings')" style="background:none;border:none;color:var(--cds-link-primary);cursor:pointer;font-size:13px;text-decoration:underline;padding:0">Settings</button> once output looks correct.</span>
     </div>
 
+    <!-- CONFIG SAVE CONFLICT BANNER -->
+    <div id="config-conflict-banner" style="display:none; background:rgba(255,131,43,0.1); border-bottom:1px solid var(--cds-support-warning); padding:8px var(--spacing-06); align-items:center; gap:var(--spacing-04); font-size:13px; color:var(--cds-support-warning);">
+      <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor" style="flex-shrink:0"><path d="M29 26H3L16 3zm-13-4h2v-8h-2zm0 4h2v-2h-2z"/></svg>
+      <span><strong>Configuration was changed elsewhere</strong> since this page loaded — autosave is paused so your local changes aren't lost, but they also aren't being saved. Reload to get the latest version.</span>
+      <button class="btn btn-sm btn-secondary" style="margin-left:auto" onclick="location.reload()">Reload</button>
+    </div>
+
     <!-- toolkit-path hidden input: derived from Prepare Software working directory -->
     <input type="hidden" id="toolkit-path" value="/tmp/scale-pkg/installer/spectrumscale">
 
@@ -5783,6 +5790,73 @@ function importConfig() {
   input.click();
 }
 
+// ===== SERVER-SIDE CONFIG AUTOSAVE =====
+// Separate from exportConfig()/importConfig() above (manual, file-based,
+// user-initiated) — this persists `state` to the backend automatically so
+// work survives a reload or closed tab, without the user having to think
+// about it. Polls for changes instead of hooking every one of the many
+// `state.*` mutation sites scattered through this file: simpler, and can't
+// end up missing one.
+let _configRevision = 0;
+let _lastSavedConfigJSON = null;
+let _configConflict = false;
+
+async function loadPersistedConfig() {
+  const token = document.querySelector('meta[name="scale-guinstall-token"]')?.content;
+  if (!token) return; // opened as file:// — no backend to load from
+  try {
+    const res = await fetch(getBackendUrl() + '/api/config', { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return;
+    const { revision, data } = await res.json();
+    _configRevision = revision;
+    if (data) {
+      Object.assign(state, data);
+      updateNodeDisplay(); updateNSDDisplay(); updateAllPreviews();
+      applyFsViaGuiMode();
+      // Saved dryRun is intentionally not trusted on restore — every fresh
+      // load starts in Dry Run regardless, same as if no config existed.
+      setDryRunState(true);
+    }
+    _lastSavedConfigJSON = JSON.stringify(state);
+  } catch (e) {
+    console.warn('Could not load persisted config:', e.message);
+  }
+}
+
+let _configSaveInFlight = false;
+
+async function autosaveConfigTick() {
+  if (_configConflict || _configSaveInFlight) return;
+  const token = document.querySelector('meta[name="scale-guinstall-token"]')?.content;
+  if (!token) return;
+  const current = JSON.stringify(state);
+  if (current === _lastSavedConfigJSON) return;
+  _configSaveInFlight = true;
+  try {
+    const res = await fetch(getBackendUrl() + '/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ revision: _configRevision, data: state }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.status === 409) {
+      _configConflict = true;
+      document.getElementById('config-conflict-banner').style.display = 'flex';
+      return;
+    }
+    if (!res.ok) { console.warn('Config autosave failed: HTTP', res.status); return; }
+    const body = await res.json();
+    _configRevision = body.revision;
+    _lastSavedConfigJSON = current;
+  } catch (e) {
+    console.warn('Config autosave failed:', e.message);
+  } finally {
+    _configSaveInFlight = false;
+  }
+}
+
+setInterval(autosaveConfigTick, 1000);
+
 function resetConfig() {
   if (confirm('Reset all configuration? This cannot be undone.')) {
     state.nodes = []; state.nsds = [];
@@ -5847,6 +5921,7 @@ updateAllPreviews();
 setDryRunState(true);
 applyFsViaGuiMode();  // default ON: hide the Filesystem nav item + skip its step
 renderDashboardSetupStatus();  // Dashboard is the default active page on load
+loadPersistedConfig();  // async, best-effort — overlays saved state once it resolves
 // Tooltips for the collapsed icon-rail sidebar. Native `title` is kept as
 // an accessibility fallback; the visible tooltip is a single shared element
 // positioned via JS so it isn't clipped by the sidebar's overflow-x:hidden.

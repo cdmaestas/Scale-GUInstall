@@ -237,6 +237,8 @@ Dry Run is enabled by default. In this mode every button generates and displays 
 
 **The server is only needed for live execution.** In Dry Run mode the GUI generates command previews entirely in the browser with no server required.
 
+**Configuration autosave.** The GUI's working state (nodes, NSDs, filesystem, protocols, cluster name, toolkit path) is autosaved to `/var/lib/scale-guinstall/config.json` roughly once a second and restored automatically the next time the page loads — closing a tab or restarting the browser no longer loses your progress. This is separate from the manual **Export/Import Config** buttons in Settings, which remain the way to back up or move a configuration to a different installer node. Writes use optimistic locking: if two tabs (or two people) have the page open, the second one to save after the first gets a "changed elsewhere" banner instead of silently overwriting the other's work, and autosave pauses there until that tab is reloaded. Requires the server process to have write access to `/var/lib/scale-guinstall` — true by default under the packaged systemd service, not guaranteed when running from source as a non-root user.
+
 ---
 
 ## Connecting Remotely (SSH Tunnel)
