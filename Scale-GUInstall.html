@@ -3021,6 +3021,29 @@ const state = {
   fsViaGui: true
 };
 
+// ===== BACKEND AUTH =====
+// The backend injects this meta tag only when it serves the page itself
+// (see _serve_sibling_html in scale-server.py) — it's absent when the file
+// is opened directly (file://), which is why that mode still loads fine
+// for dry-run/command-preview but every real backend call now 401s until
+// the page is reloaded from the server. Wrapping fetch() here, rather than
+// threading a header through every one of this app's ~25 call sites, is
+// what makes that automatic instead of something each call site has to
+// remember to do.
+(function() {
+  const token = document.querySelector('meta[name="scale-guinstall-token"]')?.content || '';
+  if (!token) return;
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = function(input, init) {
+    const url = typeof input === 'string' ? input : input.url;
+    if (url.indexOf(getBackendUrl()) === 0) {
+      init = Object.assign({}, init);
+      init.headers = Object.assign({}, init.headers, { 'X-Scale-Token': token });
+    }
+    return nativeFetch(input, init);
+  };
+})();
+
 // ===== HTML ESCAPE =====
 function h(str) {
   return String(str ?? '')
@@ -5721,6 +5744,9 @@ async function testBackendConnection(btn) {
     if (res.ok) {
       status.textContent = '✓ Connected';
       status.style.color = 'var(--cds-support-success)';
+    } else if (res.status === 401) {
+      status.textContent = '✗ Reachable, but the auth token doesn\'t match — this Backend URL points at a different server than the one that served this page';
+      status.style.color = 'var(--cds-support-error)';
     } else {
       throw new Error(`HTTP ${res.status}`);
     }

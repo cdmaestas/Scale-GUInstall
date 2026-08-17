@@ -14,6 +14,7 @@ import glob
 import json
 import os
 import re
+import secrets
 import select
 import shlex
 import subprocess
@@ -30,13 +31,25 @@ except ImportError:
 
 app = Flask(__name__)
 
+# Generated fresh every time the process starts, kept in memory only, and
+# injected into the served HTML (see _serve_sibling_html) so the page can
+# authenticate its own requests back to this same process. A restart
+# invalidates every previously-loaded tab — they get a 401 with a "reload
+# the page" hint until refreshed, which is the intended failure mode.
+_AUTH_TOKEN = secrets.token_urlsafe(32)
+_TOKEN_HEADER = "X-Scale-Token"
+_PUBLIC_PATHS = {"/", "/Scale-GUInstall.html", "/help.html"}
+
 
 def cors(response):
     origin = request.headers.get("Origin", "")
-    # Allow file:// (null origin) and localhost only — reject all remote origins
-    if origin in ("null",) or origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1"):
+    # localhost/127.0.0.1 only — file:// (null origin) is no longer served
+    # as a supported delivery mode (see getBackendUrl() on the frontend);
+    # the token below is the real gate, this just narrows who can even see
+    # a response.
+    if origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1"):
         response.headers["Access-Control-Allow-Origin"] = origin
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Headers"] = f"Content-Type, {_TOKEN_HEADER}"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Cache-Control"] = "no-cache"
     response.headers["X-Accel-Buffering"] = "no"
@@ -44,6 +57,20 @@ def cors(response):
 
 
 app.after_request(cors)
+
+
+@app.before_request
+def _require_token():
+    # OPTIONS is the CORS preflight itself — browsers never attach custom
+    # headers to it, so it can't carry the token and must always be let
+    # through untouched.
+    if request.method == "OPTIONS" or request.path in _PUBLIC_PATHS:
+        return None
+    supplied = request.headers.get(_TOKEN_HEADER, "")
+    if not secrets.compare_digest(supplied, _AUTH_TOKEN):
+        return jsonify({"error": "Unauthorized — missing or invalid auth token. "
+                                  "Reload the page served by this backend."}), 401
+    return None
 
 
 _ALLOWED_ROOTS = ("/tmp", "/opt", "/usr", "/home", "/root", "/var", "/srv", "/mnt", "/data", "/ibm")
@@ -121,6 +148,16 @@ def _serve_sibling_html(filename):
         return f"{filename} not found next to scale-server.py", 404
     with open(path, encoding="utf-8") as f:
         content = f.read()
+    if filename == "Scale-GUInstall.html":
+        # Only the main app makes authenticated backend calls — help.html is
+        # static reference content and never needs the token. Inserted as
+        # the first thing in <head> so it's present before any <script>
+        # (even one that happened to live in <head>) could read it.
+        content = content.replace(
+            "<head>",
+            f'<head>\n<meta name="scale-guinstall-token" content="{_AUTH_TOKEN}">',
+            1,
+        )
     return content, 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
