@@ -40,28 +40,28 @@ fi
 
 echo "Using $PYTHON ($(${PYTHON} --version 2>&1))"
 
-# Ensure Flask and waitress are available under the chosen interpreter
+# Ensure Flask and waitress are available under the chosen interpreter.
+# Deliberately does NOT fall back to piping get-pip.py from the network
+# into the interpreter on failure — that's an unverified remote script
+# execution with no integrity check, not appropriate to run automatically.
+# If pip itself is missing, install it via the OS package manager instead.
 if ! "$PYTHON" -c "import flask, waitress" 2>/dev/null; then
   echo "Flask/waitress not found — installing..."
-  if ! "$PYTHON" -m pip install "flask>=3.0,<4" "waitress>=3.0,<4" 2>/dev/null; then
-    # pip not available — try to bootstrap it, then retry
-    if command -v curl &>/dev/null; then
-      curl -sSL https://bootstrap.pypa.io/get-pip.py | "$PYTHON"
-    elif command -v wget &>/dev/null; then
-      wget -qO- https://bootstrap.pypa.io/get-pip.py | "$PYTHON"
-    else
-      echo "ERROR: pip is not installed and neither curl nor wget is available." >&2
-      echo "Install pip manually: sudo apt install python3-pip  OR  sudo yum install python3-pip" >&2
-      exit 1
-    fi
-    "$PYTHON" -m pip install "flask>=3.0,<4" "waitress>=3.0,<4"
+  if ! "$PYTHON" -m pip install "flask>=3.0,<4" "waitress>=3.0,<4"; then
+    echo "" >&2
+    echo "ERROR: pip install failed — is pip installed for $PYTHON?" >&2
+    echo "Install pip via your OS package manager, then re-run this script:" >&2
+    echo "  sudo apt install python3-pip  OR  sudo yum install python3-pip" >&2
+    exit 1
   fi
 fi
 
 echo ""
 echo "Scale GUInstall — backend server"
 echo "  URL : http://127.0.0.1:$PORT"
-echo "  Open: Scale-GUInstall.html in your browser"
+echo "  Open: http://127.0.0.1:$PORT in your browser — not Scale-GUInstall.html directly"
+echo "        (the server injects an auth token into the page as it serves it;"
+echo "         a copy opened straight from disk can't make real backend calls)"
 echo "  Stop: Ctrl+C"
 echo ""
 echo "  SSH tunnel (from your workstation):"

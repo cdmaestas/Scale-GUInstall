@@ -3459,7 +3459,9 @@ async function listAllDevices(btn) {
           if (msg.type === 'devices') {
             try {
               JSON.parse(msg.line).forEach(d => allDevices.push({ ...d, node }));
-            } catch {}
+            } catch (e) {
+              console.warn(`Could not parse device list from ${node}:`, e.message);
+            }
             continue;
           }
           const cls = msg.type === 'error' ? 'error' : 'normal';
@@ -4961,7 +4963,9 @@ async function runPrepare(phase, btn) {
               } else if (ev.type !== 'done') {
                 appendToTerminal(termId, ev.line, ev.type);
               }
-            } catch {}
+            } catch (e) {
+              console.warn('Could not parse ansible-check SSE line:', e.message);
+            }
           }
         }
       }
@@ -5807,7 +5811,8 @@ async function loadPersistedConfig() {
   try {
     const res = await fetch(getBackendUrl() + '/api/config', { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return;
-    const { revision, data } = await res.json();
+    const { revision, data, warning } = await res.json();
+    if (warning) console.warn('Config restore warning:', warning);
     _configRevision = revision;
     if (data) {
       Object.assign(state, data);

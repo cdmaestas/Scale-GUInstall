@@ -187,15 +187,24 @@ _config_lock = threading.Lock()
 
 
 def _config_read_locked():
-    """Must be called while holding _config_lock. Returns (revision, data)."""
+    """
+    Must be called while holding _config_lock. Returns (revision, data,
+    corrupted). A missing file is the normal "nothing saved yet" case —
+    corrupted is only set when the file exists but isn't readable as the
+    expected JSON shape, so callers can tell "nothing there" apart from
+    "something was there and couldn't be read" instead of both silently
+    behaving like an empty config.
+    """
     try:
         with open(_CONFIG_PATH, encoding="utf-8") as f:
             obj = json.load(f)
-        return int(obj.get("revision", 0)), obj.get("data")
+        return int(obj.get("revision", 0)), obj.get("data"), False
     except FileNotFoundError:
-        return 0, None
-    except (ValueError, TypeError, json.JSONDecodeError):
-        return 0, None
+        return 0, None, False
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        app.logger.error("config.json exists but could not be read as valid config "
+                          "(revision reset to 0): %s", exc)
+        return 0, None, True
 
 
 @app.route("/api/config", methods=["GET", "POST", "OPTIONS"])
@@ -205,8 +214,11 @@ def config_endpoint():
 
     if request.method == "GET":
         with _config_lock:
-            revision, data = _config_read_locked()
-        return jsonify({"revision": revision, "data": data})
+            revision, data, corrupted = _config_read_locked()
+        resp = {"revision": revision, "data": data}
+        if corrupted:
+            resp["warning"] = "Saved configuration file was unreadable and could not be restored."
+        return jsonify(resp)
 
     # POST
     body = request.get_json(silent=True) or {}
@@ -216,7 +228,7 @@ def config_endpoint():
         return jsonify({"error": "Request must include 'data' and an integer 'revision'."}), 400
 
     with _config_lock:
-        current_revision, _ = _config_read_locked()
+        current_revision, _, _corrupted = _config_read_locked()
         if client_revision != current_revision:
             return jsonify({
                 "error": "Config changed elsewhere since you loaded it.",
@@ -2463,14 +2475,16 @@ def stream_node_identity():
     org_name     = body.get("org_name", "IBM").strip() or "IBM"
     cluster_name = body.get("cluster_name", "").strip()
     ca_cn        = body.get("ca_cn", "ScaleCA").strip() or "ScaleCA"
-    try:
-        days = max(1, min(int(body.get("days", 10000)), 36525))
-    except (ValueError, TypeError):
-        days = 10000
+    days_raw     = body.get("days", 10000)
     nodes        = body.get("nodes", [])
     ssh_user     = body.get("ssh_user", "root").strip() or "root"
     # Validate early — before the generator runs
     _ni_errors = []
+    try:
+        days = max(1, min(int(days_raw), 36525))
+    except (ValueError, TypeError):
+        days = None
+        _ni_errors.append(f"Invalid days: {days_raw!r} (must be a whole number)")
     if not _VALID_SUBJ_FIELD_RE.fullmatch(org_name):
         _ni_errors.append(f"Invalid org name: {org_name!r}")
     if not _VALID_SUBJ_FIELD_RE.fullmatch(ca_cn):

@@ -73,6 +73,9 @@ jobs:
             packaging/scale-guinstall-wrapper \
             packaging/scale-guinstall-mmfs.sh \
             packaging/enable-ssh-forwarding.sh \
+            packaging/debian/postinst \
+            packaging/debian/prerm \
+            packaging/debian/postrm \
             .githooks/pre-commit \
             .githooks/pre-push
 

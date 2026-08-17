@@ -7,7 +7,11 @@ scale\-guinstall \- IBM Storage Scale Installation Toolkit GUI backend server
 .B scale\-guinstall
 starts the Flask backend server for Scale GUInstall, a web-based GUI
 for the IBM Storage Scale Installation Toolkit
-.RB ( spectrumscale ).
+.RB ( spectrumscale ),
+served by
+.B waitress
+if it's installed \(em the packaged venv includes it \(em falling back to
+Flask's own development server, with a warning, if it isn't.
 .PP
 The server listens on
 .B http://127.0.0.1:5001
@@ -55,8 +59,8 @@ Opening this file directly from disk loses the auth token and cannot
 make real backend calls.
 .TP
 .B /usr/lib/scale\-guinstall/venv/
-Python virtual environment containing Flask, created during package
-installation.
+Python virtual environment containing Flask and waitress, created
+during package installation.
 .TP
 .B /var/lib/scale\-guinstall/config.json
 GUI configuration (nodes, NSDs, filesystem, protocols, cluster name,

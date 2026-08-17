@@ -168,7 +168,7 @@
       <pre><code>python3 scale-server.py
 # or, if installed via RPM/DEB package:
 scale-guinstall</code></pre>
-      <p>It listens on <code>http://127.0.0.1:5001</code> — loopback only, never exposed to the network directly.</p>
+      <p>It listens on <code>http://127.0.0.1:5001</code> — loopback only, never exposed to the network directly. Once it's running, open <code>http://127.0.0.1:5001</code> in your browser — <strong>not</strong> a local copy of this HTML file. The server injects an auth token into the page as it serves it; a copy opened straight from disk has no token, so every real backend call fails with 401 (Dry Run still works fine, since it never touches the backend).</p>
       <h3>Work through the pages in order</h3>
       <p>Prepare Software → Node Configuration → Cluster Settings → NSD Storage → Filesystem → Protocol Services → Install &amp; Deploy → Post Configuration.</p>
     </section>
@@ -209,13 +209,13 @@ scale-guinstall</code></pre>
 
     <section id="remote-access">
       <h2>Connecting remotely</h2>
-      <p>The backend binds to <code>127.0.0.1</code> only, so it is never reachable from the network directly. To drive it from your own workstation, forward the port over SSH and open this app locally:</p>
+      <p>The backend binds to <code>127.0.0.1</code> only, so it is never reachable from the network directly. To drive it from your own workstation, forward the port over SSH, then open <code>http://127.0.0.1:5001</code> locally — not a local copy of this HTML file (see <a href="#getting-started">Getting started</a> for why):</p>
       <pre><code># Interactive (tunnel closes when the terminal closes)
 ssh -L 5001:127.0.0.1:5001 user@installer-node
 
 # Background (stays open after the terminal exits)
 ssh -fNL 5001:127.0.0.1:5001 user@installer-node</code></pre>
-      <p>Leave the Backend URL field as <code>http://127.0.0.1:5001</code> — the tunnel forwards it transparently. The Settings page has a tunnel helper that generates this command and tests the connection for you.</p>
+      <p>The Backend URL field already defaults to <code>http://127.0.0.1:5001</code> — the tunnel forwards it transparently. The Settings page has a tunnel helper that generates this command and tests the connection for you.</p>
     </section>
 
     <section id="troubleshooting">
@@ -223,6 +223,12 @@ ssh -fNL 5001:127.0.0.1:5001 user@installer-node</code></pre>
 
       <h3>"Backend not reachable"</h3>
       <p>The page can't reach <code>http://127.0.0.1:5001</code>. Confirm the backend is running (<code>python3 scale-server.py</code> or <code>scale-guinstall</code>), and if you're connecting remotely, confirm the SSH tunnel is up.</p>
+
+      <h3>Every real command fails with "Server returned HTTP 401"</h3>
+      <p>The page's auth token no longer matches the backend's — almost always because the backend process restarted (a fresh token is generated every time it starts) while this tab was still open. Reload the page to pick up the new token. Dry Run previews aren't affected, since they never touch the backend.</p>
+
+      <h3>"Configuration was changed elsewhere" banner</h3>
+      <p>Your working configuration (nodes, NSDs, filesystem, protocols, cluster name, toolkit path) autosaves to the backend about once a second. This banner means another tab or session saved a newer version since this page loaded — autosave pauses so it doesn't silently overwrite that other save, but your current unsaved changes stay right where they are in this tab. Reload to pick up the latest version, or use <strong>Export Config</strong> (Settings) first if you want to keep a copy of what's in this tab before doing so.</p>
 
       <h3>SSH tunnel fails: "channel N: open failed: administratively prohibited"</h3>
       <p>The installer node's <code>sshd</code> has TCP forwarding disabled. Enable it and reload:</p>
