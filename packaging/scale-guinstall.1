@@ -58,6 +58,15 @@ make real backend calls.
 Python virtual environment containing Flask, created during package
 installation.
 .TP
+.B /var/lib/scale\-guinstall/config.json
+GUI configuration (nodes, NSDs, filesystem, protocols, cluster name,
+toolkit path), autosaved by the browser about once a second so work
+survives a reload. Created on first save, mode 0600 in a mode 0700
+directory. Requires the server process to have write access \(em true
+by default under the packaged systemd service (runs as root), not
+guaranteed when running from source as an unprivileged user. Persists
+across upgrades and is not removed on package removal.
+.TP
 .B /usr/lib/systemd/system/scale\-guinstall.service
 systemd unit file. The service is installed but not enabled by default.
 .TP
