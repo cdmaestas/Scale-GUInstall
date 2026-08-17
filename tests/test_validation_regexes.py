@@ -71,7 +71,12 @@ def test_safe_path_rejects_shell_metacharacters(ss, value):
 def test_safe_path_does_not_block_dot_dot_traversal(ss):
     # Documents actual behavior, not a security guarantee: the charset
     # includes '.' and '/', so '..' segments pass the regex untouched.
-    # Safety here comes from elsewhere (allowlisted roots via
-    # resolve_path(), or the value never reaching a shell), not from
-    # this pattern — don't assume it blocks traversal.
+    # _SAFE_PATH_RE's one remaining caller (the profile.d binpath
+    # endpoint) doesn't need traversal protection — the value is embedded
+    # in a sourced shell script, so what matters there is blocking shell
+    # metacharacters (which this pattern does; see the accept/reject
+    # tests above), not restricting it to a safe root. Callers that do
+    # need traversal protection (disk/toolkit paths) use
+    # _VALID_DEVICE_PATH_RE or resolve_path() instead — don't reuse this
+    # pattern for those without re-checking that reasoning still holds.
     assert ss._SAFE_PATH_RE.fullmatch("/dev/../etc/passwd")

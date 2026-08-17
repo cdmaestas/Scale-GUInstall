@@ -1751,7 +1751,7 @@ def _build_nsd_add_cmd(toolkit, index, nsd):
     # GUI sets usage/pool when it builds the filesystem).
     if usage and usage not in _VALID_NSD_USAGE:
         return None, f"NSD {index}: invalid usage {usage!r}. Must be one of: {', '.join(sorted(_VALID_NSD_USAGE))}"
-    if not disk or not _SAFE_PATH_RE.fullmatch(disk):
+    if not disk or not _VALID_DEVICE_PATH_RE.fullmatch(disk):
         return None, f"NSD {index}: invalid disk path {disk!r}"
     if not server or not _VALID_HOSTNAME_RE.fullmatch(server):
         return None, f"NSD {index}: invalid server hostname {server!r}"
@@ -1791,16 +1791,13 @@ def _build_nsd_add_cmd(toolkit, index, nsd):
 @app.route("/api/stream/nsd-add", methods=["POST"])
 def stream_nsd_add():
     data    = request.get_json(force=True, silent=True) or {}
-    toolkit = data.get("toolkit", "").strip()
+    toolkit, _tk_err = resolve_path(data.get("toolkit", "").strip())
     nsds    = data.get("nsds", [])
 
     def generate():
         try:
-            if not toolkit:
-                yield sse("error", "[ERROR] Toolkit path is required.")
-                return
-            if not _SAFE_PATH_RE.fullmatch(toolkit):
-                yield sse("error", f"[ERROR] Invalid toolkit path: {toolkit!r}")
+            if _tk_err or not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
                 return
             if not nsds:
                 yield sse("error", "[ERROR] No NSDs provided.")
