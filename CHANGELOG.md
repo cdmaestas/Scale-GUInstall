@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.1.0] — 2026-08-17
+
 ### Added
 - Cluster Upgrade page is now real: **Pre-upgrade Check**, **Run Upgrade**, **Post-upgrade Check**, and a new **Show Versions** button (replacing the dead "Upgrade Protocols" button) call the actual `spectrumscale upgrade {precheck,run,postcheck,showversions}` subcommands via `/api/stream/phase`, instead of a `setTimeout`-simulated terminal with fabricated output and wrong command flags (`--precheck`/`--upgrade-protocols` — `spectrumscale upgrade` takes a positional subcommand, not flags; `run` already upgrades GPFS, S3, NFS, SMB, HDFS, and Performance Monitoring together, confirmed against the real `spectrumscale upgrade -h`). **Run Upgrade** is gated behind a confirmation dialog. The Target Version and Upgrade Method panels are marked reference-only, since `upgrade run` takes no arguments for them.
 - `testConnection()` on the Populate from Cluster page is likewise now real: a new `/api/stream/test-connection` endpoint runs `sudo -n ssh -p <port> <user>@<node> mmgetstate -a` and reports actual SSH/GPFS state, replacing a fake `[OK] SSH connection successful` timer. Also wires up the previously-decorative `pop-user`/`pop-port` fields into the real call.
