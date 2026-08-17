@@ -50,6 +50,21 @@ def test_build_nsd_add_cmd_invalid_disk_path(ss):
     assert "invalid disk path" in err
 
 
+def test_build_nsd_add_cmd_rejects_dot_dot_traversal_in_disk(ss):
+    # Uses _VALID_DEVICE_PATH_RE (no '.' in its charset), not the looser
+    # _SAFE_PATH_RE — see test_validation_regexes.py for why that
+    # distinction matters here.
+    cmd, err = ss._build_nsd_add_cmd("/tp", 1, {"disk": "/dev/../etc/passwd", "server": "node1"})
+    assert cmd is None
+    assert "invalid disk path" in err
+
+
+def test_build_nsd_add_cmd_rejects_disk_path_outside_dev(ss):
+    cmd, err = ss._build_nsd_add_cmd("/tp", 1, {"disk": "/etc/passwd", "server": "node1"})
+    assert cmd is None
+    assert "invalid disk path" in err
+
+
 def test_build_nsd_add_cmd_invalid_server_hostname(ss):
     cmd, err = ss._build_nsd_add_cmd("/tp", 1, {"disk": "/dev/sda", "server": "node1; id"})
     assert cmd is None
