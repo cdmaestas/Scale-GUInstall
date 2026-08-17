@@ -17,9 +17,17 @@ that the GUI calls to execute
 commands and stream output back to the browser.
 .PP
 Open
+.B http://127.0.0.1:5001
+in a browser on the same machine \(em
+.B not
+the
 .B Scale\-GUInstall.html
-in a browser on the same machine, or tunnel the port from a remote
-workstation using SSH (see
+file directly. The server injects a per\-process auth token into the page
+as it serves it; a copy opened straight from disk has no token and
+every real backend call fails with 401 (command previews in Dry Run
+still work, since they never touch the backend). To reach a remote
+installer node, tunnel the port from your workstation and open the same
+URL locally (see
 .B EXAMPLES
 below).
 .SH OPTIONS
@@ -39,7 +47,12 @@ Override the listening port (default:
 The Flask application.
 .TP
 .B /usr/lib/scale\-guinstall/Scale\-GUInstall.html
-The single-file web application. Open this in your browser.
+The single-file web application, served by
+.B scale\-guinstall
+itself at
+.BR http://127.0.0.1:5001 .
+Opening this file directly from disk loses the auth token and cannot
+make real backend calls.
 .TP
 .B /usr/lib/scale\-guinstall/venv/
 Python virtual environment containing Flask, created during package
@@ -80,8 +93,9 @@ sudo systemctl enable \-\-now scale\-guinstall
 .EE
 .SS Connect from a remote workstation via SSH tunnel
 Forward the server port over SSH, then open
-.B Scale\-GUInstall.html
-locally:
+.B http://127.0.0.1:5001
+locally \(em not a local copy of
+.BR Scale\-GUInstall.html :
 .EX
 # Interactive (tunnel closes when the terminal closes)
 ssh \-L 5001:127.0.0.1:5001 user@installer\-node
@@ -89,7 +103,7 @@ ssh \-L 5001:127.0.0.1:5001 user@installer\-node
 # Background (stays open after the terminal exits)
 ssh \-fNL 5001:127.0.0.1:5001 user@installer\-node
 .EE
-Leave the Backend URL in the GUI at
+The Backend URL field in the GUI already defaults to
 .BR http://127.0.0.1:5001 ;
 the SSH tunnel forwards it transparently.
 .PP
@@ -123,11 +137,14 @@ PORT=8080 scale\-guinstall
 The server binds to
 .B 127.0.0.1
 only and is not reachable from the network.
+Every API call requires a per\-process auth token, generated fresh at
+startup and injected into the page only when the server serves it
+itself; a page loaded any other way gets a 401 on every real backend
+call.
 CORS is restricted to
-.BR localhost ,
-.BR 127.0.0.1 ,
+.B localhost
 and
-.B file://
+.B 127.0.0.1
 origins.
 All executed commands are explicitly allowlisted; there is no generic
 shell execution endpoint.

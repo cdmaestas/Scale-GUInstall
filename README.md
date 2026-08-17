@@ -107,25 +107,25 @@ The server listens on `http://127.0.0.1:5001` — loopback only, not accessible 
 
 ### 3. Open the GUI
 
-Open `Scale-GUInstall.html` in a browser on the same machine. On most Linux systems:
+Open `http://127.0.0.1:5001` in a browser — **not** the `Scale-GUInstall.html` file directly. The server serves the app itself and injects a per-process auth token into the page as it does; a copy opened straight from disk has no token and gets a 401 on every real backend call (Dry Run still works fine, since it never touches the backend).
 
 ```bash
-xdg-open Scale-GUInstall.html
+xdg-open http://127.0.0.1:5001
 ```
 
-Or open `Scale-GUInstall.html` on your local workstation and connect to the installer node remotely via an SSH tunnel (recommended):
+To reach a remote installer node, tunnel the port from your workstation and open the same URL locally (recommended):
 
 ```bash
 ssh -L 5001:127.0.0.1:5001 user@installer-node
 ```
 
-Leave the Backend URL in the GUI as `http://127.0.0.1:5001` — SSH forwards it transparently. To tunnel in the background without keeping a shell open:
+Then open `http://127.0.0.1:5001` in your local browser — the tunnel forwards it transparently, and you're still loading the page (and its token) from the remote server, not a local copy. To tunnel in the background without keeping a shell open:
 
 ```bash
 ssh -fNL 5001:127.0.0.1:5001 user@installer-node
 ```
 
-> **Why a tunnel?** The backend server has no authentication and executes privileged commands. Binding it to `0.0.0.0` would expose those endpoints to anyone on the network. The tunnel keeps the server loopback-only while still allowing remote access over an encrypted channel.
+> **Why a tunnel?** Binding the server to `0.0.0.0` would expose privileged execution endpoints to anyone on the network. The tunnel keeps the server loopback-only while still allowing remote access over an encrypted channel.
 
 > **Dry Run mode is on by default.** Every button shows the command it would run without executing anything. Disable it in Settings only when you're ready to apply changes to the cluster.
 
@@ -224,7 +224,8 @@ Dry Run is enabled by default. In this mode every button generates and displays 
 
 **Security properties:**
 - Binds to `127.0.0.1` only — not reachable from the network
-- CORS restricted to `localhost`, `127.0.0.1`, and `file://` origins
+- Every API call requires a per-process auth token, generated fresh at startup and injected into the page when the server serves it — a page opened any other way (e.g. as a local `file://`) can preview commands in Dry Run but gets a 401 on every real backend call
+- CORS restricted to `localhost` and `127.0.0.1` origins
 - Credentials (GUI user passwords, S3 secret keys) are sent in POST request bodies, never in URLs or query strings
 - All executed commands are explicit and allowlisted — no generic shell execution endpoint
 - `config gpfs` flags are validated against an explicit allowlist — unrecognised flags are rejected before reaching the subprocess
@@ -250,7 +251,7 @@ ssh -L 5001:127.0.0.1:5001 user@installer-node
 ssh -fNL 5001:127.0.0.1:5001 user@installer-node
 ```
 
-Then open `Scale-GUInstall.html` locally and leave the Backend URL as `http://127.0.0.1:5001`. The **Settings** page has a tunnel helper that generates the command for you and tests the connection.
+Then open `http://127.0.0.1:5001` in your local browser — not a local copy of `Scale-GUInstall.html`, which has no auth token and can't make real backend calls. The **Settings** page has a tunnel helper that generates the command for you and tests the connection.
 
 ### Firewall and SSH server requirements
 
