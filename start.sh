@@ -40,10 +40,10 @@ fi
 
 echo "Using $PYTHON ($(${PYTHON} --version 2>&1))"
 
-# Ensure Flask is available under the chosen interpreter
-if ! "$PYTHON" -c "import flask" 2>/dev/null; then
-  echo "Flask not found — installing..."
-  if ! "$PYTHON" -m pip install "flask>=3.0,<4" 2>/dev/null; then
+# Ensure Flask and waitress are available under the chosen interpreter
+if ! "$PYTHON" -c "import flask, waitress" 2>/dev/null; then
+  echo "Flask/waitress not found — installing..."
+  if ! "$PYTHON" -m pip install "flask>=3.0,<4" "waitress>=3.0,<4" 2>/dev/null; then
     # pip not available — try to bootstrap it, then retry
     if command -v curl &>/dev/null; then
       curl -sSL https://bootstrap.pypa.io/get-pip.py | "$PYTHON"
@@ -54,7 +54,7 @@ if ! "$PYTHON" -c "import flask" 2>/dev/null; then
       echo "Install pip manually: sudo apt install python3-pip  OR  sudo yum install python3-pip" >&2
       exit 1
     fi
-    "$PYTHON" -m pip install "flask>=3.0,<4"
+    "$PYTHON" -m pip install "flask>=3.0,<4" "waitress>=3.0,<4"
   fi
 fi
 
