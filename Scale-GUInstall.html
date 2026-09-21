@@ -3627,7 +3627,7 @@ async function applyBulkNsds(btn) {
     for (const n of nsds) {
       let ok = false;
       await streamToTerminalPost(termId, `${getBackendUrl()}/api/stream/format-disk`,
-        { node: n.server, device: n.disk }, (good) => { ok = good; });
+        { node: n.server, device: n.disk, dry_run: false }, (good) => { ok = good; });
       if (ok) added.push(n);
       else appendToTerminal(termId, `[WARN] Skipping ${n.disk} on ${n.server} — wipe failed; not added.`, 'warn');
     }
@@ -4033,7 +4033,7 @@ async function runNsdAdd(btn) {
     pool: n.pool || '', filesystem: n.filesystem || '',
     size: n.size && n.size !== 'Unknown' ? n.size.replace(' ', '') : ''
   }));
-  await streamToTerminalPost('nsd-add-terminal', `${getBackendUrl()}/api/stream/nsd-add`, { toolkit: tp, nsds }, () => {
+  await streamToTerminalPost('nsd-add-terminal', `${getBackendUrl()}/api/stream/nsd-add`, { toolkit: tp, nsds, dry_run: false }, () => {
     btn.disabled = false;
   });
 }
@@ -4191,6 +4191,7 @@ async function applyClusterConfig(btn) {
     perfmon_node: perfmonNode,
     fileaudit:    fileauditOn,
     fileaudit_fs: fileauditFs,
+    dry_run:      false,
   });
 
   btn.disabled = false;
@@ -4992,7 +4993,7 @@ async function runPrepare(phase, btn) {
     const toolkitBin = (mmfsOverride && _mmfsProbeResult?.found)
       ? mmfsOverride
       : '';
-    const params = new URLSearchParams({ dir, ip });
+    const params = new URLSearchParams({ dir, ip, dry_run: 'false' });
     if (toolkitBin) params.set('bin', toolkitBin);
     const url = `${getBackendUrl()}/api/stream/setup?${params}`;
     streamToTerminal(termId, url, (ok) => {
@@ -5045,7 +5046,7 @@ async function applyNodeConfig(btn) {
     nodes: state.nodes.map(n => ({ hostname: n.hostname, roles: n.roles }))
   };
   const url = `${getBackendUrl()}/api/stream/nodes`;
-  streamToTerminalPost(termId, url, { toolkit: tp, nodes: state.nodes.map(n => ({ hostname: n.hostname, roles: n.roles })) }, () => { btn.disabled = false; });
+  streamToTerminalPost(termId, url, { toolkit: tp, nodes: state.nodes.map(n => ({ hostname: n.hostname, roles: n.roles })), dry_run: false }, () => { btn.disabled = false; });
 }
 
 // ===== NODE IDENTITY (TLS) =====
@@ -5225,7 +5226,7 @@ async function runPhase(phase, btn) {
   }
 
   if (btn) btn.disabled = true;
-  const params = new URLSearchParams({ toolkit: tp, phase, skip_ssh: skipSsh });
+  const params = new URLSearchParams({ toolkit: tp, phase, skip_ssh: skipSsh, dry_run: 'false' });
   await streamToTerminal(termId, `${getBackendUrl()}/api/stream/phase?${params}`);
 
   // Mark step complete in progress indicator
@@ -5276,7 +5277,7 @@ async function runUpgradePhase(phase, btn) {
   }
 
   if (btn) btn.disabled = true;
-  const params = new URLSearchParams({ toolkit: tp, phase: backendPhase });
+  const params = new URLSearchParams({ toolkit: tp, phase: backendPhase, dry_run: 'false' });
   await streamToTerminal(termId, `${getBackendUrl()}/api/stream/phase?${params}`);
 
   const stepOrder = ['precheck', 'upgrade', 'postcheck'];
@@ -5521,6 +5522,19 @@ async function checkSpectrumscaleProcs(btn) {
   log.innerHTML = '';
   if (btn) btn.disabled = true;
   try {
+    // Current-operation buffer: shows what's running (and who started it —
+    // this browser tab, or an MCP agent) even if this tab didn't start it.
+    try {
+      const opRes = await fetch(`${getBackendUrl()}/api/operation/current`, { signal: AbortSignal.timeout(5000) });
+      const op = await opRes.json();
+      if (op.status && op.status !== 'idle') {
+        const started = op.started_at ? new Date(op.started_at).toLocaleTimeString() : 'unknown time';
+        appendToTerminal('ss-procs-log', `[INFO] Current operation: ${op.name} (started via ${op.source} at ${started})`, 'info');
+      }
+    } catch (e) {
+      // Non-fatal — this is a nice-to-have on top of the pgrep check below.
+    }
+
     const res  = await fetch(`${getBackendUrl()}/api/spectrumscale/running`, { signal: AbortSignal.timeout(15000) });
     const data = await res.json();
     if (data.error) {
@@ -5549,7 +5563,7 @@ async function killSpectrumscaleProcs(btn) {
   if (btn) btn.disabled = true;
   try {
     const res  = await fetch(`${getBackendUrl()}/api/spectrumscale/kill`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dry_run: false }),
       signal: AbortSignal.timeout(20000),
     });
     const data = await res.json();
