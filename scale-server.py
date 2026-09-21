@@ -21,6 +21,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from datetime import datetime, timezone
 
 from flask import Flask, Response, jsonify, request, stream_with_context
 
@@ -465,31 +466,56 @@ def spectrumscale_kill():
     """Kill all running spectrumscale CLI invocations (never the backend service)."""
     if request.method == "OPTIONS":
         return "", 204
+    body = request.get_json(silent=True) or {}
+    dry_run = bool(body.get("dry_run", True))
+    source = request.headers.get("X-Scale-Client", "web")
+
     procs = _running_spectrumscale()
     if procs is None:
         return jsonify({"error": "process check failed (pgrep unavailable) — nothing killed"}), 500
     if not procs:
         return jsonify({"killed": [], "remaining": [], "message": "No spectrumscale processes running."})
-    pids = [str(p) for p, _ in procs]
-    subprocess.run(["sudo", "-n", "kill", "-TERM"] + pids,
-                   capture_output=True, timeout=_SUDO_CHECK_TIMEOUT)
-    time.sleep(2)
-    remaining = _running_spectrumscale()
-    if remaining:
-        subprocess.run(["sudo", "-n", "kill", "-KILL"] + [str(p) for p, _ in remaining],
+
+    if dry_run:
+        return jsonify({
+            "dry_run": True,
+            "would_kill": [{"pid": p, "cmd": c} for p, c in procs],
+            "message": f"[DRY RUN] Would send SIGTERM (then SIGKILL if needed) to {len(procs)} process(es).",
+        })
+
+    op, busy = _claim_operation("kill", source)
+    if busy:
+        return jsonify({
+            "error": f"Another operation is already running: {busy['name']} "
+                     f"(started via {busy['source']} at {_iso(busy['started_at'])}).",
+        }), 409
+
+    try:
+        pids = [str(p) for p, _ in procs]
+        subprocess.run(["sudo", "-n", "kill", "-TERM"] + pids,
                        capture_output=True, timeout=_SUDO_CHECK_TIMEOUT)
-        time.sleep(1)
+        time.sleep(2)
         remaining = _running_spectrumscale()
-    if remaining is None:
+        if remaining:
+            subprocess.run(["sudo", "-n", "kill", "-KILL"] + [str(p) for p, _ in remaining],
+                           capture_output=True, timeout=_SUDO_CHECK_TIMEOUT)
+            time.sleep(1)
+            remaining = _running_spectrumscale()
+        if remaining is None:
+            _release_operation(op, "error")
+            return jsonify({
+                "killed":    [{"pid": p, "cmd": c} for p, c in procs],
+                "remaining": [],
+                "error":     "post-kill process check failed — verify manually with: pgrep -af spectrumscale",
+            }), 500
+        _release_operation(op, "success" if not remaining else "error")
         return jsonify({
             "killed":    [{"pid": p, "cmd": c} for p, c in procs],
-            "remaining": [],
-            "error":     "post-kill process check failed — verify manually with: pgrep -af spectrumscale",
-        }), 500
-    return jsonify({
-        "killed":    [{"pid": p, "cmd": c} for p, c in procs],
-        "remaining": [{"pid": p, "cmd": c} for p, c in remaining],
-    })
+            "remaining": [{"pid": p, "cmd": c} for p, c in remaining],
+        })
+    finally:
+        if op["status"] == "running":
+            _release_operation(op, "error")
 
 
 # ---------------------------------------------------------------------------
@@ -533,6 +559,60 @@ def sse_response(generator):
     )
 
 
+# ---------------------------------------------------------------------------
+# Current-operation buffer — lets any client (the web UI or the MCP server)
+# see what the single most recent/in-flight mutating operation is doing,
+# independent of which HTTP connection is attached to it. Scoped to one
+# whole logical request (e.g. "add these 5 nodes"), not one stream_process()
+# call — several v1 endpoints call stream_process() more than once per
+# request (stream_nodes loops per-node; stream_apply_cluster_config loops
+# over gpfs flags plus three helper calls), and scoping per-call would let a
+# second request race into the gap between those calls.
+# ---------------------------------------------------------------------------
+
+_operation_lock = threading.Lock()
+_current_operation = None  # None when idle; a dict while running or just-finished
+
+
+def _claim_operation(name, source):
+    """
+    Atomically check-and-claim the single operation slot. Returns (op, busy_op)
+    where exactly one of the two is None. Call this once, after validation and
+    before any dry_run=False mutating work begins; release it with
+    _release_operation() in the same endpoint's finally block.
+    """
+    global _current_operation
+    with _operation_lock:
+        if _current_operation is not None and _current_operation["status"] == "running":
+            return None, dict(_current_operation)
+        op = {
+            "id": secrets.token_hex(8),
+            "name": name,
+            "source": source,
+            "started_at": time.time(),
+            "finished_at": None,
+            "status": "running",
+            "rc": None,
+            "lines": [],
+        }
+        _current_operation = op
+        return op, None
+
+
+def _release_operation(op, status, rc=None):
+    """Mark a claimed operation finished. status is 'success' or 'error'."""
+    with _operation_lock:
+        op["status"] = status
+        op["rc"] = rc
+        op["finished_at"] = time.time()
+
+
+def _append_operation_line(op, line):
+    if op is not None:
+        with _operation_lock:
+            op["lines"].append(line)
+
+
 def _running_spectrumscale():
     """
     Return [(pid, cmdline), ...] for running spectrumscale CLI invocations,
@@ -560,7 +640,7 @@ def _running_spectrumscale():
     return procs
 
 
-def stream_process(cmd, cwd=None, stdin_text=None, timeout=None):
+def stream_process(cmd, cwd=None, stdin_text=None, timeout=None, dry_run=False, op=None):
     """
     Run *cmd* as a subprocess and yield SSE lines from stdout/stderr.
     Does NOT yield a done event — the caller is responsible for that.
@@ -585,19 +665,43 @@ def stream_process(cmd, cwd=None, stdin_text=None, timeout=None):
     If cmd invokes the spectrumscale toolkit and another toolkit command is
     already running, refuses to start and returns 1 — concurrent toolkit
     invocations corrupt the cluster definition.
+
+    dry_run: when True, skip the concurrency guard and Popen entirely —
+    yield a single "dryrun"-type line describing what would run and return
+    0. Callers must not claim the operation buffer (see op below) for a
+    dry-run call; it's read-only in every observable way.
+
+    op: an operation-buffer handle from _claim_operation(), or None. Every
+    output line is also appended to it (via _append_operation_line) so a
+    second client — a refreshed browser tab, an MCP check_operation call —
+    can see this command's output even though it didn't make this specific
+    HTTP request. The caller owns claiming/releasing op; this function only
+    appends to whatever it's handed.
     """
+    if dry_run:
+        yield sse("dryrun", "[DRY RUN] Inputs validated; command not executed: " + " ".join(cmd))
+        return 0
+
     if any(str(a).endswith("spectrumscale") for a in cmd):
         busy = _running_spectrumscale()
         if busy is None:
-            yield sse("error", "[ERROR] Cannot verify that no other spectrumscale command is "
-                               "running (pgrep failed) — refusing to start. Check that procps "
-                               "is installed and the backend host is healthy.")
+            line = ("[ERROR] Cannot verify that no other spectrumscale command is "
+                     "running (pgrep failed) — refusing to start. Check that procps "
+                     "is installed and the backend host is healthy.")
+            yield sse("error", line)
+            _append_operation_line(op, line)
             return 1
         if busy:
-            yield sse("error", "[ERROR] Another spectrumscale command is already running:")
+            line = "[ERROR] Another spectrumscale command is already running:"
+            yield sse("error", line)
+            _append_operation_line(op, line)
             for pid, cmdline in busy:
-                yield sse("error", f"[ERROR]   PID {pid}: {cmdline}")
-            yield sse("error", "[ERROR] Wait for it to finish, or kill it from Settings → Running Toolkit Processes.")
+                line = f"[ERROR]   PID {pid}: {cmdline}"
+                yield sse("error", line)
+                _append_operation_line(op, line)
+            line = "[ERROR] Wait for it to finish, or kill it from Settings → Running Toolkit Processes."
+            yield sse("error", line)
+            _append_operation_line(op, line)
             return 1
     proc = subprocess.Popen(
         cmd,
@@ -607,50 +711,95 @@ def stream_process(cmd, cwd=None, stdin_text=None, timeout=None):
         cwd=cwd,
         bufsize=0,  # unbuffered — don't wait for a full buffer before yielding
     )
-    if stdin_text is not None:
-        try:
-            proc.stdin.write(stdin_text.encode())
-            proc.stdin.close()
-        except BrokenPipeError:
-            pass  # child exited before reading — its output/rc tell the story
+    try:
+        if stdin_text is not None:
+            try:
+                proc.stdin.write(stdin_text.encode())
+                proc.stdin.close()
+            except BrokenPipeError:
+                pass  # child exited before reading — its output/rc tell the story
 
-    if timeout is None:
-        for raw_line in iter(proc.stdout.readline, b""):
-            line = raw_line.decode("utf-8", errors="replace").rstrip()
-            if line:
-                yield sse("normal", line)
-    else:
-        deadline = time.monotonic() + timeout
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                # Distinguish the two ways this can happen: the command
-                # itself is still running (proc.poll() is None), vs. it
-                # already exited but something it spawned inherited the
-                # fd and is still holding the pipe open behind it.
-                already_exited = proc.poll() is not None
-                proc.kill()
-                proc.wait()
-                if already_exited:
-                    yield sse("error", f"[ERROR] Command exited, but the connection did not close within "
-                                       f"{timeout}s — something it left running on the remote side is "
-                                       "still holding it open (not a network drop). Killed the local side.")
-                else:
-                    yield sse("error", f"[ERROR] Command produced no output and did not exit within "
-                                       f"{timeout}s — killed it.")
-                return 124  # conventional shell timeout exit code
-            ready, _, _ = select.select([proc.stdout], [], [], remaining)
-            if not ready:
-                continue  # nothing to read yet — loop back and re-check the deadline
-            raw_line = proc.stdout.readline()
-            if raw_line == b"":
-                break  # real EOF
-            line = raw_line.decode("utf-8", errors="replace").rstrip()
-            if line:
-                yield sse("normal", line)
+        if timeout is None:
+            for raw_line in iter(proc.stdout.readline, b""):
+                line = raw_line.decode("utf-8", errors="replace").rstrip()
+                if line:
+                    yield sse("normal", line)
+                    _append_operation_line(op, line)
+        else:
+            deadline = time.monotonic() + timeout
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    # Distinguish the two ways this can happen: the command
+                    # itself is still running (proc.poll() is None), vs. it
+                    # already exited but something it spawned inherited the
+                    # fd and is still holding the pipe open behind it.
+                    already_exited = proc.poll() is not None
+                    proc.kill()
+                    proc.wait()
+                    if already_exited:
+                        line = (f"[ERROR] Command exited, but the connection did not close within "
+                                 f"{timeout}s — something it left running on the remote side is "
+                                 "still holding it open (not a network drop). Killed the local side.")
+                    else:
+                        line = (f"[ERROR] Command produced no output and did not exit within "
+                                 f"{timeout}s — killed it.")
+                    yield sse("error", line)
+                    _append_operation_line(op, line)
+                    return 124  # conventional shell timeout exit code
+                ready, _, _ = select.select([proc.stdout], [], [], remaining)
+                if not ready:
+                    continue  # nothing to read yet — loop back and re-check the deadline
+                raw_line = proc.stdout.readline()
+                if raw_line == b"":
+                    break  # real EOF
+                line = raw_line.decode("utf-8", errors="replace").rstrip()
+                if line:
+                    yield sse("normal", line)
+                    _append_operation_line(op, line)
 
-    proc.wait()
-    return proc.returncode  # available to caller via: rc = yield from stream_process(...)
+        proc.wait()
+        return proc.returncode  # available to caller via: rc = yield from stream_process(...)
+    finally:
+        # Best-effort: if this generator is abandoned mid-stream (the caller
+        # stops iterating — e.g. an MCP client that reads one event and
+        # drops the connection) Python throws GeneratorExit at the
+        # suspended yield above with no other cleanup path. proc.kill() on
+        # an already-exited process is a documented no-op (subprocess
+        # checks returncode is None first), so this is always safe to call.
+        # wait() after it reaps the child immediately — without it, a
+        # killed-but-unreaped process sits as a zombie until something else
+        # happens to poll()/wait() on it (e.g. Popen.__del__ at GC time).
+        proc.kill()
+        proc.wait()
+
+
+def _iso(ts):
+    return None if ts is None else datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+
+@app.route("/api/operation/current")
+def operation_current():
+    """
+    Read-only status of the single current-operation slot (see
+    _claim_operation). Lets a second client — a refreshed browser tab, an
+    MCP check_operation call — see what the most recent mutating operation
+    is doing, or did, regardless of which HTTP connection started it.
+    """
+    with _operation_lock:
+        op = dict(_current_operation) if _current_operation is not None else None
+    if op is None:
+        return jsonify({"status": "idle"})
+    return jsonify({
+        "id": op["id"],
+        "name": op["name"],
+        "source": op["source"],
+        "started_at": _iso(op["started_at"]),
+        "finished_at": _iso(op["finished_at"]),
+        "status": op["status"],
+        "rc": op["rc"],
+        "lines": op["lines"],
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -937,8 +1086,11 @@ def stream_setup():
     directory, _dir_err = resolve_path(request.args.get("dir", "").strip())
     server_ip  = request.args.get("ip", "").strip()
     bin_override = request.args.get("bin", "").strip()
+    dry_run    = request.args.get("dry_run", "false").lower() in ("true", "1", "yes")
+    source     = request.headers.get("X-Scale-Client", "web")
 
     def generate():
+        op = None
         try:
             if not server_ip:
                 yield sse("error", "[ERROR] No server IP address provided.")
@@ -987,18 +1139,34 @@ def stream_setup():
             _, _, py_ver_str, py_binary = py_info
             yield sse("normal", f"[INFO] Python {py_ver_str} confirmed ({py_binary}).")
 
+            if not dry_run:
+                op, busy = _claim_operation("setup", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
+
             cmd = ["sudo", "-n", spectrumscale_bin, "setup", "-s", server_ip]
             yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd)
+            rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
 
             if rc == 0:
                 yield sse("success", "[OK] Installation service setup complete.")
+                if op:
+                    _release_operation(op, "success")
             else:
                 yield sse("error", f"[ERROR] Setup exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
 
         except Exception as exc:
             yield sse("error", f"[ERROR] Unexpected server error: {exc}")
+            if op:
+                _release_operation(op, "error")
         finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
             yield sse("done", "")
 
     return sse_response(generate())
@@ -1015,8 +1183,11 @@ def stream_nodes():
     body             = request.get_json(silent=True) or {}
     toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
     nodes            = body.get("nodes", [])
+    dry_run          = bool(body.get("dry_run", True))
+    source           = request.headers.get("X-Scale-Client", "web")
 
     def generate():
+        op = None
         try:
             if _tk_err:
                 yield sse("error", f"[ERROR] Invalid toolkit path: {_tk_err}")
@@ -1035,6 +1206,14 @@ def stream_nodes():
                 yield sse("error", "[ERROR] No nodes provided.")
                 return
 
+            if not dry_run:
+                op, busy = _claim_operation("node-config", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
+
             role_flag_map = {
                 "nsd": "-n", "manager": "-m", "quorum": "-q", "admin": "-a",
                 "protocol": "-p", "gui": "-g", "ems": "-e", "callhome": "-c",
@@ -1051,22 +1230,32 @@ def stream_nodes():
                 # Delete first so role changes take effect cleanly
                 del_cmd = ["sudo", "-n", toolkit, "node", "delete", hostname]
                 yield sse("info", f"$ {' '.join(del_cmd)}")
-                yield from stream_process(del_cmd)  # ignore rc — node may not exist yet
+                yield from stream_process(del_cmd, dry_run=dry_run, op=op)  # ignore rc — node may not exist yet
 
                 role_flags = [role_flag_map[r] for r in roles if r in role_flag_map]
                 add_cmd = ["sudo", "-n", toolkit, "node", "add", hostname] + role_flags
                 yield sse("info", f"$ {' '.join(add_cmd)}")
-                rc = yield from stream_process(add_cmd)
+                rc = yield from stream_process(add_cmd, dry_run=dry_run, op=op)
                 if rc == 0:
                     yield sse("success", f"[OK] Node {hostname} added.")
                 else:
                     yield sse("error", f"[ERROR] Failed to add node {hostname} (exit code {rc}).")
 
             yield sse("success", "[OK] All node add commands completed.")
+            if op:
+                _release_operation(op, "success")
 
         except Exception as exc:
             yield sse("error", f"[ERROR] Unexpected server error: {exc}")
+            if op:
+                _release_operation(op, "error")
         finally:
+            # Safety net: any early `return` above that skipped the explicit
+            # release (a validation failure discovered mid-loop, say) would
+            # otherwise leave the slot stuck "running" forever, blocking
+            # every future operation until the process restarts.
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
             yield sse("done", "")
 
     return sse_response(generate())
@@ -1462,18 +1651,18 @@ def stream_populate():
 # endpoints and apply-cluster-config)
 # ---------------------------------------------------------------------------
 
-def _gen_callhome(toolkit, enable):
+def _gen_callhome(toolkit, enable, dry_run=False, op=None):
     action = "enable" if enable else "disable"
     cmd = ["sudo", "-n", toolkit, "callhome", action]
     yield sse("info", f"$ {' '.join(cmd)}")
-    rc = yield from stream_process(cmd)
+    rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
     if rc == 0:
         yield sse("success", f"[OK] Call Home {action}d.")
     else:
         yield sse("error", f"[ERROR] callhome {action} exited with code {rc}.")
 
 
-def _gen_perfmon(toolkit, enable, node=""):
+def _gen_perfmon(toolkit, enable, node="", dry_run=False, op=None):
     if node and not (node == "all" or _VALID_HOSTNAME_RE.fullmatch(node)):
         yield sse("error", f"[ERROR] Invalid perfmon node: {node!r}")
         return
@@ -1482,14 +1671,14 @@ def _gen_perfmon(toolkit, enable, node=""):
     if node:
         cmd += ["-N", node]
     yield sse("info", f"$ {' '.join(cmd)}")
-    rc = yield from stream_process(cmd)
+    rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
     if rc == 0:
         yield sse("success", f"[OK] Performance monitoring {pm_flag}.")
     else:
         yield sse("error", f"[ERROR] config perfmon exited with code {rc}.")
 
 
-def _gen_fileaudit(toolkit, enable, logfs=""):
+def _gen_fileaudit(toolkit, enable, logfs="", dry_run=False, op=None):
     if logfs and not _VALID_GPFS_NAME_RE.fullmatch(logfs):
         yield sse("error", f"[ERROR] Invalid log filesystem name: {logfs!r}")
         return
@@ -1500,7 +1689,7 @@ def _gen_fileaudit(toolkit, enable, logfs=""):
     else:
         cmd = ["sudo", "-n", toolkit, "fileauditlogging", "disable"]
     yield sse("info", f"$ {' '.join(cmd)}")
-    rc = yield from stream_process(cmd)
+    rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
     if rc == 0:
         yield sse("success", f"[OK] File audit logging {'enabled' if enable else 'disabled'}.")
     else:
@@ -1594,12 +1783,23 @@ def stream_apply_cluster_config():
     perfmon_node = body.get("perfmon_node", "")
     fileaudit_on = body.get("fileaudit", False)
     fileaudit_fs = body.get("fileaudit_fs", "")
+    dry_run      = bool(body.get("dry_run", True))
+    source       = request.headers.get("X-Scale-Client", "web")
 
     def generate():
+        op = None
         try:
             if _tk_err or not _sudo_isfile(toolkit):
                 yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
                 return
+
+            if not dry_run:
+                op, busy = _claim_operation("cluster-config-apply", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
 
             # config gpfs flags
             for entry in gpfs_flags:
@@ -1614,24 +1814,31 @@ def stream_apply_cluster_config():
                 if value:
                     cmd.append(value)
                 yield sse("info", f"$ {' '.join(cmd)}")
-                rc = yield from stream_process(cmd)
+                rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
                 if rc == 0:
                     yield sse("success", f"[OK] config gpfs {flag} completed.")
                 else:
                     yield sse("error", f"[ERROR] config gpfs {flag} exited with code {rc}.")
 
             # callhome
-            yield from _gen_callhome(toolkit, callhome_on)
+            yield from _gen_callhome(toolkit, callhome_on, dry_run=dry_run, op=op)
 
             # perfmon
-            yield from _gen_perfmon(toolkit, perfmon_on, perfmon_node)
+            yield from _gen_perfmon(toolkit, perfmon_on, perfmon_node, dry_run=dry_run, op=op)
 
             # fileaudit
-            yield from _gen_fileaudit(toolkit, fileaudit_on, fileaudit_fs)
+            yield from _gen_fileaudit(toolkit, fileaudit_on, fileaudit_fs, dry_run=dry_run, op=op)
+
+            if op:
+                _release_operation(op, "success")
 
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
         finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
             yield sse("done", "")
 
     return sse_response(generate())
@@ -1805,8 +2012,11 @@ def stream_nsd_add():
     data    = request.get_json(force=True, silent=True) or {}
     toolkit, _tk_err = resolve_path(data.get("toolkit", "").strip())
     nsds    = data.get("nsds", [])
+    dry_run = bool(data.get("dry_run", True))
+    source  = request.headers.get("X-Scale-Client", "web")
 
     def generate():
+        op = None
         try:
             if _tk_err or not _sudo_isfile(toolkit):
                 yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
@@ -1815,6 +2025,14 @@ def stream_nsd_add():
                 yield sse("error", "[ERROR] No NSDs provided.")
                 return
 
+            if not dry_run:
+                op, busy = _claim_operation("nsd-add", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
+
             for i, nsd in enumerate(nsds):
                 cmd, err = _build_nsd_add_cmd(toolkit, i + 1, nsd)
                 if err:
@@ -1822,17 +2040,23 @@ def stream_nsd_add():
                     return
 
                 yield sse("info", f"$ {' '.join(cmd)}")
-                rc = yield from stream_process(cmd)
+                rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
                 if rc != 0:
                     disk = str(nsd.get("disk", "")).strip()
                     yield sse("error", f"[ERROR] nsd add failed for {disk} (exit {rc}).")
                     return
 
             yield sse("success", f"[OK] {len(nsds)} NSD(s) added to cluster definition.")
+            if op:
+                _release_operation(op, "success")
 
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
         finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
             yield sse("done", "")
 
     return sse_response(generate())
@@ -1980,8 +2204,11 @@ def stream_format_disk():
     body = request.get_json(silent=True) or {}
     node = (body.get("node") or "").strip()
     device = (body.get("device") or "").strip()
+    dry_run = bool(body.get("dry_run", True))
+    source = request.headers.get("X-Scale-Client", "web")
 
     def generate():
+        op = None
         try:
             if not node or not _VALID_HOSTNAME_RE.fullmatch(node):
                 yield sse("error", f"[ERROR] Invalid node: {node!r}")
@@ -1989,6 +2216,15 @@ def stream_format_disk():
             if not device or not _VALID_DEVICE_PATH_RE.fullmatch(device):
                 yield sse("error", f"[ERROR] Invalid device path: {device!r}")
                 return
+
+            if not dry_run:
+                op, busy = _claim_operation("format-disk", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
+
             # sudo elevates the local ssh client to root before it connects —
             # see stream_list_devices for why.
             cmd = ["sudo", "-n", "ssh", "-o", "StrictHostKeyChecking=accept-new", *_SSH_OPTS,
@@ -1998,14 +2234,22 @@ def stream_format_disk():
             # against ssh not closing stdout because something the remote
             # command triggered (e.g. a udev worker reacting to the device
             # change) inherited the fd and is still running.
-            rc = yield from stream_process(cmd, timeout=60)
+            rc = yield from stream_process(cmd, timeout=60, dry_run=dry_run, op=op)
             if rc == 0:
                 yield sse("success", f"[OK] {device} on {node} wiped — ready for NSD use.")
+                if op:
+                    _release_operation(op, "success")
             else:
                 yield sse("error", f"[ERROR] wipefs failed on {node}:{device} (exit {rc}).")
+                if op:
+                    _release_operation(op, "error")
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
         finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
             yield sse("done", "")
 
     return sse_response(generate())
@@ -2259,8 +2503,11 @@ def stream_phase():
     toolkit,  _tk_err  = resolve_path(request.args.get("toolkit", "").strip())
     phase    = request.args.get("phase", "").strip()
     skip_ssh = request.args.get("skip_ssh", "false").lower() in ("true", "1", "yes")
+    dry_run  = request.args.get("dry_run", "false").lower() in ("true", "1", "yes")
+    source   = request.headers.get("X-Scale-Client", "web")
 
     def generate():
+        op = None
         try:
             if _tk_err or not _sudo_isfile(toolkit):
                 yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
@@ -2269,18 +2516,35 @@ def stream_phase():
             if args is None:
                 yield sse("error", f"[ERROR] Unknown phase: {phase}")
                 return
+
+            if not dry_run:
+                op, busy = _claim_operation(f"phase:{phase}", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
+
             cmd = ["sudo", "-n", toolkit] + args
             if skip_ssh and phase in _SKIP_SSH_PHASES:
                 cmd += ["--skip", "ssh"]
             yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd)
+            rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
             if rc == 0:
                 yield sse("success", f"[OK] {phase} completed successfully.")
+                if op:
+                    _release_operation(op, "success")
             else:
                 yield sse("error", f"[ERROR] {phase} exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
         finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
             yield sse("done", "")
 
     return sse_response(generate())

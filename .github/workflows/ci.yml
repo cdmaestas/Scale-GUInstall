@@ -55,6 +55,22 @@ jobs:
       - name: Run tests
         run: python3 -m pytest tests/ -v
 
+  # ── MCP server unit tests ──────────────────────────────────────────────────
+  # Separate job from `pytest` above: the MCP server is a standalone package
+  # with its own deps (mcp, httpx) that don't ship with the backend, and a
+  # failure here shouldn't gate (or be gated by) the backend's own test job.
+  mcp-server-pytest:
+    name: mcp-server pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Install mcp-server (editable, with dev deps)
+        run: pip install --quiet -e "./mcp-server[dev]"
+
+      - name: Run tests
+        run: python3 -m pytest mcp-server/tests/ -v
+
   # ── Shell script linting ──────────────────────────────────────────────────
   shellcheck:
     name: ShellCheck

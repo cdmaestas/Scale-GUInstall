@@ -5,3 +5,6 @@ packaging/.stage/
 packaging/.rpmbuild/
 packaging/.deb/
 .claude/
+*.egg-info/
+mcp-server/build/
+mcp-server/.venv/

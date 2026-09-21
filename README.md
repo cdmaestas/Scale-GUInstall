@@ -319,6 +319,16 @@ ssh -L 5001:127.0.0.1:5001 user@installer-node echo "tunnel OK"
 
 ---
 
+## MCP Server (AI Agent Access)
+
+[`mcp-server/`](mcp-server/) is a second, parallel way to drive this same backend: an [MCP](https://modelcontextprotocol.io/) server that lets an AI agent (Claude Code, Claude Desktop) call `scale-server.py` as tools, for agent-driven cluster setup and administration alongside the web UI.
+
+It's a thin client, not a reimplementation — every tool call is a stateless HTTP/SSE request to the same backend, reached over the same SSH tunnel described above. Read-only tools (list nodes, check config, probe the cluster, etc.) are always safe to call. Mutating tools (`start_*`, `kill_spectrumscale`) default to a server-side dry run and must be explicitly told not to; only one mutating operation can be in flight at a time, shared with the web UI, so a second attempt while one is running gets a clear "busy" response naming what's already running and who started it.
+
+See [`mcp-server/README.md`](mcp-server/README.md) for installation and setup instructions.
+
+---
+
 ## File Structure
 
 ```
@@ -330,6 +340,7 @@ Scale-GUInstall/
 ├── CHANGELOG.md                # Release history (Keep a Changelog format)
 ├── .githooks/                  # Local git hooks (pre-commit, pre-push) mirroring CI
 ├── tests/                      # pytest unit tests for scale-server.py
+├── mcp-server/                 # MCP server: lets an AI agent drive the backend as tools
 ├── docs/screenshots/           # README screenshots
 └── packaging/
     ├── build-pkg.sh            # Builds RPM and DEB packages into dist/
