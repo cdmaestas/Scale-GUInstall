@@ -162,13 +162,35 @@ class ScaleBackendClient:
 
         Unlike get_sse/post_sse, the caller owns closing this response
         (directly, or by fully draining it) once done with it.
+
+        Uses no read timeout for this request specifically (connect/write/
+        pool stay bounded, so an unreachable backend still fails fast) —
+        the shared client's flat 30s timeout applies to every request
+        otherwise, including this one's background drain (server.py's
+        _drain_stream), and a real toolkit phase can go quiet for minutes
+        at a time without anything being wrong. A prior real install run
+        confirmed this concretely: retried with no MCP timeout in place,
+        the exact same operation ran its full toolkit sequence to
+        completion. Under the old flat timeout, that quiet stretch instead
+        raised httpx.ReadTimeout here, which — via stream_process()'s
+        abandoned-connection safety net on the backend — could kill the
+        real child process mid-run. See docs/long-running-operations-plan.md
+        for the full fix; this is deliberately just the part that stops
+        that from happening, not a replacement for it.
         """
         if self._token is None:
             await self._bootstrap_token()
 
+        stream_timeout = httpx.Timeout(30.0, read=None)
+
         async def _send() -> httpx.Response:
             headers = {_TOKEN_HEADER: self._token, _CLIENT_HEADER: "mcp"}
-            req = self._http.build_request(method, path, params=params, json=json_body, headers=headers)
+            # send() itself has no timeout= parameter — a per-request
+            # override has to be baked into the request via build_request()
+            # instead, same as request()/get() do internally.
+            req = self._http.build_request(
+                method, path, params=params, json=json_body, headers=headers, timeout=stream_timeout,
+            )
             return await self._http.send(req, stream=True)
 
         try:

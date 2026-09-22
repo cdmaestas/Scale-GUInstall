@@ -79,6 +79,53 @@ async def test_get_sse_parses_a_real_stream(backend_url):
         await client.aclose()
 
 
+async def test_open_stream_has_no_read_timeout(backend_url):
+    """A quiet-but-healthy long operation must not get its watching
+    connection dropped by a read timeout — that's what let
+    stream_process()'s abandoned-connection safety net kill a real,
+    still-running toolkit process. Confirmed by a real install run: retried
+    with no MCP timeout in place, it ran to completion; with the old flat
+    30s timeout, it didn't. connect/write/pool stay bounded so a genuinely
+    unreachable backend still fails fast (test_unreachable_backend_raises_
+    clear_error below covers that path)."""
+    client = ScaleBackendClient(base_url=backend_url)
+    try:
+        resp = await client.open_stream("GET", "/api/stream/checkpython")
+        try:
+            timeout = resp.request.extensions.get("timeout")
+            assert timeout["read"] is None
+            assert timeout["connect"] == 30.0
+            # Fully drain to the server's own natural completion, matching
+            # what _drain_stream() does in production — closing early (even
+            # after one event) abandons the backend generator mid-yield,
+            # which is exactly the scenario stream_process()'s
+            # abandoned-connection safety net exists for, and triggers an
+            # unrelated Werkzeug-dev-server-only quirk in this in-process
+            # test harness (production always runs under waitress).
+            events = []
+            async for line in resp.aiter_lines():
+                if line.startswith("data:"):
+                    events.append(line)
+            assert events
+        finally:
+            await resp.aclose()
+    finally:
+        await client.aclose()
+
+
+async def test_other_requests_keep_the_bounded_timeout(backend_url):
+    """Only open_stream()'s requests get the relaxed read timeout — a
+    plain quick call (dry-run preview, JSON endpoint) keeps the original
+    bound, so a backend that unexpectedly hangs on one of those doesn't
+    hang the caller forever too."""
+    client = ScaleBackendClient(base_url=backend_url)
+    try:
+        await client.get_json("/api/ping")  # bootstraps a token, issues a real request
+        assert client._http.timeout.read == 30.0
+    finally:
+        await client.aclose()
+
+
 def test_parse_sse_events_handles_multiple_frames():
     text = (
         'data: {"type": "info", "line": "$ some command"}\n\n'

@@ -15,6 +15,7 @@ pattern instead — see _mutate() below.
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from mcp.server.mcpserver import MCPServer
 
@@ -30,6 +31,8 @@ mcp = MCPServer(
         "tools ('start_*') default to a dry run and must be explicitly told not to."
     ),
 )
+
+logger = logging.getLogger(__name__)
 
 # A single shared client for the process's lifetime. Deliberately not using
 # the SDK's Context/lifespan injection here — that machinery only resolves
@@ -71,10 +74,22 @@ async def _drain_stream(resp, line_iter) -> None:
     the return value — the backend's operation buffer (check_operation) is
     the source of truth for progress and outcome, not this. Without this,
     abandoning the connection after reading just the first event would
-    leave the backend's stream_process() generator suspended mid-yield."""
+    leave the backend's stream_process() generator suspended mid-yield.
+
+    The client now opens this stream with no read timeout (see
+    ScaleBackendClient.open_stream), so a healthy-but-quiet operation no
+    longer ends up here on its own. If this loop does raise, it's a real
+    failure — tunnel drop, backend restart, this process's own event loop
+    stalling — and asyncio's default unhandled-task-exception handling
+    would otherwise only log it (if at all) whenever this task happens to
+    be garbage collected. Logging it explicitly, immediately, makes that
+    failure visible instead of silently leaving check_operation as the
+    only (much later) sign anything went wrong."""
     try:
         async for _ in line_iter:
             pass
+    except Exception:
+        logger.exception("Lost the drain connection for an in-progress operation")
     finally:
         await resp.aclose()
 
