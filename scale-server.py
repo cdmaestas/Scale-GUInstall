@@ -527,6 +527,26 @@ def sse(type_, line):
     return f"data: {json.dumps({'type': type_, 'line': line})}\n\n"
 
 
+def sse_final_status(dry_run, ok_line):
+    """
+    The final "did it work" event after `rc = yield from stream_process(...,
+    dry_run=dry_run)` comes back 0. A dry run's rc is always 0 (see
+    stream_process's dry_run branch) — without this, every mutating
+    endpoint yielded the exact same "success"-typed, real-completion-
+    worded event whether or not anything actually ran, discovered by
+    testing start_setup's dry_run against a real cluster and seeing
+    "[OK] Installation service setup complete." right after a line that
+    said the command was never executed. A consumer that keys off event
+    type (the MCP server, a future non-web client) could not tell dry-run
+    validation from real success without reading and understanding the
+    line text too. Reuses the "dryrun" type stream_process itself already
+    emits, so filtering on type alone is now enough either way.
+    """
+    if dry_run:
+        return sse("dryrun", "[DRY RUN] Validated — not executed. Would report: " + ok_line)
+    return sse("success", ok_line)
+
+
 def sse_response(generator):
     """Wrap a generator in a streaming Response with correct SSE headers."""
     headers = {
@@ -1152,7 +1172,7 @@ def stream_setup():
             rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
 
             if rc == 0:
-                yield sse("success", "[OK] Installation service setup complete.")
+                yield sse_final_status(dry_run, "[OK] Installation service setup complete.")
                 if op:
                     _release_operation(op, "success")
             else:
@@ -1237,11 +1257,11 @@ def stream_nodes():
                 yield sse("info", f"$ {' '.join(add_cmd)}")
                 rc = yield from stream_process(add_cmd, dry_run=dry_run, op=op)
                 if rc == 0:
-                    yield sse("success", f"[OK] Node {hostname} added.")
+                    yield sse_final_status(dry_run, f"[OK] Node {hostname} added.")
                 else:
                     yield sse("error", f"[ERROR] Failed to add node {hostname} (exit code {rc}).")
 
-            yield sse("success", "[OK] All node add commands completed.")
+            yield sse_final_status(dry_run, "[OK] All node add commands completed.")
             if op:
                 _release_operation(op, "success")
 
@@ -1657,7 +1677,7 @@ def _gen_callhome(toolkit, enable, dry_run=False, op=None):
     yield sse("info", f"$ {' '.join(cmd)}")
     rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
     if rc == 0:
-        yield sse("success", f"[OK] Call Home {action}d.")
+        yield sse_final_status(dry_run, f"[OK] Call Home {action}d.")
     else:
         yield sse("error", f"[ERROR] callhome {action} exited with code {rc}.")
 
@@ -1673,7 +1693,7 @@ def _gen_perfmon(toolkit, enable, node="", dry_run=False, op=None):
     yield sse("info", f"$ {' '.join(cmd)}")
     rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
     if rc == 0:
-        yield sse("success", f"[OK] Performance monitoring {pm_flag}.")
+        yield sse_final_status(dry_run, f"[OK] Performance monitoring {pm_flag}.")
     else:
         yield sse("error", f"[ERROR] config perfmon exited with code {rc}.")
 
@@ -1691,7 +1711,7 @@ def _gen_fileaudit(toolkit, enable, logfs="", dry_run=False, op=None):
     yield sse("info", f"$ {' '.join(cmd)}")
     rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
     if rc == 0:
-        yield sse("success", f"[OK] File audit logging {'enabled' if enable else 'disabled'}.")
+        yield sse_final_status(dry_run, f"[OK] File audit logging {'enabled' if enable else 'disabled'}.")
     else:
         yield sse("error", f"[ERROR] fileauditlogging exited with code {rc}.")
 
@@ -1816,7 +1836,7 @@ def stream_apply_cluster_config():
                 yield sse("info", f"$ {' '.join(cmd)}")
                 rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
                 if rc == 0:
-                    yield sse("success", f"[OK] config gpfs {flag} completed.")
+                    yield sse_final_status(dry_run, f"[OK] config gpfs {flag} completed.")
                 else:
                     yield sse("error", f"[ERROR] config gpfs {flag} exited with code {rc}.")
 
@@ -2046,7 +2066,7 @@ def stream_nsd_add():
                     yield sse("error", f"[ERROR] nsd add failed for {disk} (exit {rc}).")
                     return
 
-            yield sse("success", f"[OK] {len(nsds)} NSD(s) added to cluster definition.")
+            yield sse_final_status(dry_run, f"[OK] {len(nsds)} NSD(s) added to cluster definition.")
             if op:
                 _release_operation(op, "success")
 
@@ -2236,7 +2256,7 @@ def stream_format_disk():
             # change) inherited the fd and is still running.
             rc = yield from stream_process(cmd, timeout=60, dry_run=dry_run, op=op)
             if rc == 0:
-                yield sse("success", f"[OK] {device} on {node} wiped — ready for NSD use.")
+                yield sse_final_status(dry_run, f"[OK] {device} on {node} wiped — ready for NSD use.")
                 if op:
                     _release_operation(op, "success")
             else:
@@ -2531,7 +2551,7 @@ def stream_phase():
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
             if rc == 0:
-                yield sse("success", f"[OK] {phase} completed successfully.")
+                yield sse_final_status(dry_run, f"[OK] {phase} completed successfully.")
                 if op:
                     _release_operation(op, "success")
             else:

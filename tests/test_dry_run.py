@@ -206,3 +206,73 @@ def test_nsd_add_returns_busy_when_operation_already_running(ss, _fake_toolkit_e
     body = resp.get_data(as_text=True)
     assert '"type": "busy"' in body
     assert "some-other-op" in body
+
+
+# --- sse_final_status(): a dry run's final "did it work" event must never
+# be mistaken for a real one, even by a consumer that only checks event
+# type. Found by testing start_setup's dry_run against a real cluster and
+# seeing a "success"-typed "[OK] Installation service setup complete."
+# line right after a line saying the command was never executed. -----------
+
+def test_sse_final_status_real_run_is_typed_success(ss):
+    assert '"type": "success"' in ss.sse_final_status(False, "[OK] Thing done.")
+    assert "[OK] Thing done." in ss.sse_final_status(False, "[OK] Thing done.")
+
+
+def test_sse_final_status_dry_run_is_typed_dryrun_not_success(ss):
+    event = ss.sse_final_status(True, "[OK] Thing done.")
+    assert '"type": "dryrun"' in event
+    assert '"type": "success"' not in event
+    # The real message still appears (so it's still informative), just
+    # not under the "success" type a consumer might treat as confirmation.
+    assert "[OK] Thing done." in event
+
+
+@pytest.mark.parametrize("method,path,payload", [
+    ("post", "/api/stream/nsd-add", {
+        "toolkit": "/tmp/spectrumscale", "dry_run": True,
+        "nsds": [{"server": "node1", "disk": "/dev/sdb", "usage": "dataAndMetadata"}],
+    }),
+    ("post", "/api/stream/format-disk", {
+        "node": "node1", "device": "/dev/sdb", "dry_run": True,
+    }),
+    ("post", "/api/stream/nodes", {
+        "toolkit": "/tmp/spectrumscale", "dry_run": True,
+        "nodes": [{"hostname": "node1", "roles": ["nsd"]}],
+    }),
+    ("post", "/api/stream/apply-cluster-config", {
+        "toolkit": "/tmp/spectrumscale", "dry_run": True,
+        "gpfs_flags": [{"flag": "-c", "value": "mycluster"}],
+    }),
+])
+def test_no_success_typed_event_in_any_dry_run_response(ss, _fake_toolkit_exists, method, path, payload):
+    client = ss.app.test_client()
+    resp = getattr(client, method)(path, headers={"X-Scale-Token": ss._AUTH_TOKEN}, json=payload)
+    body = resp.get_data(as_text=True)
+    assert '"type": "success"' not in body, f"{path} yielded a success-typed event during a dry run: {body}"
+    assert '"type": "dryrun"' in body
+
+
+def test_stream_phase_dry_run_has_no_success_typed_event(ss, _fake_toolkit_exists):
+    client = ss.app.test_client()
+    resp = client.get(
+        "/api/stream/phase",
+        headers={"X-Scale-Token": ss._AUTH_TOKEN},
+        query_string={"toolkit": "/tmp/spectrumscale", "phase": "install", "dry_run": "true"},
+    )
+    body = resp.get_data(as_text=True)
+    assert '"type": "success"' not in body
+    assert '"type": "dryrun"' in body
+
+
+def test_stream_setup_dry_run_has_no_success_typed_event(ss, _fake_toolkit_exists, monkeypatch):
+    monkeypatch.setattr(ss, "find_compliant_python", lambda: (3, 12, "3.12.0", "/usr/bin/python3.12"))
+    client = ss.app.test_client()
+    resp = client.get(
+        "/api/stream/setup",
+        headers={"X-Scale-Token": ss._AUTH_TOKEN},
+        query_string={"bin": "/tmp/spectrumscale", "ip": "node1", "dry_run": "true"},
+    )
+    body = resp.get_data(as_text=True)
+    assert '"type": "success"' not in body
+    assert '"type": "dryrun"' in body
