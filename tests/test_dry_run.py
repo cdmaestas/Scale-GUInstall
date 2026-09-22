@@ -244,6 +244,9 @@ def test_sse_final_status_dry_run_is_typed_dryrun_not_success(ss):
         "toolkit": "/tmp/spectrumscale", "dry_run": True,
         "gpfs_flags": [{"flag": "-c", "value": "mycluster"}],
     }),
+    ("post", "/api/stream/nsd-clear", {
+        "toolkit": "/tmp/spectrumscale", "dry_run": True,
+    }),
 ])
 def test_no_success_typed_event_in_any_dry_run_response(ss, _fake_toolkit_exists, method, path, payload):
     client = ss.app.test_client()

@@ -115,7 +115,7 @@ async def test_all_read_only_tools_are_registered():
         "ccr_status", "check_ansible", "check_locale",
     }
     expected_mutating = {
-        "start_format_disk", "start_nsd_add", "start_node_config",
+        "start_format_disk", "start_nsd_add", "start_nsd_clear", "start_node_config",
         "kill_spectrumscale", "start_cluster_config_apply", "start_phase",
         "start_setup",
     }

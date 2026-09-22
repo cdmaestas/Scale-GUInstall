@@ -2082,6 +2082,62 @@ def stream_nsd_add():
     return sse_response(generate())
 
 
+@app.route("/api/stream/nsd-clear", methods=["POST", "OPTIONS"])
+def stream_nsd_clear():
+    """
+    `spectrumscale nsd clear -f` — wipes the toolkit's entire staged NSD
+    list in one shot (verified against a real `nsd clear -h`: takes only
+    -f/--force to skip its own interactive confirmation, no NSD names or
+    other arguments). This is the toolkit's *staged cluster definition*,
+    the same thing node add/delete edit — it does not touch the live GPFS
+    filesystem or the disks themselves, matching how node delete+add above
+    only ever edits that same staged config, not the live cluster.
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    body = request.get_json(silent=True) or {}
+    toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
+    dry_run = bool(body.get("dry_run", True))
+    source  = request.headers.get("X-Scale-Client", "web")
+
+    def generate():
+        op = None
+        try:
+            if _tk_err or not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
+                return
+
+            if not dry_run:
+                op, busy = _claim_operation("nsd-clear", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
+
+            cmd = ["sudo", "-n", toolkit, "nsd", "clear", "-f"]
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
+            if rc == 0:
+                yield sse_final_status(dry_run, "[OK] NSD configuration cleared.")
+                if op:
+                    _release_operation(op, "success")
+            else:
+                yield sse("error", f"[ERROR] nsd clear exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
+        finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
+            yield sse("done", "")
+
+    return sse_response(generate())
+
+
 # ---------------------------------------------------------------------------
 # Test SSH connectivity + GPFS state on a remote node
 # ---------------------------------------------------------------------------

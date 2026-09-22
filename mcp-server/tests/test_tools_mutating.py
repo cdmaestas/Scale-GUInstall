@@ -57,6 +57,11 @@ async def test_start_nsd_add_dry_run_preview(backend_url, _fake_toolkit_exists):
     assert any(e["type"] == "dryrun" for e in result["events"])
 
 
+async def test_start_nsd_clear_dry_run_preview(backend_url, _fake_toolkit_exists):
+    result = await tools.start_nsd_clear(toolkit="/tmp/spectrumscale", dry_run=True)
+    assert any(e["type"] == "dryrun" for e in result["events"])
+
+
 async def test_start_node_config_dry_run_preview(backend_url, _fake_toolkit_exists):
     result = await tools.start_node_config(
         toolkit="/tmp/spectrumscale",
