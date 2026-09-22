@@ -4,13 +4,22 @@
 
 Proposed implementation plan. This document describes the intended design; it
 does not change the behavior of the backend, web UI, or MCP server by itself,
-except for one piece: the "interim guard" described under MCP changes has
-landed (`ScaleBackendClient.open_stream` now opens with no read timeout,
-connect/write/pool unchanged; `_drain_stream` logs instead of silently
-swallowing a lost connection). That closes the specific danger — a real
-operation's watching connection timing out and, via `stream_process()`'s
-abandoned-connection safety net, killing the still-running child — without
-implementing any of the architecture below. Phases A–D are still unstarted.
+except for two pieces that close the specific danger (a real operation's
+watcher losing its connection and, via `stream_process()`'s abandoned-
+connection safety net, getting the still-running child killed) without
+implementing any of the architecture below:
+
+- The "interim guard" described under MCP changes has landed
+  (`ScaleBackendClient.open_stream` now opens with no read timeout, connect/
+  write/pool unchanged; `_drain_stream` logs instead of silently swallowing a
+  lost connection).
+- The same danger existed for the web UI via a different mechanism — not a
+  client-side timeout (the web UI's `fetch()`-based streaming has none), but
+  an idle NAT/firewall silently dropping the SSH tunnel itself during a long
+  quiet phase. Every documented and generated tunnel command now includes
+  `-o ServerAliveInterval=30 -o ServerAliveCountMax=3`.
+
+Phases A–D are still unstarted.
 
 ## Problem statement
 

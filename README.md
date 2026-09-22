@@ -116,16 +116,18 @@ xdg-open http://127.0.0.1:5001
 To reach a remote installer node, tunnel the port from your workstation and open the same URL locally (recommended):
 
 ```bash
-ssh -L 5001:127.0.0.1:5001 user@installer-node
+ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 5001:127.0.0.1:5001 user@installer-node
 ```
 
 Then open `http://127.0.0.1:5001` in your local browser — the tunnel forwards it transparently, and you're still loading the page (and its token) from the remote server, not a local copy. To tunnel in the background without keeping a shell open:
 
 ```bash
-ssh -fNL 5001:127.0.0.1:5001 user@installer-node
+ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -fNL 5001:127.0.0.1:5001 user@installer-node
 ```
 
 > **Why a tunnel?** Binding the server to `0.0.0.0` would expose privileged execution endpoints to anyone on the network. The tunnel keeps the server loopback-only while still allowing remote access over an encrypted channel.
+
+> **Why `ServerAliveInterval`/`ServerAliveCountMax`?** Install, deploy, and upgrade phases can go quiet for minutes at a time — that's normal, not a hang. Without a keepalive, an idle NAT or firewall between you and the installer node can silently drop the tunnel's TCP connection during one of those quiet stretches, which the backend sees as an abandoned request and responds to by killing the still-running command. This sends a keepalive probe every 30s so the connection stays open through long quiet periods instead.
 
 > **Dry Run mode is on by default.** Every button shows the command it would run without executing anything. Disable it in Settings only when you're ready to apply changes to the cluster.
 
@@ -247,11 +249,13 @@ The backend server binds to `127.0.0.1` only. To use the GUI from your workstati
 
 ```bash
 # Interactive (tunnel closes when terminal closes)
-ssh -L 5001:127.0.0.1:5001 user@installer-node
+ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 5001:127.0.0.1:5001 user@installer-node
 
 # Background (stays open)
-ssh -fNL 5001:127.0.0.1:5001 user@installer-node
+ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -fNL 5001:127.0.0.1:5001 user@installer-node
 ```
+
+The `ServerAliveInterval`/`ServerAliveCountMax` options keep the tunnel alive through the long quiet stretches install/deploy/upgrade phases normally have — without them, an idle NAT or firewall can silently drop the connection mid-phase, which looks to the backend like an abandoned request and gets the still-running command killed.
 
 Then open `http://127.0.0.1:5001` in your local browser — not a local copy of `Scale-GUInstall.html`, which has no auth token and can't make real backend calls. The **Settings** page has a tunnel helper that generates the command for you and tests the connection.
 

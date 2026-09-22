@@ -2895,7 +2895,7 @@
           </div>
           <div style="margin-top:var(--spacing-05); padding:var(--spacing-04); background:rgba(69,137,255,0.07); border:1px solid rgba(69,137,255,0.3); font-size:12px; color:var(--cds-text-secondary)">
             <strong>Background tunnel</strong> (stays open after closing the terminal):<br>
-            <span id="tunnel-bg-preview" style="font-family:var(--font-mono); color:var(--cds-text-primary)">ssh -fNL 5001:127.0.0.1:5001 user@installer-node</span>
+            <span id="tunnel-bg-preview" style="font-family:var(--font-mono); color:var(--cds-text-primary)">ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -fNL 5001:127.0.0.1:5001 user@installer-node</span>
           </div>
         </div>
       </div>
@@ -5729,6 +5729,13 @@ function copyStanza() { navigator.clipboard?.writeText(document.getElementById('
 function copyFSCmd() { navigator.clipboard?.writeText(document.getElementById('fs-cmd-preview').innerText); }
 
 // ===== SSH TUNNEL HELPER =====
+// Keeps the tunnel alive through the long quiet stretches install/deploy/
+// upgrade phases normally have — without a keepalive, an idle NAT or
+// firewall can silently drop the tunnel mid-phase, which looks to the
+// backend like an abandoned request and gets the still-running command
+// killed, not just the connection.
+const TUNNEL_KEEPALIVE_FLAGS = '-o ServerAliveInterval=30 -o ServerAliveCountMax=3';
+
 function updateTunnelCmd() {
   const host = document.getElementById('tunnel-host').value.trim();
   const port = document.getElementById('tunnel-port').value.trim() || '5001';
@@ -5736,12 +5743,12 @@ function updateTunnelCmd() {
   const bgPreview = document.getElementById('tunnel-bg-preview');
   if (!host) {
     preview.innerHTML = '<div style="color:var(--cds-text-secondary)">Enter installer node above to generate tunnel command</div>';
-    bgPreview.textContent = `ssh -fNL ${port}:127.0.0.1:${port} user@installer-node`;
+    bgPreview.textContent = `ssh ${TUNNEL_KEEPALIVE_FLAGS} -fNL ${port}:127.0.0.1:${port} user@installer-node`;
     return;
   }
   const fwd = `${h(port)}:127.0.0.1:${h(port)}`;
-  preview.innerHTML = `<div><span class="cmd-prompt">$ </span>ssh -L ${fwd} ${h(host)}</div>`;
-  bgPreview.textContent = `ssh -fNL ${port}:127.0.0.1:${port} ${host}`;
+  preview.innerHTML = `<div><span class="cmd-prompt">$ </span>ssh ${TUNNEL_KEEPALIVE_FLAGS} -L ${fwd} ${h(host)}</div>`;
+  bgPreview.textContent = `ssh ${TUNNEL_KEEPALIVE_FLAGS} -fNL ${port}:127.0.0.1:${port} ${host}`;
 
   // Keep backend URL field in sync with the port
   const backendInput = document.getElementById('prepare-backend-url');
@@ -5751,7 +5758,7 @@ function updateTunnelCmd() {
 function copyTunnelCmd(btn) {
   const host = document.getElementById('tunnel-host').value.trim();
   const port = document.getElementById('tunnel-port').value.trim() || '5001';
-  const cmd = `ssh -L ${port}:127.0.0.1:${port} ${host || 'user@installer-node'}`;
+  const cmd = `ssh ${TUNNEL_KEEPALIVE_FLAGS} -L ${port}:127.0.0.1:${port} ${host || 'user@installer-node'}`;
   navigator.clipboard.writeText(cmd).then(() => {
     const orig = btn.textContent;
     btn.textContent = 'Copied!';

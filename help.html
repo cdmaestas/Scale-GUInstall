@@ -211,11 +211,12 @@ scale-guinstall</code></pre>
       <h2>Connecting remotely</h2>
       <p>The backend binds to <code>127.0.0.1</code> only, so it is never reachable from the network directly. To drive it from your own workstation, forward the port over SSH, then open <code>http://127.0.0.1:5001</code> locally — not a local copy of this HTML file (see <a href="#getting-started">Getting started</a> for why):</p>
       <pre><code># Interactive (tunnel closes when the terminal closes)
-ssh -L 5001:127.0.0.1:5001 user@installer-node
+ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 5001:127.0.0.1:5001 user@installer-node
 
 # Background (stays open after the terminal exits)
-ssh -fNL 5001:127.0.0.1:5001 user@installer-node</code></pre>
-      <p>The Backend URL field already defaults to <code>http://127.0.0.1:5001</code> — the tunnel forwards it transparently. The Settings page has a tunnel helper that generates this command and tests the connection for you.</p>
+ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -fNL 5001:127.0.0.1:5001 user@installer-node</code></pre>
+      <p><code>ServerAliveInterval</code>/<code>ServerAliveCountMax</code> keep the tunnel alive through the long quiet stretches install, deploy, and upgrade phases normally have — without them, an idle NAT or firewall can silently drop the tunnel mid-phase, which looks to the backend like an abandoned request and gets the still-running command killed, not just the connection.</p>
+      <p>The Backend URL field already defaults to <code>http://127.0.0.1:5001</code> — the tunnel forwards it transparently. The Settings page has a tunnel helper that generates this command (with these same keepalive options) and tests the connection for you.</p>
     </section>
 
     <section id="troubleshooting">
