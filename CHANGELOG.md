@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.2.0] — 2026-09-22
+
 ### Added
 - New `mcp-server/` package: an MCP server that lets an AI agent (Claude Code, Claude Desktop) drive `scale-server.py` as tools — a second, parallel interface alongside the web UI, not a replacement for it. It's a thin, stateless HTTP+SSE client of the existing backend, reached over the same manually-set-up SSH tunnel as the browser; it holds no cluster state of its own. All 19 read-only endpoints are exposed as freely-callable tools, plus a new `check_operation` tool. The 7 mutating endpoints (node config, NSD add, cluster config apply, install/deploy/upgrade phases, setup, format-disk, kill) are exposed as `start_*`/`kill_spectrumscale` tools that default to a server-side dry run and must be explicitly told not to.
 - New `start_nsd_clear` MCP tool + `POST /api/stream/nsd-clear` backend endpoint (`spectrumscale nsd clear -f`, verified against a real `nsd clear -h` before implementing — no arguments besides `-f`/`--force`), for wiping the toolkit's entire staged NSD list in one shot. All-or-nothing: there's no per-NSD delete tool yet, since the toolkit's own `nsd list` output doesn't expose per-NSD names through this backend's current parsing — only the disk/server/usage/failureGroup fields callers need to re-add.

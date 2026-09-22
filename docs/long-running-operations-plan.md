@@ -18,6 +18,12 @@ implementing any of the architecture below:
   an idle NAT/firewall silently dropping the SSH tunnel itself during a long
   quiet phase. Every documented and generated tunnel command now includes
   `-o ServerAliveInterval=30 -o ServerAliveCountMax=3`.
+- Both fixes were verified together against a real cluster on 2026-09-22: a
+  `spectrumscale install` run over the MCP+tunnel path completed successfully
+  after 27m23s of continuous streaming (5 nodes, zero Ansible failures, GPFS/
+  perfmon/GUI all active at the end) with no connection drop and no premature
+  kill. A `precheck-install` re-run immediately before it also completed
+  cleanly. No further incident of the "broken cluster" symptom was observed.
 
 Phases A–D are still unstarted.
 
