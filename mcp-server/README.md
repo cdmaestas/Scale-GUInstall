@@ -52,11 +52,10 @@ server, for example in Claude Code's `.mcp.json`:
 
 - **Read-only tools** (`ping`, `list_nodes`, `check_operation`, etc.) are
   always safe to call — no confirmation needed.
-- **Mutating tools** (`start_*`, `kill_spectrumscale` — added in a later
-  pass; not yet in this v1) take a `dry_run` parameter that **defaults to
-  `true`**. The backend itself validates inputs and reports what it would
-  run without executing anything until the caller explicitly passes
-  `dry_run=false`.
+- **Mutating tools** (`start_*`, `kill_spectrumscale`) take a `dry_run`
+  parameter that **defaults to `true`**. The backend itself validates
+  inputs and reports what it would run without executing anything until
+  the caller explicitly passes `dry_run=false`.
 - Only one mutating operation can be in flight at a time, shared with the
   web UI — a second attempt gets a clear "busy" response naming what's
   already running and who started it (web UI or MCP), rather than
@@ -68,11 +67,10 @@ server, for example in Claude Code's `.mcp.json`:
 ## v1 tool scope
 
 Every read-only backend endpoint, plus `check_operation`. Mutating tools
-(node config, NSD add, cluster config apply, install/deploy phases,
-setup, format-disk, kill) are tracked separately — see the project's
-CHANGELOG for what's shipped in a given version. Endpoints not yet
-exposed as tools at all (AFM gateway, node identity/certs, NFS core dump,
-etc.) are an explicit backlog, not an oversight.
+cover node config, NSD add, cluster config apply, install/deploy/upgrade
+phases, setup, format-disk, and kill. Endpoints not yet exposed as tools
+at all (AFM gateway, node identity/certs, NFS core dump, etc.) are an
+explicit backlog, not an oversight.
 
 ## Development
 
