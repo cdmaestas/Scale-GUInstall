@@ -111,11 +111,20 @@ locally \(em not a local copy of
 .BR Scale\-GUInstall.html :
 .EX
 # Interactive (tunnel closes when the terminal closes)
-ssh \-L 5001:127.0.0.1:5001 user@installer\-node
+ssh \-o ServerAliveInterval=30 \-o ServerAliveCountMax=3 \-L 5001:127.0.0.1:5001 user@installer\-node
 
 # Background (stays open after the terminal exits)
-ssh \-fNL 5001:127.0.0.1:5001 user@installer\-node
+ssh \-o ServerAliveInterval=30 \-o ServerAliveCountMax=3 \-fNL 5001:127.0.0.1:5001 user@installer\-node
 .EE
+The
+.B ServerAliveInterval / ServerAliveCountMax
+options keep the tunnel alive through the long quiet stretches install,
+deploy, and upgrade phases normally have. Without them, an idle NAT or
+firewall between you and the installer node can silently drop the
+connection mid\-phase, which looks to the backend like an abandoned
+request and gets the still\-running command killed, not just the
+connection.
+.PP
 The Backend URL field in the GUI already defaults to
 .BR http://127.0.0.1:5001 ;
 the SSH tunnel forwards it transparently.
