@@ -67,10 +67,11 @@ server, for example in Claude Code's `.mcp.json`:
 ## v1 tool scope
 
 Every read-only backend endpoint, plus `check_operation`. Mutating tools
-cover node config, NSD add, cluster config apply, install/deploy/upgrade
-phases, setup, format-disk, and kill. Endpoints not yet exposed as tools
-at all (AFM gateway, node identity/certs, NFS core dump, etc.) are an
-explicit backlog, not an oversight.
+cover node config, NSD add, NSD clear (all-or-nothing — no per-NSD delete
+tool yet), cluster config apply, install/deploy/upgrade phases, setup,
+format-disk, and kill. Endpoints not yet exposed as tools at all (AFM
+gateway, node identity/certs, NFS core dump, etc.) are an explicit
+backlog, not an oversight.
 
 ## Development
 

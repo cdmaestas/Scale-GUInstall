@@ -294,6 +294,21 @@ async def start_nsd_add(toolkit: str, nsds: list[dict], dry_run: bool = True) ->
 
 
 @mcp.tool()
+async def start_nsd_clear(toolkit: str, dry_run: bool = True) -> dict:
+    """Wipe the toolkit's entire staged NSD list in one shot (`spectrumscale
+    nsd clear -f`) — everything nsd add has configured, gone, so the next
+    nsd add starts from empty. This only edits the toolkit's staged cluster
+    definition, the same thing node add/delete edit; it does not touch the
+    live GPFS filesystem or the disks themselves. There's no per-NSD delete
+    tool yet — this is all-or-nothing. Use check_operation to see the
+    result of a real run."""
+    return await _mutate(
+        "POST", "/api/stream/nsd-clear", dry_run,
+        json_body={"toolkit": toolkit, "dry_run": dry_run},
+    )
+
+
+@mcp.tool()
 async def start_node_config(toolkit: str, nodes: list[dict], dry_run: bool = True) -> dict:
     """Configure nodes in the cluster definition (`spectrumscale node add`,
     replacing any prior definition of the same node). Each entry in nodes
