@@ -2457,6 +2457,117 @@ def stream_mmchconfig():
     return sse_response(generate())
 
 
+@app.route("/api/stream/postupgrade/release-latest", methods=["POST", "OPTIONS"])
+def stream_release_latest():
+    """
+    `mmchconfig release=LATEST -i` — activates the highest cluster
+    functionality level supported by every currently-installed node's
+    packages. Deliberately its own endpoint, not folded into the
+    tunables-only `/api/stream/postconfig/mmchconfig` (allowlisted to
+    maxFilesToCache/maxStatCache/pagepool/maxMBpS): bumping the cluster's
+    effective release level is a much more consequential, semi-irreversible,
+    cluster-wide action than a runtime performance tunable, and packages on
+    every node must already be upgraded first — `upgrade run` only upgrades
+    packages, it deliberately never does this itself.
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    body    = request.get_json(silent=True) or {}
+    dry_run = bool(body.get("dry_run", True))
+    source  = request.headers.get("X-Scale-Client", "web")
+
+    def generate():
+        op = None
+        try:
+            if not dry_run:
+                op, busy = _claim_operation("release-latest", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
+            cmd = ["sudo", "-n"] + mmcmd("mmchconfig", "release=LATEST", "-i")
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
+            if rc == 0:
+                yield sse_final_status(dry_run, "[OK] Cluster release level set to LATEST.")
+                if op:
+                    _release_operation(op, "success")
+            else:
+                yield sse("error", f"[ERROR] mmchconfig release=LATEST exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
+        finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
+            yield sse("done", "")
+
+    return sse_response(generate())
+
+
+_VALID_FS_VERSION_RE = re.compile(r'^(full|compat)$')
+
+@app.route("/api/stream/postupgrade/filesystem-version", methods=["POST", "OPTIONS"])
+def stream_filesystem_version():
+    """
+    `mmchfs <device> -V full|compat` — activates the on-disk filesystem
+    format matching the cluster's current release level (full) or the
+    latest format still compatible with older, not-yet-upgraded nodes
+    (compat). Only these two literal values are accepted, matching the
+    pattern `_ALLOWED_GPFS_FLAGS` already uses elsewhere in this file for
+    mm-command arguments — never an arbitrary version string.
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    body    = request.get_json(silent=True) or {}
+    device  = body.get("device", "").strip()
+    version = body.get("version", "full").strip()
+    dry_run = bool(body.get("dry_run", True))
+    source  = request.headers.get("X-Scale-Client", "web")
+
+    def generate():
+        op = None
+        try:
+            if not device or not _VALID_GPFS_NAME_RE.fullmatch(device):
+                yield sse("error", f"[ERROR] Invalid filesystem device name: {device!r}")
+                return
+            if not _VALID_FS_VERSION_RE.fullmatch(version):
+                yield sse("error", f"[ERROR] Invalid version {version!r}. Must be 'full' or 'compat'.")
+                return
+            if not dry_run:
+                op, busy = _claim_operation("filesystem-version", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
+            cmd = ["sudo", "-n"] + mmcmd("mmchfs", device, "-V", version)
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
+            if rc == 0:
+                yield sse_final_status(dry_run, f"[OK] Filesystem {device} version set to {version}.")
+                if op:
+                    _release_operation(op, "success")
+            else:
+                yield sse("error", f"[ERROR] mmchfs -V {version} exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
+        finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
+            yield sse("done", "")
+
+    return sse_response(generate())
+
+
 @app.route("/api/stream/postconfig/healthinterval")
 def stream_healthinterval():
     interval = request.args.get("interval", "DEFAULT").strip().upper()
@@ -2632,6 +2743,69 @@ def stream_phase():
                     _release_operation(op, "success")
             else:
                 yield sse("error", f"[ERROR] {phase} exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
+        finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
+            yield sse("done", "")
+
+    return sse_response(generate())
+
+
+@app.route("/api/stream/upgrade/offline-nodes", methods=["POST", "OPTIONS"])
+def stream_upgrade_offline_nodes():
+    """
+    `spectrumscale upgrade config offline -N <node1,node2,...>` — designates
+    nodes for an offline upgrade: `upgrade run` will upgrade their packages
+    without restarting GPFS on them, so `mmstartup` must be run manually on
+    each afterward. This is a separate opt-in step from a normal `upgrade
+    run`, which otherwise does an automatic rolling/online upgrade one node
+    at a time. Confirmed against IBM's documented toolkit behavior — there
+    is no corresponding "mark online again" subcommand documented, so this
+    endpoint only supports designating nodes offline, not reverting it.
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    body    = request.get_json(silent=True) or {}
+    toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
+    nodes   = [str(n).strip() for n in body.get("nodes", []) if str(n).strip()]
+    dry_run = bool(body.get("dry_run", True))
+    source  = request.headers.get("X-Scale-Client", "web")
+
+    def generate():
+        op = None
+        try:
+            if _tk_err or not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
+                return
+            if not nodes:
+                yield sse("error", "[ERROR] At least one node is required.")
+                return
+            for n in nodes:
+                if not _VALID_HOSTNAME_RE.fullmatch(n):
+                    yield sse("error", f"[ERROR] Invalid node hostname: {n!r}")
+                    return
+            if not dry_run:
+                op, busy = _claim_operation("upgrade-offline-nodes", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
+            cmd = ["sudo", "-n", toolkit, "upgrade", "config", "offline", "-N", ",".join(nodes)]
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
+            if rc == 0:
+                yield sse_final_status(dry_run, f"[OK] {len(nodes)} node(s) designated for offline upgrade.")
+                if op:
+                    _release_operation(op, "success")
+            else:
+                yield sse("error", f"[ERROR] upgrade config offline exited with code {rc}.")
                 if op:
                     _release_operation(op, "error")
         except Exception as exc:

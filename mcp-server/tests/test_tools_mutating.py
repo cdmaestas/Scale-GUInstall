@@ -62,6 +62,23 @@ async def test_start_nsd_clear_dry_run_preview(backend_url, _fake_toolkit_exists
     assert any(e["type"] == "dryrun" for e in result["events"])
 
 
+async def test_start_upgrade_offline_nodes_dry_run_preview(backend_url, _fake_toolkit_exists):
+    result = await tools.start_upgrade_offline_nodes(
+        toolkit="/tmp/spectrumscale", nodes=["node1", "node2"], dry_run=True,
+    )
+    assert any(e["type"] == "dryrun" for e in result["events"])
+
+
+async def test_start_release_latest_dry_run_preview(backend_url):
+    result = await tools.start_release_latest(dry_run=True)
+    assert any(e["type"] == "dryrun" for e in result["events"])
+
+
+async def test_start_filesystem_version_dry_run_preview(backend_url):
+    result = await tools.start_filesystem_version(device="gpfs0", version="full", dry_run=True)
+    assert any(e["type"] == "dryrun" for e in result["events"])
+
+
 async def test_start_node_config_dry_run_preview(backend_url, _fake_toolkit_exists):
     result = await tools.start_node_config(
         toolkit="/tmp/spectrumscale",

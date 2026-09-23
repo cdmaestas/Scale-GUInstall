@@ -9,6 +9,11 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Post-upgrade finalization support, closing the gap where `spectrumscale upgrade run` only upgrades packages and deliberately never activates the new functionality: `POST /api/stream/postupgrade/release-latest` (`mmchconfig release=LATEST -i`) and `POST /api/stream/postupgrade/filesystem-version` (`mmchfs <device> -V full|compat`), each with dry-run/operation-buffer support and its own MCP tool (`start_release_latest`, `start_filesystem_version`). Kept as their own dedicated endpoints rather than folded into the existing tunables-only `/api/stream/postconfig/mmchconfig` (allowlisted to `maxFilesToCache`/`maxStatCache`/`pagepool`/`maxMBpS`), since bumping the cluster's effective release level or a filesystem's on-disk format is a much more consequential, semi-irreversible action than a runtime performance tunable.
+- `POST /api/stream/upgrade/offline-nodes` (`spectrumscale upgrade config offline -N <node1,node2,...>`) + `start_upgrade_offline_nodes` MCP tool, for designating specific nodes to skip the toolkit's automatic rolling/online upgrade during `upgrade run` — confirmed against IBM's documented toolkit behavior, including that there's no corresponding "mark online again" subcommand to build a reverse of this against.
+- `config populate` (`spectrumscale config populate -N <node>`) gained `dry_run`/operation-buffer support and a `start_config_populate` MCP tool, bringing it in line with every other mutating endpoint — it previously always ran for real with no dry-run option at all.
+
 ---
 
 ## [1.2.0] — 2026-09-22
