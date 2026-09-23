@@ -2292,8 +2292,13 @@
                 <input type="text" class="form-input" id="pc-gpfs-binpath" value="/usr/lpp/mmfs/bin" oninput="updatePostConfigPreview()">
                 <div class="form-help">Directory containing mmls, mmdf, mmchconfig, etc.</div>
               </div>
+              <div class="form-group">
+                <label class="form-label">Target Nodes</label>
+                <input type="text" class="form-input" id="pc-profiled-nodes" placeholder="e.g. node1,node2,node3" oninput="updatePostConfigPreview()">
+                <div class="form-help">Comma-separated cluster node hostnames — runs over SSH on each, not the installer node. Pre-filled from Node Configuration when you open this page.</div>
+              </div>
               <div class="cmd-preview" style="margin-top:var(--spacing-04)" id="pc-profiled-preview">
-                <div><span class="cmd-prompt">$ </span>sudo bash -c "echo 'export PATH=\$PATH:/usr/lpp/mmfs/bin' &gt; /etc/profile.d/gpfs.sh"</div>
+                <div><span class="cmd-prompt">$ </span>sudo ssh &lt;node&gt; "printf 'export PATH=\$PATH:/usr/lpp/mmfs/bin\n' &gt; /etc/profile.d/gpfs.sh &amp;&amp; chmod 644 /etc/profile.d/gpfs.sh"</div>
               </div>
               <div style="margin-top:var(--spacing-05)">
                 <button class="btn btn-primary btn-sm" onclick="applyPostConfig('profiled', this)">Apply</button>
@@ -3110,6 +3115,13 @@ function navigateTo(page) {
     const niCn = document.getElementById('ni-cluster-name');
     if (niCn && !niCn.value && state.clusterName) niCn.value = state.clusterName;
     populateNodeIdentityNodes();
+  }
+  if (page === 'postconfig') {
+    const pdNodes = document.getElementById('pc-profiled-nodes');
+    if (pdNodes && !pdNodes.value && state.nodes.length) {
+      pdNodes.value = state.nodes.map(n => n.hostname).join(',');
+      updatePostConfigPreview();
+    }
   }
 }
 
@@ -5302,9 +5314,11 @@ function updatePostConfigPreview() {
   const binpath = document.getElementById('pc-gpfs-binpath')?.value.trim() || '/usr/lpp/mmfs/bin';
 
   // Profile.d preview
+  const pdNodes = document.getElementById('pc-profiled-nodes')?.value.trim() || '<node>';
+  const pdFirstNode = pdNodes.split(',')[0].trim() || '<node>';
   const pdPrev = document.getElementById('pc-profiled-preview');
   if (pdPrev) pdPrev.innerHTML =
-    `<div><span class="cmd-prompt">$ </span>sudo bash -c "echo 'export PATH=\\$PATH:${binpath}' &gt; /etc/profile.d/gpfs.sh"</div>`;
+    `<div><span class="cmd-prompt">$ </span>sudo ssh ${pdFirstNode} "printf 'export PATH=\\$PATH:${binpath}\\n' &gt; /etc/profile.d/gpfs.sh &amp;&amp; chmod 644 /etc/profile.d/gpfs.sh"</div>`;
 
   // GUI user preview
   const guiUser = document.getElementById('pc-gui-user')?.value.trim() || '<username>';
@@ -5413,8 +5427,10 @@ async function applyPostConfig(action, btn) {
 
   if (action === 'profiled') {
     const binpath = document.getElementById('pc-gpfs-binpath')?.value.trim() || '/usr/lpp/mmfs/bin';
-    const params = new URLSearchParams({ binpath });
-    await streamToTerminal(termId, `${getBackendUrl()}/api/stream/postconfig/profiled?${params}`);
+    const nodes = (document.getElementById('pc-profiled-nodes')?.value || '')
+      .split(',').map(n => n.trim()).filter(Boolean);
+    if (!nodes.length) { appendToTerminal(termId, '[ERROR] At least one target node is required.', 'error'); if (btn) btn.disabled = false; return; }
+    await streamToTerminalPost(termId, `${getBackendUrl()}/api/stream/postconfig/profiled`, { binpath, nodes });
 
   } else if (action === 'guiuser') {
     const username = document.getElementById('pc-gui-user')?.value.trim();

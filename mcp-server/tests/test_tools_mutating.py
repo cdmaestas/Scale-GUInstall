@@ -110,7 +110,7 @@ async def test_start_protocols_enable_dry_run_preview(backend_url, _fake_toolkit
 
 
 async def test_start_profiled_dry_run_preview(backend_url):
-    result = await tools.start_profiled(dry_run=True)
+    result = await tools.start_profiled(nodes=["node1", "node2"], dry_run=True)
     assert any(e["type"] == "dryrun" for e in result["events"])
 
 

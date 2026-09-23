@@ -24,30 +24,66 @@ def _fake_toolkit_exists(monkeypatch, ss):
 
 
 # ---- profiled ---------------------------------------------------------
+# Reworked from a local `cp` on the installer node to SSH per cluster node
+# — the installer node is the one place GPFS binaries don't need PATH
+# help from this script; the actual cluster nodes are where users log in
+# and run mmXXX commands by hand.
 
-def test_profiled_omitted_dry_run_still_runs_for_real(ss, monkeypatch):
-    # Checks that the operation buffer gets claimed, proving dry_run
-    # defaulted to False (a dry run never claims the buffer).
+def test_profiled_runs_over_ssh_per_node_not_locally(ss, monkeypatch):
+    commands = []
+
     def fake_stream_process(cmd, **kwargs):
+        commands.append(cmd)
         yield ss.sse("normal", "running")
         return 0
     monkeypatch.setattr(ss, "stream_process", fake_stream_process)
     client = ss.app.test_client()
-    resp = client.get(
+    resp = client.post(
         "/api/stream/postconfig/profiled",
         headers={"X-Scale-Token": ss._AUTH_TOKEN},
+        json={"nodes": ["node1", "node2"]},
     )
     resp.get_data()
+    assert len(commands) == 2
+    for cmd in commands:
+        assert cmd[:4] == ["sudo", "-n", "ssh", "-o"]
+        assert "cp" not in cmd  # not the old local-cp behavior
+    assert commands[0][-2] in ("node1", "node2")  # target node, before the remote command string
     assert ss._current_operation is not None
     assert ss._current_operation["name"] == "postconfig-profiled"
 
 
-def test_profiled_dry_run_true_does_not_claim_operation(ss):
+def test_profiled_rejects_empty_node_list(ss):
     client = ss.app.test_client()
-    resp = client.get(
+    resp = client.post(
         "/api/stream/postconfig/profiled",
         headers={"X-Scale-Token": ss._AUTH_TOKEN},
-        query_string={"dry_run": "true"},
+        json={"nodes": []},
+    )
+    body = resp.get_data(as_text=True)
+    assert '"type": "error"' in body
+    assert "At least one node is required" in body
+    assert ss._current_operation is None
+
+
+def test_profiled_rejects_invalid_node_hostname(ss):
+    client = ss.app.test_client()
+    resp = client.post(
+        "/api/stream/postconfig/profiled",
+        headers={"X-Scale-Token": ss._AUTH_TOKEN},
+        json={"nodes": ["node1; rm -rf /"]},
+    )
+    body = resp.get_data(as_text=True)
+    assert '"type": "error"' in body
+    assert "Invalid node hostname" in body
+
+
+def test_profiled_dry_run_true_does_not_claim_operation(ss):
+    client = ss.app.test_client()
+    resp = client.post(
+        "/api/stream/postconfig/profiled",
+        headers={"X-Scale-Token": ss._AUTH_TOKEN},
+        json={"nodes": ["node1"], "dry_run": True},
     )
     body = resp.get_data(as_text=True)
     assert '"type": "dryrun"' in body
