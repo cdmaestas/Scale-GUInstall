@@ -399,16 +399,26 @@ async def start_cluster_config_apply(
 
 
 @mcp.tool()
-async def start_phase(toolkit: str, phase: str, skip_ssh: bool = False, dry_run: bool = True) -> dict:
+async def start_phase(
+    toolkit: str, phase: str, skip_ssh: bool = False, confirm: bool = False, dry_run: bool = True
+) -> dict:
     """Run one install/deploy/upgrade phase of the spectrumscale toolkit.
     phase is one of: precheck-install, install, postcheck-install,
     enable-daemon, nodeid-define, precheck-deploy, deploy, postcheck-deploy,
     upgrade-precheck, upgrade-run, upgrade-postcheck, upgrade-showversions.
-    skip_ssh only applies to phases that support it. Use check_operation to
-    see the result of a real run."""
+    skip_ssh only applies to phases that support it. confirm answers "y" to
+    an interactive confirmation prompt some phases raise — confirmed live:
+    upgrade-run asks "Do you want to continue the parallel offline upgrade
+    process? [y/N]" when every node is designated offline (via
+    start_upgrade_offline_nodes); without confirm=true it hits EOF on
+    stdin and fails with "An unexpected error occurred" instead of
+    running. Use check_operation to see the result of a real run."""
     return await _mutate(
         "GET", "/api/stream/phase", dry_run,
-        params={"toolkit": toolkit, "phase": phase, "skip_ssh": skip_ssh, "dry_run": dry_run},
+        params={
+            "toolkit": toolkit, "phase": phase, "skip_ssh": skip_ssh,
+            "confirm": confirm, "dry_run": dry_run,
+        },
     )
 
 
