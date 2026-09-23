@@ -9,7 +9,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Changed
+### Fixed
+- Hardening pass (security review, silent-failure audit, git hook coverage, doc drift), second pass following the earlier one in 1.2.0:
+  - `.mcp.json` was never in `.gitignore` — every commit this project has made so far manually excluded it by staging files individually, but a future `git add -A` would have committed it. Now automatic.
+  - Local `core.hooksPath` was pointing at a dead path left over from before this repo moved to its current location, so `.githooks/pre-commit` and `.githooks/pre-push` have been silently not running on this machine — not a repo-file bug (git config isn't tracked), fixed locally by repointing it at the portable relative path `.githooks`, same as the setup the README already documents.
+  - `mcp-server/README.md`'s "v1 tool scope" section still described the CES protocols, call home, GPFS shutdown/startup, post-upgrade finalization, and all six "Post Configuration" tools as backlog/not-yet-exposed — all had shipped since that section was last updated. Rewritten to match current scope; `node-identity` is the one real remaining gap.
+  - `packaging/scale-guinstall-mmfs.sh`: quoted `$PATH` per shellcheck SC2086.
+  - Added a `pip-audit` job to CI (dependency vulnerability scanning) — nothing found on the current dependency set, but nothing was checking for it before either.
+  - Baseline scan found no injection risks (no `shell=True`/`os.system`/`eval`/unsafe `yaml.load`/`pickle`), no hardcoded secrets, no bad permissions, and no unguarded bare `except`. `os.path` vs `pathlib` usage throughout `scale-server.py` is flagged but deliberately not touched — too large/risky a refactor for this pass given how much of the file's path-validation logic is built around it.
 - `postconfig/profiled` (`start_profiled`) reworked from a local `cp` on the installer node to SSH per cluster node — found live while trying it: GPFS binaries don't need PATH help from this script on the installer node, which already knows its own binary paths; the actual GPFS cluster nodes are where users log in and run mmXXX commands by hand. Now takes a required `nodes` list and creates `/etc/profile.d/gpfs.sh` on each one over SSH, matching the pattern `list_devices`/`test_connection` already use for reaching remote nodes. The web UI's Environment Setup panel gained a "Target Nodes" field (pre-filled from Node Configuration) to match.
 
 ### Added
