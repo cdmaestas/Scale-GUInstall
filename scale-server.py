@@ -2711,6 +2711,13 @@ def stream_phase():
     phase    = request.args.get("phase", "").strip()
     skip_ssh = request.args.get("skip_ssh", "false").lower() in ("true", "1", "yes")
     dry_run  = request.args.get("dry_run", "false").lower() in ("true", "1", "yes")
+    # Some phases prompt for interactive confirmation — e.g. `upgrade run`
+    # asks "Do you want to continue the parallel offline upgrade process?
+    # [y/N]" when every node is designated offline. stream_process's stdin
+    # is /dev/null by default, so without an explicit answer the prompt
+    # hits EOF and the toolkit fails with "An unexpected error occurred"
+    # instead of hanging — confirmed live. confirm=true answers "y".
+    confirm  = request.args.get("confirm", "false").lower() in ("true", "1", "yes")
     source   = request.headers.get("X-Scale-Client", "web")
 
     def generate():
@@ -2736,7 +2743,8 @@ def stream_phase():
             if skip_ssh and phase in _SKIP_SSH_PHASES:
                 cmd += ["--skip", "ssh"]
             yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
+            stdin_text = "y\n" if confirm else None
+            rc = yield from stream_process(cmd, dry_run=dry_run, op=op, stdin_text=stdin_text)
             if rc == 0:
                 yield sse_final_status(dry_run, f"[OK] {phase} completed successfully.")
                 if op:
