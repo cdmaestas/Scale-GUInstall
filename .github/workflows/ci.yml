@@ -81,11 +81,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
 
-      - name: Install dependencies + pip-audit
-        run: pip install --quiet "flask>=3.0,<4" "waitress>=3.0,<4" -e "./mcp-server" pip-audit
+      # Isolated in its own venv, not the runner's global site-packages —
+      # pip-audit scans everything importable in its environment, and the
+      # runner ships pre-installed tooling (requests, urllib3, setuptools,
+      # twisted, wheel, …) with its own, unrelated advisories. Auditing the
+      # global environment picked those up as false "our dependency" hits.
+      - name: Install dependencies + pip-audit into an isolated venv
+        run: |
+          python3 -m venv .audit-venv
+          .audit-venv/bin/pip install --quiet --upgrade pip
+          .audit-venv/bin/pip install --quiet "flask>=3.0,<4" "waitress>=3.0,<4" -e "./mcp-server" pip-audit
 
       - name: Audit installed packages
-        run: pip-audit
+        run: .audit-venv/bin/pip-audit
 
   # ── Shell script linting ──────────────────────────────────────────────────
   shellcheck:
