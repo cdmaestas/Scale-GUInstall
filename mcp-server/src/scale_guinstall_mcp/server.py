@@ -570,13 +570,15 @@ async def start_setup(dir: str, ip: str, bin: str = "", dry_run: bool = True) ->
 # ---------------------------------------------------------------------------
 
 @mcp.tool()
-async def start_profiled(binpath: str = "/usr/lpp/mmfs/bin", dry_run: bool = True) -> dict:
-    """Create /etc/profile.d/gpfs.sh so GPFS binaries are on PATH for all
-    users after login. Use check_operation to see the result of a real
-    run."""
+async def start_profiled(nodes: list[str], binpath: str = "/usr/lpp/mmfs/bin", dry_run: bool = True) -> dict:
+    """Create /etc/profile.d/gpfs.sh on each given cluster node (over SSH)
+    so GPFS binaries are on PATH for all users after login. Runs on the
+    given nodes only — never the installer node itself, since that's not
+    where cluster users log in and run mmXXX commands by hand. Use
+    check_operation to see the result of a real run."""
     return await _mutate(
-        "GET", "/api/stream/postconfig/profiled", dry_run,
-        params={"binpath": binpath, "dry_run": dry_run},
+        "POST", "/api/stream/postconfig/profiled", dry_run,
+        json_body={"binpath": binpath, "nodes": nodes, "dry_run": dry_run},
     )
 
 

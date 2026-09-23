@@ -2402,13 +2402,25 @@ def stream_format_disk():
 # ---------------------------------------------------------------------------
 
 
-@app.route("/api/stream/postconfig/profiled")
+@app.route("/api/stream/postconfig/profiled", methods=["POST", "OPTIONS"])
 def stream_profiled():
-    binpath = request.args.get("binpath", "/usr/lpp/mmfs/bin").strip()
-    # Default False (not True like newer endpoints) — the web UI's existing
-    # call never sends this param, so preserving its always-real-run
-    # behavior exactly matters here.
-    dry_run = request.args.get("dry_run", "false").lower() in ("true", "1", "yes")
+    """
+    Creates /etc/profile.d/gpfs.sh on each given cluster node over SSH —
+    NOT on the installer node itself. Originally ran a local `cp` on
+    whatever host scale-server.py happens to run on (the installer node),
+    which is the one place GPFS binaries don't need PATH help from this
+    script (the toolkit already knows its own binary paths); the actual
+    GPFS cluster nodes are where users log in and run mmXXX commands by
+    hand. Reworked to take an explicit node list and SSH to each one,
+    matching the pattern list_devices/test_connection already use for
+    reaching remote nodes.
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    body    = request.get_json(silent=True) or {}
+    binpath = body.get("binpath", "/usr/lpp/mmfs/bin").strip()
+    nodes   = body.get("nodes", [])
+    dry_run = bool(body.get("dry_run", False))
     source  = request.headers.get("X-Scale-Client", "web")
 
     def generate():
@@ -2417,6 +2429,13 @@ def stream_profiled():
             if not _SAFE_PATH_RE.fullmatch(binpath):
                 yield sse("error", "[ERROR] Invalid binpath — only alphanumeric characters, '/', '.', '_', '-', and ':' are allowed.")
                 return
+            if not nodes:
+                yield sse("error", "[ERROR] At least one node is required.")
+                return
+            for n in nodes:
+                if not _VALID_HOSTNAME_RE.fullmatch(n):
+                    yield sse("error", f"[ERROR] Invalid node hostname: {n!r}")
+                    return
             if not dry_run:
                 op, busy = _claim_operation("postconfig-profiled", source)
                 if busy:
@@ -2425,34 +2444,26 @@ def stream_profiled():
                                        "Wait for it to finish or call check_operation.")
                     return
 
-            profile_content = f"export PATH=$PATH:{binpath}\n"
             dest = "/etc/profile.d/gpfs.sh"
-            cmd_preview = f"$ sudo cp <tmpfile> {dest}  # content: export PATH=$PATH:{binpath}"
-            if dry_run:
-                yield sse("info", cmd_preview)
-                yield sse("dryrun", f"[DRY RUN] Inputs validated; command not executed: {cmd_preview}")
-                yield sse("dryrun", "[DRY RUN] Validated — not executed. Would report: "
-                                    "[OK] /etc/profile.d/gpfs.sh created. Source it or re-login to apply.")
-                return
+            # binpath is already restricted to _SAFE_PATH_RE (alnum, / . _ - :),
+            # so no shell-metacharacter risk in embedding it directly here.
+            remote_cmd = f"printf 'export PATH=$PATH:{binpath}\\n' > {dest} && chmod 644 {dest}"
+            failed = []
+            for node in nodes:
+                cmd = ["sudo", "-n", "ssh", "-o", "StrictHostKeyChecking=accept-new",
+                       *_SSH_OPTS, node, remote_cmd]
+                yield sse("info", f"$ sudo ssh {node} \"{remote_cmd}\"")
+                rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
+                if rc != 0:
+                    failed.append(node)
 
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as tf:
-                tf.write(profile_content)
-                tmp_path = tf.name
-
-            cmd = ["sudo", "-n", "cp", tmp_path, dest]
-            yield sse("info", cmd_preview)
-            rc = yield from stream_process(cmd, op=op)
-            os.unlink(tmp_path)
-
-            if rc == 0:
-                chmod_cmd = ["sudo", "-n", "chmod", "644", dest]
-                yield from stream_process(chmod_cmd, op=op)
-            if rc == 0:
-                yield sse("success", "[OK] /etc/profile.d/gpfs.sh created. Source it or re-login to apply.")
+            if not failed:
+                yield sse_final_status(dry_run, f"[OK] {dest} created on {len(nodes)} node(s). "
+                                                 "Users must re-login (or source it) to apply.")
                 if op:
                     _release_operation(op, "success")
             else:
-                yield sse("error", f"[ERROR] profile.d setup exited with code {rc}.")
+                yield sse("error", f"[ERROR] Failed on: {', '.join(failed)}.")
                 if op:
                     _release_operation(op, "error")
         except Exception as exc:
