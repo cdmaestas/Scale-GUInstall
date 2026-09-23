@@ -89,6 +89,11 @@ async def test_start_filesystem_version_dry_run_preview(backend_url):
     assert any(e["type"] == "dryrun" for e in result["events"])
 
 
+async def test_start_callhome_dry_run_preview(backend_url, _fake_toolkit_exists):
+    result = await tools.start_callhome(toolkit="/tmp/spectrumscale", enable=False, dry_run=True)
+    assert any(e["type"] == "dryrun" for e in result["events"])
+
+
 async def test_start_node_config_dry_run_preview(backend_url, _fake_toolkit_exists):
     result = await tools.start_node_config(
         toolkit="/tmp/spectrumscale",

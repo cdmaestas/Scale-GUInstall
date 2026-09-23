@@ -1740,20 +1740,62 @@ def _gen_fileaudit(toolkit, enable, logfs="", dry_run=False, op=None):
 # Call Home enable / disable
 # ---------------------------------------------------------------------------
 
-@app.route("/api/stream/callhome")
+@app.route("/api/stream/callhome", methods=["POST", "OPTIONS"])
 def stream_callhome():
-    toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
-    enable  = request.args.get("enable", "false").lower() in ("true", "1", "yes")
+    """
+    `spectrumscale callhome enable|disable` — its own endpoint since
+    start_cluster_config_apply's `callhome` flag only ever enables call
+    home as part of a broader config-apply; there was previously no way
+    to actually disable it (needed, for instance, to satisfy
+    `install --precheck`'s FATAL when call home is enabled by default
+    but never configured).
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    body    = request.get_json(silent=True) or {}
+    toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
+    enable  = bool(body.get("enable", False))
+    dry_run = bool(body.get("dry_run", True))
+    source  = request.headers.get("X-Scale-Client", "web")
 
     def generate():
+        op = None
         try:
             if _tk_err or not _sudo_isfile(toolkit):
                 yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
                 return
-            yield from _gen_callhome(toolkit, enable)
+            if not dry_run:
+                op, busy = _claim_operation("callhome", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
+            # Inlined rather than reusing _gen_callhome (used elsewhere by
+            # cluster-config-apply) so rc is checked here directly — that
+            # shared helper doesn't return rc to its caller, which is fine
+            # for cluster-config-apply's own best-effort handling but would
+            # make this single-purpose endpoint always report "success"
+            # regardless of the actual exit code.
+            action = "enable" if enable else "disable"
+            cmd = ["sudo", "-n", toolkit, "callhome", action]
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
+            if rc == 0:
+                yield sse_final_status(dry_run, f"[OK] Call Home {action}d.")
+                if op:
+                    _release_operation(op, "success")
+            else:
+                yield sse("error", f"[ERROR] callhome {action} exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
         finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
             yield sse("done", "")
 
     return sse_response(generate())
