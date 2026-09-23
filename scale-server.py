@@ -88,7 +88,7 @@ _VALID_SSH_USER_RE = re.compile(r'^[a-zA-Z0-9._-]{1,64}$')
 
 _ALLOWED_GPFS_FLAGS = frozenset({
     "-c", "-p", "-r", "-rc", "-e", "--gplbin_dir", "--list",
-    "--ccr-enable", "--ccr-disable",
+    "--ccr-enable", "--ccr-disable", "--ephemeral_port_range",
 })
 
 _VALID_MMCHCONFIG_VALUE_RE = re.compile(r'^[A-Za-z0-9.]+$')
