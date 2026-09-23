@@ -371,7 +371,7 @@ async def start_cluster_config_apply(
     toolkit: str,
     gpfs_flags: list[dict] | None = None,
     callhome: bool = False,
-    perfmon: bool = False,
+    perfmon: bool = True,
     perfmon_node: str = "",
     fileaudit: bool = False,
     fileaudit_fs: str = "",
@@ -381,8 +381,14 @@ async def start_cluster_config_apply(
     config gpfs <flag> [value]` calls (gpfs_flags is a list of dicts with
     keys flag and value), plus optionally enabling call home, performance
     monitoring (perfmon_node required if perfmon is true), and file audit
-    logging (fileaudit_fs required if fileaudit is true). Use
-    check_operation to see the result of a real run."""
+    logging (fileaudit_fs required if fileaudit is true). perfmon defaults
+    to True — performance monitoring should be on by default; pass
+    perfmon=False to explicitly turn it off instead. Every gpfs_flags/
+    callhome/perfmon/fileaudit value is always applied explicitly (on or
+    off) each call, not left unchanged, so a call that only needs to set a
+    gpfs flag will also explicitly disable callhome/fileaudit and enable
+    perfmon unless told otherwise. Use check_operation to see the result
+    of a real run."""
     return await _mutate(
         "POST", "/api/stream/apply-cluster-config", dry_run,
         json_body={
