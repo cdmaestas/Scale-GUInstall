@@ -493,6 +493,20 @@ async def start_filesystem_version(device: str, version: str = "full", dry_run: 
 
 
 @mcp.tool()
+async def start_callhome(toolkit: str, enable: bool = False, dry_run: bool = True) -> dict:
+    """Run `spectrumscale callhome enable|disable`. Call home is enabled
+    by default in the install toolkit (5.0.0+) but must be either
+    disabled or configured before `install --precheck` will pass — it
+    fails with a FATAL if call home is enabled with no settings
+    configured. enable=False (the default) disables it. Use
+    check_operation to see the result of a real run."""
+    return await _mutate(
+        "POST", "/api/stream/callhome", dry_run,
+        json_body={"toolkit": toolkit, "enable": enable, "dry_run": dry_run},
+    )
+
+
+@mcp.tool()
 async def start_setup(dir: str, ip: str, bin: str = "", dry_run: bool = True) -> dict:
     """Run `spectrumscale setup -s <ip>`, installing the toolkit's
     installation service. dir is the working directory containing the
