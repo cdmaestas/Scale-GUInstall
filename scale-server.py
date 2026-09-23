@@ -2405,34 +2405,63 @@ def stream_format_disk():
 @app.route("/api/stream/postconfig/profiled")
 def stream_profiled():
     binpath = request.args.get("binpath", "/usr/lpp/mmfs/bin").strip()
+    # Default False (not True like newer endpoints) — the web UI's existing
+    # call never sends this param, so preserving its always-real-run
+    # behavior exactly matters here.
+    dry_run = request.args.get("dry_run", "false").lower() in ("true", "1", "yes")
+    source  = request.headers.get("X-Scale-Client", "web")
 
     def generate():
+        op = None
         try:
             if not _SAFE_PATH_RE.fullmatch(binpath):
                 yield sse("error", "[ERROR] Invalid binpath — only alphanumeric characters, '/', '.', '_', '-', and ':' are allowed.")
                 return
+            if not dry_run:
+                op, busy = _claim_operation("postconfig-profiled", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
 
             profile_content = f"export PATH=$PATH:{binpath}\n"
+            dest = "/etc/profile.d/gpfs.sh"
+            cmd_preview = f"$ sudo cp <tmpfile> {dest}  # content: export PATH=$PATH:{binpath}"
+            if dry_run:
+                yield sse("info", cmd_preview)
+                yield sse("dryrun", f"[DRY RUN] Inputs validated; command not executed: {cmd_preview}")
+                yield sse("dryrun", "[DRY RUN] Validated — not executed. Would report: "
+                                    "[OK] /etc/profile.d/gpfs.sh created. Source it or re-login to apply.")
+                return
+
             with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as tf:
                 tf.write(profile_content)
                 tmp_path = tf.name
 
-            dest = "/etc/profile.d/gpfs.sh"
             cmd = ["sudo", "-n", "cp", tmp_path, dest]
-            yield sse("info", f"$ sudo cp <tmpfile> {dest}  # content: export PATH=$PATH:{binpath}")
-            rc = yield from stream_process(cmd)
+            yield sse("info", cmd_preview)
+            rc = yield from stream_process(cmd, op=op)
             os.unlink(tmp_path)
 
             if rc == 0:
                 chmod_cmd = ["sudo", "-n", "chmod", "644", dest]
-                yield from stream_process(chmod_cmd)
+                yield from stream_process(chmod_cmd, op=op)
             if rc == 0:
                 yield sse("success", "[OK] /etc/profile.d/gpfs.sh created. Source it or re-login to apply.")
+                if op:
+                    _release_operation(op, "success")
             else:
                 yield sse("error", f"[ERROR] profile.d setup exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
         finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
             yield sse("done", "")
 
     return sse_response(generate())
@@ -2446,8 +2475,12 @@ def stream_guiuser():
     username = body.get("username", "").strip()
     role     = body.get("role", "SecurityAdmin").strip()
     password = body.get("password", "").strip()
+    # Default False — the web UI's existing call never sends this param.
+    dry_run  = bool(body.get("dry_run", False))
+    source   = request.headers.get("X-Scale-Client", "web")
 
     def generate():
+        op = None
         try:
             if not username or not password:
                 yield sse("error", "[ERROR] Username and password are required.")
@@ -2458,17 +2491,32 @@ def stream_guiuser():
             if role not in _ALLOWED_GUI_ROLES:
                 yield sse("error", f"[ERROR] Invalid role '{role}'. Must be one of: {', '.join(sorted(_ALLOWED_GUI_ROLES))}.")
                 return
+            if not dry_run:
+                op, busy = _claim_operation("postconfig-guiuser", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
             gui_cli = "/usr/lpp/mmfs/gui/cli/mkuser"
             cmd = ["sudo", "-n", gui_cli, username, "-g", role, "-p", password]
             yield sse("info", f"$ sudo {gui_cli} {username} -g {role} -p ********")
-            rc = yield from stream_process(cmd)
+            rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
             if rc == 0:
-                yield sse("success", f"[OK] GUI user '{username}' created with role {role}.")
+                yield sse_final_status(dry_run, f"[OK] GUI user '{username}' created with role {role}.")
+                if op:
+                    _release_operation(op, "success")
             else:
                 yield sse("error", f"[ERROR] mkuser exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
         finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
             yield sse("done", "")
 
     return sse_response(generate())
@@ -2478,8 +2526,12 @@ def stream_guiuser():
 def stream_mmchconfig():
     allowed = {"maxFilesToCache", "maxStatCache", "pagepool", "maxMBpS"}
     settings = {k: v.strip() for k, v in request.args.items() if k in allowed and v.strip()}
+    # Default False — the web UI's existing call never sends this param.
+    dry_run = request.args.get("dry_run", "false").lower() in ("true", "1", "yes")
+    source  = request.headers.get("X-Scale-Client", "web")
 
     def generate():
+        op = None
         try:
             if not settings:
                 yield sse("error", "[ERROR] No settings provided.")
@@ -2488,16 +2540,32 @@ def stream_mmchconfig():
                 if not _VALID_MMCHCONFIG_VALUE_RE.fullmatch(val):
                     yield sse("error", f"[ERROR] Invalid value for {key}: {val!r}")
                     return
+            if not dry_run:
+                op, busy = _claim_operation("postconfig-mmchconfig", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
+            for key, val in settings.items():
                 cmd = ["sudo", "-n"] + mmcmd("mmchconfig", f"{key}={val}", "-i")
                 yield sse("info", f"$ {' '.join(cmd)}")
-                rc = yield from stream_process(cmd)
+                rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
                 if rc != 0:
                     yield sse("error", f"[ERROR] mmchconfig {key} exited with code {rc}.")
+                    if op:
+                        _release_operation(op, "error")
                     return
-            yield sse("success", "[OK] GPFS configuration settings applied.")
+            yield sse_final_status(dry_run, "[OK] GPFS configuration settings applied.")
+            if op:
+                _release_operation(op, "success")
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
         finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
             yield sse("done", "")
 
     return sse_response(generate())
@@ -2770,8 +2838,12 @@ def stream_healthinterval():
     interval = request.args.get("interval", "DEFAULT").strip().upper()
     nodes    = request.args.get("nodes", "all").strip()
     valid    = {"OFF", "LOW", "MEDIUM", "DEFAULT", "HIGH"}
+    # Default False — the web UI's existing call never sends this param.
+    dry_run  = request.args.get("dry_run", "false").lower() in ("true", "1", "yes")
+    source   = request.headers.get("X-Scale-Client", "web")
 
     def generate():
+        op = None
         try:
             if interval not in valid:
                 yield sse("error", f"[ERROR] Invalid interval '{interval}'. Must be one of: {', '.join(sorted(valid))}.")
@@ -2779,16 +2851,31 @@ def stream_healthinterval():
             if nodes != "all" and not _VALID_HOSTNAME_RE.fullmatch(nodes):
                 yield sse("error", f"[ERROR] Invalid nodes value: {nodes!r}")
                 return
+            if not dry_run:
+                op, busy = _claim_operation("postconfig-healthinterval", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
             cmd = ["sudo", "-n"] + mmcmd("mmhealth", "config", "interval", interval, "-N", nodes)
             yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd)
+            rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
             if rc == 0:
-                yield sse("success", f"[OK] Health monitoring interval set to {interval} on {nodes}.")
+                yield sse_final_status(dry_run, f"[OK] Health monitoring interval set to {interval} on {nodes}.")
+                if op:
+                    _release_operation(op, "success")
             else:
                 yield sse("error", f"[ERROR] mmhealth config exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
         finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
             yield sse("done", "")
 
     return sse_response(generate())
@@ -2804,8 +2891,12 @@ def stream_afmgateway():
     fileset = body.get("fileset", "").strip()
     node    = body.get("node", "").strip()
     mode    = body.get("mode", "ro").strip()
+    # Default False — the web UI's existing call never sends this param.
+    dry_run = bool(body.get("dry_run", False))
+    source  = request.headers.get("X-Scale-Client", "web")
 
     def generate():
+        op = None
         try:
             if not fs or not fileset or not node:
                 yield sse("error", "[ERROR] Filesystem, fileset, and gateway node are required.")
@@ -2822,55 +2913,75 @@ def stream_afmgateway():
             if mode not in _ALLOWED_AFM_MODES:
                 yield sse("error", f"[ERROR] Invalid AFM mode '{mode}'. Must be one of: {', '.join(sorted(_ALLOWED_AFM_MODES))}.")
                 return
+            if proto == "nfs":
+                if not body.get("nfs_target", "").strip():
+                    yield sse("error", "[ERROR] NFS target is required.")
+                    return
+            else:
+                if not all(body.get(k, "").strip() for k in ("s3_url", "s3_bucket", "s3_key", "s3_secret")):
+                    yield sse("error", "[ERROR] All S3 fields are required.")
+                    return
+            if not dry_run:
+                op, busy = _claim_operation("postconfig-afmgateway", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
 
             # Step 1: create the fileset
             cmd1 = ["sudo", "-n"] + mmcmd("mmcrfileset", fs, fileset, "--inode-space", "new")
             yield sse("info", f"$ {' '.join(cmd1)}")
-            rc = yield from stream_process(cmd1)
+            rc = yield from stream_process(cmd1, dry_run=dry_run, op=op)
             if rc != 0:
                 yield sse("error", f"[ERROR] mmcrfileset exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
                 return
 
             # Step 2: configure AFM target
             if proto == "nfs":
                 nfs_target = body.get("nfs_target", "").strip()
-                if not nfs_target:
-                    yield sse("error", "[ERROR] NFS target is required.")
-                    return
                 cmd2 = ["sudo", "-n"] + mmcmd("mmafmconfig", fs, fileset, "-N", node,
                         "--afm-target", f"nfs://{nfs_target}", "--afm-mode", mode)
+                yield sse("info", f"$ {' '.join(cmd2)}")
             else:
                 s3_url    = body.get("s3_url", "").strip()
                 s3_bucket = body.get("s3_bucket", "").strip()
                 s3_key    = body.get("s3_key", "").strip()
                 s3_secret = body.get("s3_secret", "").strip()
-                if not all([s3_url, s3_bucket, s3_key, s3_secret]):
-                    yield sse("error", "[ERROR] All S3 fields are required.")
-                    return
                 cmd2 = ["sudo", "-n"] + mmcmd("mmafmconfig", fs, fileset, "-N", node,
                         "--afm-target", f"s3://{s3_url}/{s3_bucket}",
                         "--afm-mode", mode, "-K", s3_key, "-E", s3_secret)
                 yield sse("info", f"$ sudo {MMFS_BIN}/mmafmconfig {fs} {fileset} -N {node} --afm-target s3://{s3_url}/{s3_bucket} --afm-mode {mode} -K {s3_key} -E ********")
 
-            if proto == "nfs":
-                yield sse("info", f"$ {' '.join(cmd2)}")
-            rc = yield from stream_process(cmd2)
+            rc = yield from stream_process(cmd2, dry_run=dry_run, op=op)
             if rc != 0:
                 yield sse("error", f"[ERROR] mmafmconfig exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
                 return
 
             # Step 3: link the fileset
             junction = f"/ibm/{fs}/{fileset}"
             cmd3 = ["sudo", "-n"] + mmcmd("mmlinkfileset", fs, fileset, "-J", junction)
             yield sse("info", f"$ {' '.join(cmd3)}")
-            rc = yield from stream_process(cmd3)
+            rc = yield from stream_process(cmd3, dry_run=dry_run, op=op)
             if rc == 0:
-                yield sse("success", f"[OK] AFM fileset '{fileset}' configured and linked at {junction}.")
+                yield sse_final_status(dry_run, f"[OK] AFM fileset '{fileset}' configured and linked at {junction}.")
+                if op:
+                    _release_operation(op, "success")
             else:
                 yield sse("error", f"[ERROR] mmlinkfileset exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
         finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
             yield sse("done", "")
 
     return sse_response(generate())
@@ -3260,8 +3371,12 @@ def stream_nfs_core_dump():
     body             = request.get_json(silent=True) or {}
     toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
     mode             = body.get("mode", "enable").strip().lower()
+    # Default False — the web UI's existing call never sends this param.
+    dry_run          = bool(body.get("dry_run", False))
+    source           = request.headers.get("X-Scale-Client", "web")
 
     def generate():
+        op = None
         try:
             if mode not in ("enable", "disable"):
                 yield sse("error", f"[ERROR] Invalid mode '{mode}'. Use 'enable' or 'disable'.")
@@ -3269,16 +3384,31 @@ def stream_nfs_core_dump():
             if _tk_err or not _sudo_isfile(toolkit):
                 yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
                 return
+            if not dry_run:
+                op, busy = _claim_operation("nfs-core-dump", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
             cmd = ["sudo", "-n", toolkit, "nfs_core_dump", mode]
             yield sse("info", f"$ {' '.join(cmd)}")
-            rc = yield from stream_process(cmd)
+            rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
             if rc == 0:
-                yield sse("success", f"[OK] NFS core dump {mode}d.")
+                yield sse_final_status(dry_run, f"[OK] NFS core dump {mode}d.")
+                if op:
+                    _release_operation(op, "success")
             else:
                 yield sse("error", f"[ERROR] nfs_core_dump {mode} exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
         finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
             yield sse("done", "")
     return sse_response(generate())
 

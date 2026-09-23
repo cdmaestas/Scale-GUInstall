@@ -109,6 +109,39 @@ async def test_start_protocols_enable_dry_run_preview(backend_url, _fake_toolkit
     assert any(e["type"] == "dryrun" for e in result["events"])
 
 
+async def test_start_profiled_dry_run_preview(backend_url):
+    result = await tools.start_profiled(dry_run=True)
+    assert any(e["type"] == "dryrun" for e in result["events"])
+
+
+async def test_start_guiuser_dry_run_preview(backend_url):
+    result = await tools.start_guiuser(username="testuser", password="testpass123", dry_run=True)
+    assert any(e["type"] == "dryrun" for e in result["events"])
+
+
+async def test_start_mmchconfig_tunables_dry_run_preview(backend_url):
+    result = await tools.start_mmchconfig_tunables(pagepool="4G", dry_run=True)
+    assert any(e["type"] == "dryrun" for e in result["events"])
+
+
+async def test_start_healthinterval_dry_run_preview(backend_url):
+    result = await tools.start_healthinterval(interval="LOW", dry_run=True)
+    assert any(e["type"] == "dryrun" for e in result["events"])
+
+
+async def test_start_nfs_core_dump_dry_run_preview(backend_url, _fake_toolkit_exists):
+    result = await tools.start_nfs_core_dump(toolkit="/tmp/spectrumscale", mode="enable", dry_run=True)
+    assert any(e["type"] == "dryrun" for e in result["events"])
+
+
+async def test_start_afmgateway_dry_run_preview(backend_url):
+    result = await tools.start_afmgateway(
+        fs="gpfs0", fileset="afmfs1", node="node1", proto="nfs",
+        nfs_target="nfsserver:/export", dry_run=True,
+    )
+    assert any(e["type"] == "dryrun" for e in result["events"])
+
+
 async def test_start_node_config_dry_run_preview(backend_url, _fake_toolkit_exists):
     result = await tools.start_node_config(
         toolkit="/tmp/spectrumscale",

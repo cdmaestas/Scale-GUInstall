@@ -564,6 +564,112 @@ async def start_setup(dir: str, ip: str, bin: str = "", dry_run: bool = True) ->
     )
 
 
+# ---------------------------------------------------------------------------
+# Post-configuration tools — mirror the web UI's "Post Configuration" page,
+# which had all six of these wired but was never ported to MCP.
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def start_profiled(binpath: str = "/usr/lpp/mmfs/bin", dry_run: bool = True) -> dict:
+    """Create /etc/profile.d/gpfs.sh so GPFS binaries are on PATH for all
+    users after login. Use check_operation to see the result of a real
+    run."""
+    return await _mutate(
+        "GET", "/api/stream/postconfig/profiled", dry_run,
+        params={"binpath": binpath, "dry_run": dry_run},
+    )
+
+
+@mcp.tool()
+async def start_guiuser(username: str, password: str, role: str = "SecurityAdmin", dry_run: bool = True) -> dict:
+    """Create a GUI admin/user account (`/usr/lpp/mmfs/gui/cli/mkuser`).
+    role must be one of: SecurityAdmin, SystemAdmin, CopyAdmin, DataAccess,
+    Monitor. Use check_operation to see the result of a real run."""
+    return await _mutate(
+        "POST", "/api/stream/postconfig/guiuser", dry_run,
+        json_body={"username": username, "password": password, "role": role, "dry_run": dry_run},
+    )
+
+
+@mcp.tool()
+async def start_mmchconfig_tunables(
+    max_files_to_cache: str = "",
+    max_stat_cache: str = "",
+    pagepool: str = "",
+    max_mbps: str = "",
+    dry_run: bool = True,
+) -> dict:
+    """Apply GPFS runtime performance tunables via `mmchconfig <key>=<value>
+    -i` — one call per non-empty value given (maxFilesToCache, maxStatCache,
+    pagepool, maxMBpS). At least one must be set. Named distinctly from
+    start_cluster_config_apply's gpfs_flags (a different, allowlisted set
+    of config flags) to avoid confusion between the two. Use
+    check_operation to see the result of a real run."""
+    return await _mutate(
+        "GET", "/api/stream/postconfig/mmchconfig", dry_run,
+        params={
+            "maxFilesToCache": max_files_to_cache, "maxStatCache": max_stat_cache,
+            "pagepool": pagepool, "maxMBpS": max_mbps, "dry_run": dry_run,
+        },
+    )
+
+
+@mcp.tool()
+async def start_healthinterval(interval: str = "DEFAULT", nodes: str = "all", dry_run: bool = True) -> dict:
+    """Set the `mmhealth` monitoring check interval (`mmhealth config
+    interval <interval> -N <nodes>`). interval must be one of: OFF, LOW,
+    MEDIUM, DEFAULT, HIGH. nodes defaults to "all". Use check_operation to
+    see the result of a real run."""
+    return await _mutate(
+        "GET", "/api/stream/postconfig/healthinterval", dry_run,
+        params={"interval": interval, "nodes": nodes, "dry_run": dry_run},
+    )
+
+
+@mcp.tool()
+async def start_nfs_core_dump(toolkit: str, mode: str = "enable", dry_run: bool = True) -> dict:
+    """Enable or disable NFS core dump collection on protocol nodes
+    (`spectrumscale nfs_core_dump enable|disable`, 6.0.1+) — useful for
+    troubleshooting NFS Ganesha crashes. mode must be "enable" or
+    "disable". Use check_operation to see the result of a real run."""
+    return await _mutate(
+        "POST", "/api/stream/nfs-core-dump", dry_run,
+        json_body={"toolkit": toolkit, "mode": mode, "dry_run": dry_run},
+    )
+
+
+@mcp.tool()
+async def start_afmgateway(
+    fs: str,
+    fileset: str,
+    node: str,
+    proto: str = "nfs",
+    mode: str = "ro",
+    nfs_target: str = "",
+    s3_url: str = "",
+    s3_bucket: str = "",
+    s3_key: str = "",
+    s3_secret: str = "",
+    dry_run: bool = True,
+) -> dict:
+    """Create an AFM (Active File Management) fileset on fs linked to an
+    NFS or S3 home target, run from the given gateway node: creates the
+    independent fileset (`mmcrfileset`), points it at the target
+    (`mmafmconfig` — nfs_target required when proto="nfs"; s3_url/
+    s3_bucket/s3_key/s3_secret all required when proto="s3"), then links
+    it under /ibm/<fs>/<fileset> (`mmlinkfileset`). mode must be one of:
+    ro, rw, sw, iw, lg. Use check_operation to see the result of a real
+    run."""
+    return await _mutate(
+        "POST", "/api/stream/postconfig/afmgateway", dry_run,
+        json_body={
+            "fs": fs, "fileset": fileset, "node": node, "proto": proto, "mode": mode,
+            "nfs_target": nfs_target, "s3_url": s3_url, "s3_bucket": s3_bucket,
+            "s3_key": s3_key, "s3_secret": s3_secret, "dry_run": dry_run,
+        },
+    )
+
+
 def main() -> None:
     mcp.run(transport="stdio")
 
