@@ -2614,6 +2614,157 @@ def stream_filesystem_version():
     return sse_response(generate())
 
 
+# ---------------------------------------------------------------------------
+# Protocol (CES) configuration: shared root filesystem/mountpoint/interface/
+# export IP pool, and enabling NFS/SMB/S3/HDFS. Found as a real gap live: a
+# successful `spectrumscale deploy` only installs and activates CES
+# infrastructure (packages, the CES daemon, GUI, perfmon) — it never runs
+# `config protocols` or `enable <protocol>` itself, so NFS/SMB/S3 stay
+# "Disabled" in `node list` even after a clean install+deploy unless these
+# are run explicitly. Confirmed against this toolkit version's own -h output
+# rather than guessed.
+# ---------------------------------------------------------------------------
+
+_VALID_MOUNTPOINT_RE = re.compile(r'^/[A-Za-z0-9._/-]{1,254}$')
+_VALID_INTERFACE_RE  = re.compile(r'^[A-Za-z0-9_.:-]{1,64}$')
+_VALID_IPV4_RE = re.compile(
+    r'^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$'
+)
+_VALID_PROTOCOLS = {"s3", "smb", "nfs", "hdfs"}
+
+
+@app.route("/api/stream/protocols/config", methods=["POST", "OPTIONS"])
+def stream_protocols_config():
+    """
+    `spectrumscale config protocols -f <fs> -m <mountpoint> [-i <interface>]
+    [-e <export_ip_pool>]` — sets the CES shared-root filesystem/mountpoint
+    and (optionally) the network interface and additional CES export IPs.
+    Required before `enable <protocol>` will actually bring NFS/SMB/S3 up.
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    body           = request.get_json(silent=True) or {}
+    toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
+    filesystem     = body.get("filesystem", "").strip()
+    mountpoint     = body.get("mountpoint", "").strip()
+    interface      = body.get("interface", "").strip()
+    export_ip_pool = body.get("export_ip_pool", "").strip()
+    dry_run        = bool(body.get("dry_run", True))
+    source         = request.headers.get("X-Scale-Client", "web")
+
+    def generate():
+        op = None
+        try:
+            if _tk_err or not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
+                return
+            if not filesystem or not _VALID_GPFS_NAME_RE.fullmatch(filesystem):
+                yield sse("error", f"[ERROR] Invalid filesystem name: {filesystem!r}")
+                return
+            if not mountpoint or not _VALID_MOUNTPOINT_RE.fullmatch(mountpoint):
+                yield sse("error", f"[ERROR] Invalid mountpoint: {mountpoint!r}")
+                return
+            if interface and not _VALID_INTERFACE_RE.fullmatch(interface):
+                yield sse("error", f"[ERROR] Invalid interface: {interface!r}")
+                return
+            export_ips = [ip.strip() for ip in export_ip_pool.split(",") if ip.strip()]
+            for ip in export_ips:
+                if not _VALID_IPV4_RE.fullmatch(ip):
+                    yield sse("error", f"[ERROR] Invalid export IP: {ip!r}")
+                    return
+            if not dry_run:
+                op, busy = _claim_operation("protocols-config", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
+            cmd = ["sudo", "-n", toolkit, "config", "protocols", "-f", filesystem, "-m", mountpoint]
+            if interface:
+                cmd += ["-i", interface]
+            if export_ips:
+                cmd += ["-e", ",".join(export_ips)]
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
+            if rc == 0:
+                yield sse_final_status(dry_run, "[OK] Protocol configuration set.")
+                if op:
+                    _release_operation(op, "success")
+            else:
+                yield sse("error", f"[ERROR] config protocols exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
+        finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
+            yield sse("done", "")
+
+    return sse_response(generate())
+
+
+@app.route("/api/stream/protocols/enable", methods=["POST", "OPTIONS"])
+def stream_protocols_enable():
+    """
+    `spectrumscale enable <protocol> [<protocol> ...]` — actually turns on
+    one or more of s3/smb/nfs/hdfs. Requires `config protocols` (shared
+    root filesystem/mountpoint) to already be set.
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    body      = request.get_json(silent=True) or {}
+    toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
+    protocols = body.get("protocols", [])
+    dry_run   = bool(body.get("dry_run", True))
+    source    = request.headers.get("X-Scale-Client", "web")
+
+    def generate():
+        op = None
+        try:
+            if _tk_err or not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
+                return
+            if not protocols:
+                yield sse("error", "[ERROR] At least one protocol is required.")
+                return
+            for proto in protocols:
+                if proto not in _VALID_PROTOCOLS:
+                    yield sse("error", f"[ERROR] Invalid protocol: {proto!r}. "
+                                        f"Must be one of: {', '.join(sorted(_VALID_PROTOCOLS))}.")
+                    return
+            if not dry_run:
+                op, busy = _claim_operation("protocols-enable", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
+            cmd = ["sudo", "-n", toolkit, "enable"] + list(protocols)
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
+            if rc == 0:
+                yield sse_final_status(dry_run, f"[OK] Enabled: {', '.join(protocols)}.")
+                if op:
+                    _release_operation(op, "success")
+            else:
+                yield sse("error", f"[ERROR] enable exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
+        finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
+            yield sse("done", "")
+
+    return sse_response(generate())
+
+
 @app.route("/api/stream/postconfig/healthinterval")
 def stream_healthinterval():
     interval = request.args.get("interval", "DEFAULT").strip().upper()
