@@ -429,6 +429,32 @@ async def start_upgrade_offline_nodes(toolkit: str, nodes: list[str], dry_run: b
 
 
 @mcp.tool()
+async def start_gpfs_shutdown(nodes: list[str], dry_run: bool = True) -> dict:
+    """Run `mmshutdown -N <node1,node2,...>` to stop the GPFS daemon on the
+    given nodes. Required before start_upgrade_offline_nodes will accept a
+    node — confirmed live, it refuses with "cannot be designated for
+    offline upgrade until the GPFS daemon running on the node is stopped"
+    otherwise. Use check_operation to see the result of a real run."""
+    return await _mutate(
+        "POST", "/api/stream/gpfs/shutdown", dry_run,
+        json_body={"nodes": nodes, "dry_run": dry_run},
+    )
+
+
+@mcp.tool()
+async def start_gpfs_startup(nodes: list[str], dry_run: bool = True) -> dict:
+    """Run `mmstartup -N <node1,node2,...>` to start the GPFS daemon on the
+    given nodes. The manual step an offline-upgraded node needs afterward
+    — start_phase(phase="upgrade-run") deliberately never restarts GPFS on
+    nodes designated offline via start_upgrade_offline_nodes. Use
+    check_operation to see the result of a real run."""
+    return await _mutate(
+        "POST", "/api/stream/gpfs/startup", dry_run,
+        json_body={"nodes": nodes, "dry_run": dry_run},
+    )
+
+
+@mcp.tool()
 async def start_release_latest(dry_run: bool = True) -> dict:
     """Run `mmchconfig release=LATEST -i` to activate the highest cluster
     functionality level supported by every currently-installed node's
