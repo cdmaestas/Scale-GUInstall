@@ -120,5 +120,6 @@ async def test_all_read_only_tools_are_registered():
         "start_setup", "start_config_populate", "start_upgrade_offline_nodes",
         "start_release_latest", "start_filesystem_version",
         "start_gpfs_shutdown", "start_gpfs_startup", "start_callhome",
+        "start_protocols_config", "start_protocols_enable",
     }
     assert registered == expected_read_only | expected_mutating

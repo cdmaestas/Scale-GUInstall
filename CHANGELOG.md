@@ -9,6 +9,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `POST /api/stream/protocols/config` (`spectrumscale config protocols -f <fs> -m <mountpoint> [-i <interface>] [-e <export_ip_pool>]`) and `POST /api/stream/protocols/enable` (`spectrumscale enable <protocol> ...`), plus `start_protocols_config`/`start_protocols_enable` MCP tools. Found as a real, previously-invisible gap live: a successful `spectrumscale deploy` only installs and activates CES infrastructure (packages, CES daemon, GUI, perfmon) — it never runs either of these itself, so NFS/SMB/S3 stay "Disabled" in `node list` even after a clean install+deploy. Checked the web UI's "Protocols" page first and confirmed it's pure mockup (NFS/SMB/Object toggles, CES IP fields) with zero backend wiring — these endpoints are genuinely new work, not a duplicate of something already implemented. Flags confirmed against the real toolkit's own `-h` output rather than guessed.
+
 ### Changed
 - `apply-cluster-config`'s `perfmon` param now defaults to `True` (on) instead of `False` — the user's explicit preference, since every gpfs_flags/callhome/perfmon/fileaudit value this endpoint touches is always applied explicitly on each call rather than left unchanged, so a call made only to set an unrelated gpfs flag was silently also turning performance monitoring off. `callhome` and `fileaudit` still default to `False`.
 

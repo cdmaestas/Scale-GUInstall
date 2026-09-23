@@ -513,6 +513,44 @@ async def start_callhome(toolkit: str, enable: bool = False, dry_run: bool = Tru
 
 
 @mcp.tool()
+async def start_protocols_config(
+    toolkit: str,
+    filesystem: str,
+    mountpoint: str,
+    interface: str = "",
+    export_ip_pool: str = "",
+    dry_run: bool = True,
+) -> dict:
+    """Run `spectrumscale config protocols -f <filesystem> -m <mountpoint>
+    [-i <interface>] [-e <export_ip_pool>]` to set the CES shared-root
+    filesystem/mountpoint and (optionally) the network interface and a
+    comma-separated list of additional CES export IPs. Required before
+    start_protocols_enable will actually bring NFS/SMB/S3 up — a
+    successful start_phase(phase="deploy") only installs and activates CES
+    infrastructure, it never runs this itself. Use check_operation to see
+    the result of a real run."""
+    return await _mutate(
+        "POST", "/api/stream/protocols/config", dry_run,
+        json_body={
+            "toolkit": toolkit, "filesystem": filesystem, "mountpoint": mountpoint,
+            "interface": interface, "export_ip_pool": export_ip_pool, "dry_run": dry_run,
+        },
+    )
+
+
+@mcp.tool()
+async def start_protocols_enable(toolkit: str, protocols: list[str], dry_run: bool = True) -> dict:
+    """Run `spectrumscale enable <protocol> [<protocol> ...]` to turn on
+    one or more of s3/smb/nfs/hdfs. Requires start_protocols_config (CES
+    shared-root filesystem/mountpoint) to already be set. Use
+    check_operation to see the result of a real run."""
+    return await _mutate(
+        "POST", "/api/stream/protocols/enable", dry_run,
+        json_body={"toolkit": toolkit, "protocols": protocols, "dry_run": dry_run},
+    )
+
+
+@mcp.tool()
 async def start_setup(dir: str, ip: str, bin: str = "", dry_run: bool = True) -> dict:
     """Run `spectrumscale setup -s <ip>`, installing the toolkit's
     installation service. dir is the working directory containing the
