@@ -1624,13 +1624,16 @@ def list_config():
 def stream_populate():
     if request.method == "OPTIONS":
         return "", 204
-    body     = request.get_json(silent=True) or {}
+    body      = request.get_json(silent=True) or {}
     toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
     node      = body.get("node", "").strip()
     skip_nsd  = body.get("skip_nsd", False)
     overwrite = bool(body.get("overwrite", False))
+    dry_run   = bool(body.get("dry_run", True))
+    source    = request.headers.get("X-Scale-Client", "web")
 
     def generate():
+        op = None
         try:
             if _tk_err or not _sudo_isfile(toolkit):
                 yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
@@ -1641,6 +1644,13 @@ def stream_populate():
             if not _VALID_HOSTNAME_RE.fullmatch(node):
                 yield sse("error", f"[ERROR] Invalid node hostname: {node!r}")
                 return
+            if not dry_run:
+                op, busy = _claim_operation("config-populate", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
             cmd = ["sudo", "-n", toolkit, "config", "populate", "-N", node]
             if skip_nsd:
                 cmd += ["--skip", "nsd"]
@@ -1649,18 +1659,28 @@ def stream_populate():
             # already exists — answer from the Overwrite checkbox so the
             # process can never sit waiting on invisible interactive input.
             answer = "y\n" if overwrite else "n\n"
-            rc = yield from stream_process(cmd, stdin_text=answer)
+            rc = yield from stream_process(cmd, stdin_text=answer, dry_run=dry_run, op=op)
             if rc == 0:
-                yield sse("success", "[OK] Cluster definition populated successfully.")
+                yield sse_final_status(dry_run, "[OK] Cluster definition populated successfully.")
+                if op:
+                    _release_operation(op, "success")
             elif not overwrite:
                 yield sse("error", f"[ERROR] config populate exited with code {rc}.")
                 yield sse("warn", "[WARN] A cluster definition may already exist — enable "
                                   "'Overwrite existing cluster definition' to replace it.")
+                if op:
+                    _release_operation(op, "error")
             else:
                 yield sse("error", f"[ERROR] config populate exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
         except Exception as exc:
             yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
         finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
             yield sse("done", "")
 
     return sse_response(generate())
