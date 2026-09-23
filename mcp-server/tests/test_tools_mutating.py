@@ -69,6 +69,16 @@ async def test_start_upgrade_offline_nodes_dry_run_preview(backend_url, _fake_to
     assert any(e["type"] == "dryrun" for e in result["events"])
 
 
+async def test_start_gpfs_shutdown_dry_run_preview(backend_url):
+    result = await tools.start_gpfs_shutdown(nodes=["node1"], dry_run=True)
+    assert any(e["type"] == "dryrun" for e in result["events"])
+
+
+async def test_start_gpfs_startup_dry_run_preview(backend_url):
+    result = await tools.start_gpfs_startup(nodes=["node1"], dry_run=True)
+    assert any(e["type"] == "dryrun" for e in result["events"])
+
+
 async def test_start_release_latest_dry_run_preview(backend_url):
     result = await tools.start_release_latest(dry_run=True)
     assert any(e["type"] == "dryrun" for e in result["events"])

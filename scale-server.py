@@ -2820,6 +2820,86 @@ def stream_upgrade_offline_nodes():
     return sse_response(generate())
 
 
+def _stream_mm_node_command(mm_binary, nodes, dry_run, op_name, source, success_verb):
+    """
+    Shared body for mmshutdown/mmstartup: both take only `-N <comma-list>`,
+    both are node-identity-sensitive in exactly the way this session's
+    `/etc/hosts` investigation surfaced for other mm/spectrumscale
+    commands, so both get the same hostname validation and comma-join
+    as start_upgrade_offline_nodes rather than trusting a raw string.
+    """
+    if not nodes:
+        yield sse("error", "[ERROR] At least one node is required.")
+        return
+    for n in nodes:
+        if not _VALID_HOSTNAME_RE.fullmatch(n):
+            yield sse("error", f"[ERROR] Invalid node hostname: {n!r}")
+            return
+    op = None
+    if not dry_run:
+        op, busy = _claim_operation(op_name, source)
+        if busy:
+            yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                               f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                               "Wait for it to finish or call check_operation.")
+            return
+    try:
+        cmd = ["sudo", "-n"] + mmcmd(mm_binary, "-N", ",".join(nodes))
+        yield sse("info", f"$ {' '.join(cmd)}")
+        rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
+        if rc == 0:
+            yield sse_final_status(dry_run, f"[OK] {len(nodes)} node(s) {success_verb}.")
+            if op:
+                _release_operation(op, "success")
+        else:
+            yield sse("error", f"[ERROR] {mm_binary} exited with code {rc}.")
+            if op:
+                _release_operation(op, "error")
+    except Exception as exc:
+        yield sse("error", f"[ERROR] {exc}")
+        if op:
+            _release_operation(op, "error")
+    finally:
+        if op is not None and op["status"] == "running":
+            _release_operation(op, "error")
+        yield sse("done", "")
+
+
+@app.route("/api/stream/gpfs/shutdown", methods=["POST", "OPTIONS"])
+def stream_gpfs_shutdown():
+    """
+    `mmshutdown -N <node1,node2,...>` — stops the GPFS daemon on the given
+    nodes. Required before `spectrumscale upgrade config offline -N
+    <node>` will accept a node (confirmed live: it refuses with "cannot be
+    designated for offline upgrade until the GPFS daemon running on the
+    node is stopped" otherwise).
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    body    = request.get_json(silent=True) or {}
+    nodes   = [str(n).strip() for n in body.get("nodes", []) if str(n).strip()]
+    dry_run = bool(body.get("dry_run", True))
+    source  = request.headers.get("X-Scale-Client", "web")
+    return sse_response(_stream_mm_node_command("mmshutdown", nodes, dry_run, "gpfs-shutdown", source, "shut down"))
+
+
+@app.route("/api/stream/gpfs/startup", methods=["POST", "OPTIONS"])
+def stream_gpfs_startup():
+    """
+    `mmstartup -N <node1,node2,...>` — starts the GPFS daemon on the given
+    nodes. The manual step an offline-upgraded node needs afterward, since
+    `upgrade run` deliberately never restarts GPFS on nodes designated
+    offline via `upgrade config offline`.
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    body    = request.get_json(silent=True) or {}
+    nodes   = [str(n).strip() for n in body.get("nodes", []) if str(n).strip()]
+    dry_run = bool(body.get("dry_run", True))
+    source  = request.headers.get("X-Scale-Client", "web")
+    return sse_response(_stream_mm_node_command("mmstartup", nodes, dry_run, "gpfs-startup", source, "started up"))
+
+
 # ---------------------------------------------------------------------------
 # CCR status check
 # ---------------------------------------------------------------------------

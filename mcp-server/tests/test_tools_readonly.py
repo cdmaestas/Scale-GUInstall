@@ -119,5 +119,6 @@ async def test_all_read_only_tools_are_registered():
         "kill_spectrumscale", "start_cluster_config_apply", "start_phase",
         "start_setup", "start_config_populate", "start_upgrade_offline_nodes",
         "start_release_latest", "start_filesystem_version",
+        "start_gpfs_shutdown", "start_gpfs_startup",
     }
     assert registered == expected_read_only | expected_mutating
