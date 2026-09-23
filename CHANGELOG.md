@@ -10,6 +10,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- `GET /api/stream/test-connection`'s `mmgetstate -a` check failed with "command not found" every time — found live while confirming GPFS came back up after a real offline upgrade. A non-interactive `ssh` session doesn't source the profile that puts `/usr/lpp/mmfs/bin` on `PATH`, so the bare `mmgetstate` command it ran never resolved, even though the node itself had GPFS running fine. Now invoked via the full `MMFS_BIN` path, matching every other `mm*` command in the file.
 - `upgrade run` failed with "An unexpected error occurred" every time every node was designated offline — found live while testing a real parallel-offline upgrade end to end. In that mode the toolkit prompts an interactive `Do you want to continue the parallel offline upgrade process? [y/N]` confirmation, and `/api/stream/phase` had no way to answer it: `stream_process`'s default `/dev/null` stdin makes the prompt hit EOF instead of hanging, so the toolkit exited with a generic fatal error rather than running. `/api/stream/phase` and `start_phase` gained a `confirm` param that answers `y` when set.
 
 ### Added

@@ -2187,9 +2187,13 @@ def stream_test_connection():
             # whatever was entered (root by default, matching GPFS's
             # root-to-root SSH trust); sudo just unlocks root's own key.
             target = f"{user}@{node}"
+            # Full path: a non-interactive ssh session doesn't source the
+            # profile that puts MMFS_BIN on PATH, so a bare "mmgetstate"
+            # fails with "command not found" — confirmed live.
+            mmgetstate = f"{MMFS_BIN}/mmgetstate"
             cmd = ["sudo", "-n", "ssh", "-o", "StrictHostKeyChecking=accept-new",
-                   *_SSH_OPTS, "-p", port, target, "mmgetstate", "-a"]
-            yield sse("info", f"$ sudo ssh -p {port} {target} mmgetstate -a")
+                   *_SSH_OPTS, "-p", port, target, mmgetstate, "-a"]
+            yield sse("info", f"$ sudo ssh -p {port} {target} {mmgetstate} -a")
             stdout, rc = _run_cmd(cmd, timeout=15)
             for line in stdout.splitlines():
                 if line.strip():
