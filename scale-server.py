@@ -1861,7 +1861,7 @@ def stream_apply_cluster_config():
 
     gpfs_flags   = body.get("gpfs_flags", [])   # list of {flag, value}
     callhome_on  = body.get("callhome", False)
-    perfmon_on   = body.get("perfmon", False)
+    perfmon_on   = body.get("perfmon", True)
     perfmon_node = body.get("perfmon_node", "")
     fileaudit_on = body.get("fileaudit", False)
     fileaudit_fs = body.get("fileaudit_fs", "")
