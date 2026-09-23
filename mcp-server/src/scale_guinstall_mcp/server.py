@@ -413,6 +413,50 @@ async def start_phase(toolkit: str, phase: str, skip_ssh: bool = False, dry_run:
 
 
 @mcp.tool()
+async def start_upgrade_offline_nodes(toolkit: str, nodes: list[str], dry_run: bool = True) -> dict:
+    """Designate nodes for an offline upgrade (`spectrumscale upgrade config
+    offline -N <node1,node2,...>`). A subsequent start_phase(phase=
+    "upgrade-run") will upgrade these nodes' packages WITHOUT restarting
+    GPFS on them — `mmstartup` must be run manually on each afterward.
+    Nodes not designated offline get the toolkit's normal automatic
+    rolling/online upgrade instead. There is no corresponding "mark online
+    again" toolkit subcommand, so this only designates nodes offline, never
+    reverts it. Use check_operation to see the result of a real run."""
+    return await _mutate(
+        "POST", "/api/stream/upgrade/offline-nodes", dry_run,
+        json_body={"toolkit": toolkit, "nodes": nodes, "dry_run": dry_run},
+    )
+
+
+@mcp.tool()
+async def start_release_latest(dry_run: bool = True) -> dict:
+    """Run `mmchconfig release=LATEST -i` to activate the highest cluster
+    functionality level supported by every currently-installed node's
+    packages. Only meaningful after every node has already been upgraded
+    (start_phase(phase="upgrade-run") only upgrades packages — it never
+    bumps the cluster's effective release level itself). Use
+    check_operation to see the result of a real run."""
+    return await _mutate(
+        "POST", "/api/stream/postupgrade/release-latest", dry_run,
+        json_body={"dry_run": dry_run},
+    )
+
+
+@mcp.tool()
+async def start_filesystem_version(device: str, version: str = "full", dry_run: bool = True) -> dict:
+    """Run `mmchfs <device> -V full|compat` to activate the on-disk
+    filesystem format matching the cluster's current release level (full)
+    or the latest format still compatible with older, not-yet-upgraded
+    nodes (compat). version must be exactly "full" or "compat". Typically
+    run after start_release_latest. Use check_operation to see the result
+    of a real run."""
+    return await _mutate(
+        "POST", "/api/stream/postupgrade/filesystem-version", dry_run,
+        json_body={"device": device, "version": version, "dry_run": dry_run},
+    )
+
+
+@mcp.tool()
 async def start_setup(dir: str, ip: str, bin: str = "", dry_run: bool = True) -> dict:
     """Run `spectrumscale setup -s <ip>`, installing the toolkit's
     installation service. dir is the working directory containing the
