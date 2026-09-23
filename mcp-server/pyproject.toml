@@ -1,6 +1,6 @@
 [project]
 name = "scale-guinstall-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server for driving Scale GUInstall's backend (scale-server.py) as agent tool calls — a thin HTTP+SSE client, not a reimplementation. Runs locally next to the agent; the backend it talks to runs on the Storage Scale installer node."
 readme = "README.md"
 requires-python = ">=3.10"
