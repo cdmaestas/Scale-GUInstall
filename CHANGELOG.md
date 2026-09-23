@@ -9,6 +9,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- MCP server setup guide expanded beyond Claude Code/Desktop: `mcp-server/README.md`'s "Configure" section now has dedicated instructions for Codex CLI (`~/.codex/config.toml`) alongside Claude Code, plus a general note that any MCP-compliant client works the same way since `scale-guinstall-mcp` is a standard stdio server, not something built for one client specifically. Root `README.md`'s MCP section updated to match.
+
 ### Fixed
 - Hardening pass (security review, silent-failure audit, git hook coverage, doc drift), second pass following the earlier one in 1.2.0:
   - `.mcp.json` was never in `.gitignore` — every commit this project has made so far manually excluded it by staging files individually, but a future `git add -A` would have committed it. Now automatic.

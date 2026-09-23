@@ -1,8 +1,9 @@
 # scale-guinstall-mcp
 
-An MCP (Model Context Protocol) server that lets an AI agent (Claude Code
-or Claude Desktop) drive an IBM Storage Scale cluster install/admin
-session by calling tools — a second, parallel interface alongside the
+An MCP (Model Context Protocol) server that lets an AI agent — Claude
+Code, Claude Desktop, Codex CLI, or any other MCP-compliant client —
+drive an IBM Storage Scale cluster install/admin session by calling
+tools. A second, parallel interface alongside the
 [Scale GUInstall web UI](../README.md), not a replacement for it.
 
 This is a **thin client**, not a reimplementation: every tool call is a
@@ -34,8 +35,18 @@ pip install -e .
 Set `SCALE_BACKEND_URL` if the backend isn't at the default
 `http://127.0.0.1:5001` (e.g. if you tunnel to a different local port).
 
-Register it with Claude Code or Claude Desktop as a local stdio MCP
-server, for example in Claude Code's `.mcp.json`:
+This is a standard stdio-transport MCP server — `scale-guinstall-mcp` is
+just a regular local process any MCP-compliant client can launch, not
+something built specifically for one client. Confirmed working with
+Claude Code and Codex CLI; any other client with stdio MCP server
+support should work the same way — point it at the `scale-guinstall-mcp`
+command (or its full path, e.g.
+`mcp-server/.venv/bin/scale-guinstall-mcp` if you installed into a venv)
+with `SCALE_BACKEND_URL` in its environment.
+
+### Claude Code
+
+Add to `.mcp.json` in your project root:
 
 ```json
 {
@@ -47,6 +58,28 @@ server, for example in Claude Code's `.mcp.json`:
   }
 }
 ```
+
+### Codex CLI
+
+Add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.scale-guinstall]
+command = "scale-guinstall-mcp"
+env = { SCALE_BACKEND_URL = "http://127.0.0.1:5001" }
+```
+
+(Codex's config schema has moved before — check `codex mcp --help` or the
+current [Codex docs](https://github.com/openai/codex) if this doesn't
+take.)
+
+### Claude Desktop and other clients
+
+Claude Desktop uses the same `command`/`env` shape as Claude Code, in its
+own `claude_desktop_config.json` (location varies by OS — see
+[Anthropic's MCP quickstart](https://modelcontextprotocol.io/quickstart/user)).
+For any other client, consult its docs for where local stdio MCP servers
+are configured; the `command` + `env` values above are all it needs.
 
 ## Safety model
 
