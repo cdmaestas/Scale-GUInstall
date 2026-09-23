@@ -34,11 +34,16 @@ fi
 if [[ -z "$PYTHON" ]]; then
   echo "ERROR: Python 3.10+ is required but not found." >&2
   echo "Available: python3.10, python3.11, python3.12, python3.13, or python3.14" >&2
-  echo "Install:   sudo apt install python3.11  OR  sudo yum install python3.11" >&2
+  echo "Install:   sudo apt install python3.11 python3.11-pip  OR  sudo yum install python3.11 python3.11-pip" >&2
   exit 1
 fi
 
 echo "Using $PYTHON ($(${PYTHON} --version 2>&1))"
+
+# The exact "3.11" style version of $PYTHON, for naming the matching OS
+# package below — a generic "python3-pip" suggestion can resolve to a
+# different interpreter/version than the one actually in use.
+PYVER="$("$PYTHON" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || true)"
 
 # Ensure Flask and waitress are available under the chosen interpreter.
 # Deliberately does NOT fall back to piping get-pip.py from the network
@@ -51,7 +56,11 @@ if ! "$PYTHON" -c "import flask, waitress" 2>/dev/null; then
     echo "" >&2
     echo "ERROR: pip install failed — is pip installed for $PYTHON?" >&2
     echo "Install pip via your OS package manager, then re-run this script:" >&2
-    echo "  sudo apt install python3-pip  OR  sudo yum install python3-pip" >&2
+    if [[ -n "$PYVER" ]]; then
+      echo "  sudo apt install python${PYVER}-pip  OR  sudo yum install python${PYVER}-pip" >&2
+    else
+      echo "  sudo apt install python3-pip  OR  sudo yum install python3-pip" >&2
+    fi
     exit 1
   fi
 fi
