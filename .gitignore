@@ -1,5 +1,10 @@
 __pycache__/
 *.pyc
+
+# Local MCP client config — machine-specific absolute paths, never checked in.
+# (Every commit this project has made so far has manually excluded it; this
+# just makes that exclusion automatic instead of relying on remembering to.)
+.mcp.json
 dist/
 packaging/.stage/
 packaging/.rpmbuild/

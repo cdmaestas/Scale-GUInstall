@@ -71,6 +71,30 @@ jobs:
       - name: Run tests
         run: python3 -m pytest mcp-server/tests/ -v
 
+  # ── Dependency vulnerability scan ──────────────────────────────────────────
+  # Covers both dependency sets (backend: flask/waitress; mcp-server: mcp/
+  # httpx) with one pip-audit pass over their union, rather than duplicating
+  # the install+scan across two jobs.
+  pip-audit:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      # Isolated in its own venv, not the runner's global site-packages —
+      # pip-audit scans everything importable in its environment, and the
+      # runner ships pre-installed tooling (requests, urllib3, setuptools,
+      # twisted, wheel, …) with its own, unrelated advisories. Auditing the
+      # global environment picked those up as false "our dependency" hits.
+      - name: Install dependencies + pip-audit into an isolated venv
+        run: |
+          python3 -m venv .audit-venv
+          .audit-venv/bin/pip install --quiet --upgrade pip
+          .audit-venv/bin/pip install --quiet "flask>=3.0,<4" "waitress>=3.0,<4" -e "./mcp-server" pip-audit
+
+      - name: Audit installed packages
+        run: .audit-venv/bin/pip-audit
+
   # ── Shell script linting ──────────────────────────────────────────────────
   shellcheck:
     name: ShellCheck
