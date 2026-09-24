@@ -469,10 +469,83 @@ journalctl -u gpfs-ces
 # or wherever Ganesha logs on your distro
 ```
 
-Root cause not yet identified as of this writing — candidates worth
-checking first: CES export-IP (`eth1`) reachability/routing from the
-toolkit's health-check perspective, and whether the Ganesha NFS daemon is
-actually starting (crash-looping) on the protocol nodes.
+### Root cause, identified: `export_ip_pool` addresses weren't actually free
+
+Diagnosed live on one of the two environments above. `mmhealth node show`
+gave the real reasons under the CES component:
+
+```
+CES   FAILED   nfsd_down, ces_network_ips_not_assignable, portmapper_down
+```
+
+`ces_network_ips_not_assignable` is the root cause; `nfsd_down` and
+`portmapper_down` are downstream of it (Ganesha won't fully start without
+its CES IP). The GPFS log confirmed it directly
+(`/var/adm/ras/mmfs.log.latest`):
+
+```
+[W] mmcesnetworkmonitor: Taking down 10.249.128.70 because it is assigned
+    to another node or has no interface
+```
+
+Working backward from there: `eth1` existed and was link-`UP`
+(`ip link show`), but `ip -4 addr show eth1` returned **nothing** — no
+address at all — and `ip route get 10.249.128.70` resolved via `eth0`,
+not `eth1`. TechZone's cloud-init only auto-configures the primary NIC
+(`eth0`); the secondary NIC exists at the hypervisor level but is never
+brought up by the OS. Bringing it up by hand:
+
+```bash
+nmcli device connect eth1
+ip -4 addr show eth1   # confirm it now has an address
+```
+
+...revealed the deeper problem: DHCP on that segment handed `eth1` the
+address **`10.249.128.70`** — the exact IP the runbook's own §8 example
+used as a `export_ip_pool` entry (pulled from the `/etc/hosts`
+`-secondary` label, which turned out to be describing the node's own
+DHCP-assigned address, not a free floating one). CES export IPs must be
+addresses nothing else holds, so GPFS could never take ownership of an
+address the interface itself was already leasing — hence the endless
+"taking down" loop. **§8's guidance to source `export_ip_pool` from the
+`/etc/hosts` `-secondary` entries is wrong** on environments configured
+this way; use addresses confirmed free on the segment instead (e.g. by
+temporarily bringing an interface up via DHCP first to see what it gets
+handed, then picking different, unclaimed addresses).
+
+### Fix path (partially validated — pick up from here on the next run)
+
+1. Bring `eth1` up on every protocol node first (`nmcli device connect
+   eth1` or `dhclient eth1`), so an address in the target subnet actually
+   exists before configuring CES around it.
+2. Reconfigure with **different**, confirmed-free IPs — not the ones
+   handed out by DHCP:
+   ```bash
+   mmces address remove --ces-ip <bad-ip-1>,<bad-ip-2>
+   mmces address add --ces-ip <new-free-ip> --ces-node <proto-node>
+   # one IP/node pair per invocation — --ces-node does not take a
+   # comma-separated list despite some docs implying otherwise
+   ```
+3. **`mmces address add` requires the IP to resolve** (forward lookup) —
+   add it to `/etc/hosts` (or DNS) *before* calling `add`, or it fails
+   immediately with `Cannot resolve <ip>; Name or service not known`.
+4. Watch for a stuck `Failed` flag in `mmces node list`'s "Node Flags"
+   column — GPFS sets this after repeated address-assignment failures and
+   it independently blocks new assignments even once the underlying cause
+   is fixed. `mmces node resume -N <node>` is a no-op if the node was
+   never formally suspended; an explicit `mmces node suspend -N <node>`
+   followed immediately by `mmces node resume -N <node>` was what cleared
+   it in testing.
+5. Confirm with `mmces node list` (no `Failed` flag, not suspended) before
+   retrying `mmces address add`.
+
+This sequence got CES/NFS visibly closer to healthy but wasn't fully
+confirmed `ACTIVE` end-to-end as of this writing — pick up from step 5 on
+the next live run. The permanent fix belongs earlier in the flow, though:
+either don't auto-configure `eth1`'s address as a TechZone default (so
+step 1 becomes unnecessary), or have whoever provisions the environment
+document genuinely free IPs for `export_ip_pool` up front so §8 doesn't
+need this whole detour.
 
 ## 10. Post-configuration (optional, as needed)
 
