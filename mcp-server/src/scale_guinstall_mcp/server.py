@@ -571,11 +571,11 @@ async def start_setup(dir: str, ip: str, bin: str = "", dry_run: bool = True) ->
 
 @mcp.tool()
 async def start_profiled(nodes: list[str], binpath: str = "/usr/lpp/mmfs/bin", dry_run: bool = True) -> dict:
-    """Create /etc/profile.d/gpfs.sh on each given cluster node (over SSH)
-    so GPFS binaries are on PATH for all users after login. Runs on the
-    given nodes only — never the installer node itself, since that's not
-    where cluster users log in and run mmXXX commands by hand. Use
-    check_operation to see the result of a real run."""
+    """Create /etc/profile.d/gpfs.sh and a validated
+    /etc/sudoers.d/gpfs-path on each given cluster node over SSH. This puts
+    GPFS binaries on PATH both for users after login and for commands run
+    through sudo's secure_path. Use check_operation to see the result of a
+    real run."""
     return await _mutate(
         "POST", "/api/stream/postconfig/profiled", dry_run,
         json_body={"binpath": binpath, "nodes": nodes, "dry_run": dry_run},
@@ -619,9 +619,10 @@ async def start_mmchconfig_tunables(
 @mcp.tool()
 async def start_healthinterval(interval: str = "DEFAULT", nodes: str = "all", dry_run: bool = True) -> dict:
     """Set the `mmhealth` monitoring check interval (`mmhealth config
-    interval <interval> -N <nodes>`). interval must be one of: OFF, LOW,
-    MEDIUM, DEFAULT, HIGH. nodes defaults to "all". Use check_operation to
-    see the result of a real run."""
+    interval <interval>`). This is a cluster-wide setting; nodes is retained
+    for API compatibility and must be "all" because this command rejects
+    `-a`/`-N`. interval must be one of: OFF, LOW, MEDIUM, DEFAULT, HIGH. Use
+    check_operation to see the result of a real run."""
     return await _mutate(
         "GET", "/api/stream/postconfig/healthinterval", dry_run,
         params={"interval": interval, "nodes": nodes, "dry_run": dry_run},

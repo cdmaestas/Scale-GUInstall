@@ -2405,15 +2405,12 @@ def stream_format_disk():
 @app.route("/api/stream/postconfig/profiled", methods=["POST", "OPTIONS"])
 def stream_profiled():
     """
-    Creates /etc/profile.d/gpfs.sh on each given cluster node over SSH —
-    NOT on the installer node itself. Originally ran a local `cp` on
-    whatever host scale-server.py happens to run on (the installer node),
-    which is the one place GPFS binaries don't need PATH help from this
-    script (the toolkit already knows its own binary paths); the actual
-    GPFS cluster nodes are where users log in and run mmXXX commands by
-    hand. Reworked to take an explicit node list and SSH to each one,
-    matching the pattern list_devices/test_connection already use for
-    reaching remote nodes.
+    Creates /etc/profile.d/gpfs.sh and /etc/sudoers.d/gpfs-path on each
+    given cluster node over SSH.  The profile snippet makes GPFS commands
+    available to login shells; the sudoers snippet extends sudo's separate
+    secure_path so `sudo mmhealth` works too.  The sudoers content is
+    written to a temporary file, validated with visudo, and only then moved
+    into place.
     """
     if request.method == "OPTIONS":
         return "", 204
@@ -2445,9 +2442,17 @@ def stream_profiled():
                     return
 
             dest = "/etc/profile.d/gpfs.sh"
+            sudoers_dest = "/etc/sudoers.d/gpfs-path"
+            sudoers_tmp = f"{sudoers_dest}.tmp"
+            secure_path = f"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:{binpath}"
             # binpath is already restricted to _SAFE_PATH_RE (alnum, / . _ - :),
             # so no shell-metacharacter risk in embedding it directly here.
-            remote_cmd = f"printf 'export PATH=$PATH:{binpath}\\n' > {dest} && chmod 644 {dest}"
+            remote_cmd = (
+                f"printf 'export PATH=$PATH:{binpath}\\n' > {dest} && chmod 644 {dest} && "
+                f"printf 'Defaults secure_path=\"{secure_path}\"\\n' > {sudoers_tmp} && "
+                f"chmod 440 {sudoers_tmp} && visudo -cf {sudoers_tmp} && "
+                f"mv -f {sudoers_tmp} {sudoers_dest}"
+            )
             failed = []
             for node in nodes:
                 cmd = ["sudo", "-n", "ssh", "-o", "StrictHostKeyChecking=accept-new",
@@ -2458,8 +2463,11 @@ def stream_profiled():
                     failed.append(node)
 
             if not failed:
-                yield sse_final_status(dry_run, f"[OK] {dest} created on {len(nodes)} node(s). "
-                                                 "Users must re-login (or source it) to apply.")
+                yield sse_final_status(
+                    dry_run,
+                    f"[OK] {dest} and {sudoers_dest} created on {len(nodes)} node(s). "
+                    "Users must re-login (or source the profile) to apply the interactive PATH.",
+                )
                 if op:
                     _release_operation(op, "success")
             else:
@@ -2859,8 +2867,11 @@ def stream_healthinterval():
             if interval not in valid:
                 yield sse("error", f"[ERROR] Invalid interval '{interval}'. Must be one of: {', '.join(sorted(valid))}.")
                 return
-            if nodes != "all" and not _VALID_HOSTNAME_RE.fullmatch(nodes):
-                yield sse("error", f"[ERROR] Invalid nodes value: {nodes!r}")
+            # `mmhealth config interval` is a cluster-wide setting.  Unlike
+            # many other mm* commands it explicitly rejects remote execution
+            # selectors (`-a`/`-N`), including `-N all`.
+            if nodes != "all":
+                yield sse("error", "[ERROR] Health monitoring interval is cluster-wide; nodes must be 'all'.")
                 return
             if not dry_run:
                 op, busy = _claim_operation("postconfig-healthinterval", source)
@@ -2869,11 +2880,11 @@ def stream_healthinterval():
                                        f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
                                        "Wait for it to finish or call check_operation.")
                     return
-            cmd = ["sudo", "-n"] + mmcmd("mmhealth", "config", "interval", interval, "-N", nodes)
+            cmd = ["sudo", "-n"] + mmcmd("mmhealth", "config", "interval", interval)
             yield sse("info", f"$ {' '.join(cmd)}")
             rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
             if rc == 0:
-                yield sse_final_status(dry_run, f"[OK] Health monitoring interval set to {interval} on {nodes}.")
+                yield sse_final_status(dry_run, f"[OK] Cluster health monitoring interval set to {interval}.")
                 if op:
                     _release_operation(op, "success")
             else:

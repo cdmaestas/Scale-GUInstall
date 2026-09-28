@@ -48,6 +48,12 @@ def test_profiled_runs_over_ssh_per_node_not_locally(ss, monkeypatch):
     for cmd in commands:
         assert cmd[:4] == ["sudo", "-n", "ssh", "-o"]
         assert "cp" not in cmd  # not the old local-cp behavior
+        remote_cmd = cmd[-1]
+        assert "/etc/profile.d/gpfs.sh" in remote_cmd
+        assert "/etc/sudoers.d/gpfs-path.tmp" in remote_cmd
+        assert "visudo -cf /etc/sudoers.d/gpfs-path.tmp" in remote_cmd
+        assert "mv -f /etc/sudoers.d/gpfs-path.tmp /etc/sudoers.d/gpfs-path" in remote_cmd
+        assert "/usr/lpp/mmfs/bin" in remote_cmd
     assert commands[0][-2] in ("node1", "node2")  # target node, before the remote command string
     assert ss._current_operation is not None
     assert ss._current_operation["name"] == "postconfig-profiled"
@@ -87,6 +93,8 @@ def test_profiled_dry_run_true_does_not_claim_operation(ss):
     )
     body = resp.get_data(as_text=True)
     assert '"type": "dryrun"' in body
+    assert "/etc/sudoers.d/gpfs-path" in body
+    assert "visudo -cf" in body
     assert ss._current_operation is None
 
 
@@ -177,7 +185,21 @@ def test_healthinterval_dry_run_true_does_not_claim_operation(ss):
     )
     body = resp.get_data(as_text=True)
     assert '"type": "dryrun"' in body
+    assert "/usr/lpp/mmfs/bin/mmhealth config interval LOW" in body
+    assert " -N " not in body
     assert ss._current_operation is None
+
+
+def test_healthinterval_rejects_per_node_selector(ss):
+    client = ss.app.test_client()
+    resp = client.get(
+        "/api/stream/postconfig/healthinterval",
+        headers={"X-Scale-Token": ss._AUTH_TOKEN},
+        query_string={"interval": "HIGH", "nodes": "node1", "dry_run": "true"},
+    )
+    body = resp.get_data(as_text=True)
+    assert "cluster-wide" in body
+    assert '"type": "error"' in body
 
 
 # ---- nfs-core-dump ----------------------------------------------------

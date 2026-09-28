@@ -2284,7 +2284,7 @@
           <!-- 1. Profile.d Script -->
           <div class="panel" style="margin-bottom:var(--spacing-05)">
             <div class="panel-header">
-              <div><h3>Environment Setup</h3><p>Create <code>/etc/profile.d/gpfs.sh</code> to add GPFS binaries to PATH</p></div>
+              <div><h3>Environment Setup</h3><p>Add GPFS binaries to login-shell PATH and sudo secure_path</p></div>
             </div>
             <div class="panel-body">
               <div class="form-group">
@@ -2298,7 +2298,7 @@
                 <div class="form-help">Comma-separated cluster node hostnames — runs over SSH on each, not the installer node. Pre-filled from Node Configuration when you open this page.</div>
               </div>
               <div class="cmd-preview" style="margin-top:var(--spacing-04)" id="pc-profiled-preview">
-                <div><span class="cmd-prompt">$ </span>sudo ssh &lt;node&gt; "printf 'export PATH=\$PATH:/usr/lpp/mmfs/bin\n' &gt; /etc/profile.d/gpfs.sh &amp;&amp; chmod 644 /etc/profile.d/gpfs.sh"</div>
+                <div><span class="cmd-prompt">$ </span>sudo ssh &lt;node&gt; "create /etc/profile.d/gpfs.sh; validate and install /etc/sudoers.d/gpfs-path"</div>
               </div>
               <div style="margin-top:var(--spacing-05)">
                 <button class="btn btn-primary btn-sm" onclick="applyPostConfig('profiled', this)">Apply</button>
@@ -2398,14 +2398,9 @@
                   </select>
                   <div class="form-help">OFF disables monitoring; HIGH increases check frequency</div>
                 </div>
-                <div class="form-group">
-                  <label class="form-label">Nodes</label>
-                  <input type="text" class="form-input" id="pc-health-nodes" value="all" oninput="updatePostConfigPreview()">
-                  <div class="form-help">Node name, list, or "all"</div>
-                </div>
               </div>
               <div class="cmd-preview" style="margin-top:var(--spacing-04)" id="pc-health-preview">
-                <div><span class="cmd-prompt">$ </span>sudo mmhealth config interval DEFAULT -N all</div>
+                <div><span class="cmd-prompt">$ </span>sudo mmhealth config interval DEFAULT</div>
               </div>
               <div style="margin-top:var(--spacing-05)">
                 <button class="btn btn-primary btn-sm" onclick="applyPostConfig('healthinterval', this)">Apply</button>
@@ -5318,7 +5313,7 @@ function updatePostConfigPreview() {
   const pdFirstNode = pdNodes.split(',')[0].trim() || '<node>';
   const pdPrev = document.getElementById('pc-profiled-preview');
   if (pdPrev) pdPrev.innerHTML =
-    `<div><span class="cmd-prompt">$ </span>sudo ssh ${pdFirstNode} "printf 'export PATH=\\$PATH:${binpath}\\n' &gt; /etc/profile.d/gpfs.sh &amp;&amp; chmod 644 /etc/profile.d/gpfs.sh"</div>`;
+    `<div><span class="cmd-prompt">$ </span>sudo ssh ${pdFirstNode} "create /etc/profile.d/gpfs.sh; validate and install /etc/sudoers.d/gpfs-path with ${binpath}"</div>`;
 
   // GUI user preview
   const guiUser = document.getElementById('pc-gui-user')?.value.trim() || '<username>';
@@ -5347,10 +5342,9 @@ function updatePostConfigPreview() {
 
   // mmhealth preview
   const hi = document.getElementById('pc-health-interval')?.value || 'DEFAULT';
-  const hn = document.getElementById('pc-health-nodes')?.value.trim() || 'all';
   const hPrev = document.getElementById('pc-health-preview');
   if (hPrev) hPrev.innerHTML =
-    `<div><span class="cmd-prompt">$ </span>sudo mmhealth config interval ${hi} -N ${hn}</div>`;
+    `<div><span class="cmd-prompt">$ </span>sudo mmhealth config interval ${hi}</div>`;
 
   // AFM preview
   const proto  = document.getElementById('pc-afm-proto')?.value || 'nfs';
@@ -5455,9 +5449,8 @@ async function applyPostConfig(action, btn) {
 
   } else if (action === 'healthinterval') {
     const interval = document.getElementById('pc-health-interval')?.value.trim();
-    const nodes    = document.getElementById('pc-health-nodes')?.value.trim() || 'all';
     if (!interval) { appendToTerminal(termId, '[ERROR] Interval is required.', 'error'); if (btn) btn.disabled = false; return; }
-    const params = new URLSearchParams({ interval, nodes });
+    const params = new URLSearchParams({ interval });
     await streamToTerminal(termId, `${getBackendUrl()}/api/stream/postconfig/healthinterval?${params}`);
 
   } else if (action === 'afmgateway') {

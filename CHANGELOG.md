@@ -1,5 +1,7 @@
 # Changelog
 
+- `postconfig/profiled` now configures both interactive-shell PATH and sudo's separate `secure_path`: the same MCP/UI call creates `/etc/profile.d/gpfs.sh` plus `/etc/sudoers.d/gpfs-path` on every selected node. The sudoers content is written with mode `0440` to a temporary file, validated with `visudo -cf`, and moved into place only after validation succeeds.
+
 All notable changes to Scale GUInstall are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
