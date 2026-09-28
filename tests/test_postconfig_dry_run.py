@@ -155,7 +155,33 @@ def test_mmchconfig_dry_run_true_does_not_claim_operation(ss):
     )
     body = resp.get_data(as_text=True)
     assert '"type": "dryrun"' in body
+    assert "/usr/lpp/mmfs/bin/mmchconfig pagepool=4G" in body
+    assert "pagepool=4G -i" not in body
+    assert "restart the GPFS daemon" in body
     assert ss._current_operation is None
+
+
+def test_mmchconfig_never_uses_immediate_flag(ss, monkeypatch):
+    commands = []
+
+    def fake_stream_process(cmd, **kwargs):
+        commands.append(cmd)
+        yield ss.sse("normal", "running")
+        return 0
+
+    monkeypatch.setattr(ss, "stream_process", fake_stream_process)
+    client = ss.app.test_client()
+    resp = client.get(
+        "/api/stream/postconfig/mmchconfig",
+        headers={"X-Scale-Token": ss._AUTH_TOKEN},
+        query_string={
+            "maxFilesToCache": "65536", "maxStatCache": "65536",
+            "pagepool": "4G", "maxMBpS": "4000", "dry_run": "false",
+        },
+    )
+    resp.get_data()
+    assert len(commands) == 4
+    assert all("-i" not in cmd for cmd in commands)
 
 
 # ---- healthinterval ---------------------------------------------------

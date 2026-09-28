@@ -1,5 +1,7 @@
 # Changelog
 
+- Corrected `postconfig/mmchconfig` / `start_mmchconfig_tunables` to persist `maxFilesToCache`, `maxStatCache`, `pagepool`, and `maxMBpS` without blindly appending `-i`. These settings now explicitly report that affected GPFS filesystems must be unmounted and the GPFS daemon restarted during planned maintenance before the new values are active; the tuning call never performs that disruptive work itself.
+
 - `postconfig/profiled` now configures both interactive-shell PATH and sudo's separate `secure_path`: the same MCP/UI call creates `/etc/profile.d/gpfs.sh` plus `/etc/sudoers.d/gpfs-path` on every selected node. The sudoers content is written with mode `0440` to a temporary file, validated with `visudo -cf`, and moved into place only after validation succeeds.
 
 All notable changes to Scale GUInstall are documented here.

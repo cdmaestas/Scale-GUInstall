@@ -2344,9 +2344,12 @@
           <!-- 3. GPFS Performance Settings -->
           <div class="panel" style="margin-bottom:var(--spacing-05)">
             <div class="panel-header">
-              <div><h3>GPFS Performance Settings</h3><p><code>mmchconfig</code></p></div>
+              <div><h3>GPFS Performance Settings</h3><p><code>mmchconfig</code> — saved now, activated after planned restart</p></div>
             </div>
             <div class="panel-body">
+              <div class="alert alert-warning" style="margin-bottom:var(--spacing-05)">
+                These settings are persisted without <code>-i</code>. To activate them, unmount affected GPFS filesystems and restart the GPFS daemon on the affected nodes during a maintenance window. This action does not perform the unmount or restart.
+              </div>
               <div class="form-row">
                 <div class="form-group">
                   <label class="form-label">maxFilesToCache</label>
@@ -5336,7 +5339,7 @@ function updatePostConfigPreview() {
     if (pp)   pairs.push(`pagepool=${pp}`);
     if (mbps) pairs.push(`maxMBpS=${mbps}`);
     cfgPrev.innerHTML = pairs.length
-      ? pairs.map(p => `<div><span class="cmd-prompt">$ </span>sudo mmchconfig ${p} -i</div>`).join('')
+      ? pairs.map(p => `<div><span class="cmd-prompt">$ </span>sudo mmchconfig ${p}</div>`).join('')
       : '<div style="color:#6f6f6f"># Fill in at least one value above</div>';
   }
 

@@ -601,12 +601,13 @@ async def start_mmchconfig_tunables(
     max_mbps: str = "",
     dry_run: bool = True,
 ) -> dict:
-    """Apply GPFS runtime performance tunables via `mmchconfig <key>=<value>
-    -i` — one call per non-empty value given (maxFilesToCache, maxStatCache,
-    pagepool, maxMBpS). At least one must be set. Named distinctly from
-    start_cluster_config_apply's gpfs_flags (a different, allowlisted set
-    of config flags) to avoid confusion between the two. Use
-    check_operation to see the result of a real run."""
+    """Persist GPFS performance settings via `mmchconfig <key>=<value>` —
+    one call per non-empty value given (maxFilesToCache, maxStatCache,
+    pagepool, maxMBpS). At least one must be set. The call deliberately
+    does not use `-i`: activation requires unmounting affected GPFS file
+    systems and restarting the GPFS daemon on the affected nodes. This tool
+    only saves the settings; it never performs that disruptive maintenance.
+    Use check_operation to see the result of a real run."""
     return await _mutate(
         "GET", "/api/stream/postconfig/mmchconfig", dry_run,
         params={

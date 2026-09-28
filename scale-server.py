@@ -2567,7 +2567,12 @@ def stream_mmchconfig():
                                        "Wait for it to finish or call check_operation.")
                     return
             for key, val in settings.items():
-                cmd = ["sudo", "-n"] + mmcmd("mmchconfig", f"{key}={val}", "-i")
+                # These cache/throughput settings are persisted now and
+                # activated during a controlled GPFS daemon restart.  Do not
+                # append -i: maxFilesToCache/maxStatCache/maxMBpS are not
+                # generally immediate tunables, and even pagepool has NSD,
+                # RAID, RDMA, and dynamic-pagepool restrictions.
+                cmd = ["sudo", "-n"] + mmcmd("mmchconfig", f"{key}={val}")
                 yield sse("info", f"$ {' '.join(cmd)}")
                 rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
                 if rc != 0:
@@ -2575,7 +2580,11 @@ def stream_mmchconfig():
                     if op:
                         _release_operation(op, "error")
                     return
-            yield sse_final_status(dry_run, "[OK] GPFS configuration settings applied.")
+            yield sse_final_status(
+                dry_run,
+                "[OK] GPFS configuration settings saved. Unmount affected GPFS filesystems "
+                "and restart the GPFS daemon on the affected nodes to activate them.",
+            )
             if op:
                 _release_operation(op, "success")
         except Exception as exc:
