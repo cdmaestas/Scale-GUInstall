@@ -176,12 +176,14 @@ def test_mmchconfig_never_uses_immediate_flag(ss, monkeypatch):
         headers={"X-Scale-Token": ss._AUTH_TOKEN},
         query_string={
             "maxFilesToCache": "65536", "maxStatCache": "65536",
-            "pagepool": "4G", "maxMBpS": "4000", "dry_run": "false",
+            "pagepool": "4G", "maxMBpS": "4000", "autoBuildGPL": "yes",
+            "dry_run": "false",
         },
     )
     resp.get_data()
-    assert len(commands) == 4
+    assert len(commands) == 5
     assert all("-i" not in cmd for cmd in commands)
+    assert any("autoBuildGPL=yes" in " ".join(cmd) for cmd in commands)
 
 
 # ---- healthinterval ---------------------------------------------------

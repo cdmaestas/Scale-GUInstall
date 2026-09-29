@@ -1457,6 +1457,25 @@
         </div>
       </div>
 
+      <!-- Grafana Bridge -->
+      <div class="panel" style="margin-top:var(--spacing-06)">
+        <div class="panel-header">
+          <div><h3>Grafana Bridge</h3><p><code>spectrumscale grafanabridge enable|disable</code></p></div>
+        </div>
+        <div class="panel-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Enable Grafana Bridge</label>
+              <div class="toggle-wrapper">
+                <button class="toggle" id="grafanabridge-toggle" onclick="this.classList.toggle('on'); updateClusterCmdPreview()"></button>
+                <span class="toggle-label" id="grafanabridge-toggle-label">Disabled</span>
+              </div>
+              <div class="form-help">Stages the Grafana Bridge (<code>gpfs.grafana-bridge</code>) so Grafana can query GPFS's performance monitoring data. Only staged here — installed and started during Deploy.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="panel" style="margin-top:var(--spacing-06)">
         <div class="panel-header">
           <div><h3>Apply Cluster Configuration</h3><p>Run <code>spectrumscale config gpfs</code> with the settings above</p></div>
@@ -2136,6 +2155,14 @@
             </div>
           </div>
 
+          <div class="notification notification-info" style="margin-bottom:var(--spacing-05)">
+            <svg width="20" height="20" viewBox="0 0 32 32" fill="currentColor" style="color:var(--cds-support-info)"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm-1 6h2v9h-2zm1 14a1.5 1.5 0 111.5-1.5A1.5 1.5 0 0116 22z"/></svg>
+            <div class="notification-content">
+              <h4>Consider GPFS performance tunables now</h4>
+              <p><code>mmchconfig</code> settings (maxFilesToCache, maxStatCache, pagepool, maxMBpS, autoBuildGPL) need an existing cluster, so they can't be set before Run Install creates one — but this is the earliest point they can be applied, right after the cluster and filesystem(s) are created and before Deploy brings up protocols. See <a href="#" onclick="navigateTo('postconfig'); return false;">Post Configuration &rarr; GPFS Performance Settings</a>.</p>
+            </div>
+          </div>
+
           <div class="panel" style="margin-bottom:var(--spacing-05)">
             <div class="panel-header"><div><h3>Step 2: Enable Admin Daemon &amp; Node Identity</h3></div></div>
             <div class="panel-body">
@@ -2231,6 +2258,14 @@
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div class="notification notification-info" style="margin-bottom:var(--spacing-05)">
+            <svg width="20" height="20" viewBox="0 0 32 32" fill="currentColor" style="color:var(--cds-support-info)"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm-1 6h2v9h-2zm1 14a1.5 1.5 0 111.5-1.5A1.5 1.5 0 0116 22z"/></svg>
+            <div class="notification-content">
+              <h4>Want the Grafana Bridge? Stage it before Deploy, not after</h4>
+              <p>Unlike the GPFS performance tunables, <code>grafanabridge enable</code> is only staged in the cluster definition — Deploy is what actually installs and activates it. If it's not enabled before you click Run Deploy below, it won't come up until you re-run Deploy. See <a href="#" onclick="navigateTo('cluster'); return false;">Cluster Settings &rarr; Grafana Bridge</a>.</p>
             </div>
           </div>
 
@@ -2372,6 +2407,17 @@
                   <label class="form-label">maxMBpS</label>
                   <input type="text" class="form-input" id="pc-maxmbps" placeholder="e.g. 4000" oninput="updatePostConfigPreview()">
                   <div class="form-help">Max MB/s disk throughput per node</div>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">autoBuildGPL</label>
+                  <select class="form-input" id="pc-autobuildgpl" onchange="updatePostConfigPreview()">
+                    <option value="">(leave unset)</option>
+                    <option value="yes">yes</option>
+                    <option value="no">no</option>
+                  </select>
+                  <div class="form-help">Auto-rebuild the GPL portability layer after a kernel upgrade</div>
                 </div>
               </div>
               <div class="cmd-preview" style="margin-top:var(--spacing-04)" id="pc-mmchconfig-preview">
@@ -4092,15 +4138,18 @@ function updateClusterCmdPreview() {
   const perfmonNode = document.getElementById('perfmon-querynode')?.value.trim() || '';
   const fileauditOn = document.getElementById('fileaudit-toggle')?.classList.contains('on');
   const fileauditFs = document.getElementById('fileaudit-logfs')?.value.trim() || '';
+  const grafanaOn   = document.getElementById('grafanabridge-toggle')?.classList.contains('on');
   const gplbinDir   = document.getElementById('cluster-gplbin-dir')?.value.trim() || '';
 
   // Keep toggle labels in sync
   const chLabel = document.getElementById('callhome-toggle-label');
   const pmLabel = document.getElementById('perfmon-toggle-label');
   const faLabel = document.getElementById('fileaudit-toggle-label');
+  const gbLabel = document.getElementById('grafanabridge-toggle-label');
   if (chLabel) chLabel.textContent = callhomeOn  ? 'Enabled' : 'Disabled';
   if (pmLabel) pmLabel.textContent = perfmonOn   ? 'Enabled' : 'Disabled';
   if (faLabel) faLabel.textContent = fileauditOn ? 'Enabled' : 'Disabled';
+  if (gbLabel) gbLabel.textContent = grafanaOn   ? 'Enabled' : 'Disabled';
 
   const cmds = [];
   if (name)  cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} config gpfs -c ${h(name)}</div>`);
@@ -4122,6 +4171,9 @@ function updateClusterCmdPreview() {
   } else {
     cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} fileauditlogging disable</div>`);
   }
+
+  // Grafana Bridge — always emitted so disable is enforced on every apply, not just on change
+  cmds.push(`<div><span class="cmd-prompt">$ </span>sudo ${tp} grafanabridge ${grafanaOn ? 'enable' : 'disable'}${grafanaOn ? '' : '  <span style="color:var(--cds-text-disabled)"># always enforced when disabled</span>'}</div>`);
 
   const el = document.getElementById('cluster-cmd-preview');
   if (el) el.innerHTML = cmds.length > 1 ? cmds.join('') : '<div style="color:#6f6f6f"># Fill in Cluster Name above to generate commands</div>';
@@ -4150,6 +4202,7 @@ async function applyClusterConfig(btn) {
   const perfmonOn   = document.getElementById('perfmon-toggle')?.classList.contains('on');
   const fileauditOn = document.getElementById('fileaudit-toggle')?.classList.contains('on');
   const fileauditFs = document.getElementById('fileaudit-logfs')?.value.trim() || '';
+  const grafanaOn   = document.getElementById('grafanabridge-toggle')?.classList.contains('on');
   const gplbinDirLive = document.getElementById('cluster-gplbin-dir')?.value.trim() || '';
 
   if (!name) {
@@ -4168,6 +4221,7 @@ async function applyClusterConfig(btn) {
     appendToTerminal(termId, `$ sudo ${tp} config perfmon -r ${perfmonOn ? 'on' : 'off'}  # (dry run)`, 'info');
     const faFlag = fileauditFs ? ` --log-fileset ${fileauditFs}` : '';
     appendToTerminal(termId, `$ sudo ${tp} fileauditlogging ${fileauditOn ? `enable${faFlag}` : 'disable'}  # (dry run)`, 'info');
+    appendToTerminal(termId, `$ sudo ${tp} grafanabridge ${grafanaOn ? 'enable' : 'disable'}  # (dry run)`, 'info');
     appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
     return;
   }
@@ -4201,6 +4255,7 @@ async function applyClusterConfig(btn) {
     perfmon_node: perfmonNode,
     fileaudit:    fileauditOn,
     fileaudit_fs: fileauditFs,
+    grafana_bridge: grafanaOn,
     dry_run:      false,
   });
 
@@ -5331,6 +5386,7 @@ function updatePostConfigPreview() {
   const msc = document.getElementById('pc-maxstatcache')?.value.trim();
   const pp  = document.getElementById('pc-pagepool')?.value.trim();
   const mbps= document.getElementById('pc-maxmbps')?.value.trim();
+  const abgpl = document.getElementById('pc-autobuildgpl')?.value.trim();
   const cfgPrev = document.getElementById('pc-mmchconfig-preview');
   if (cfgPrev) {
     const pairs = [];
@@ -5338,6 +5394,7 @@ function updatePostConfigPreview() {
     if (msc)  pairs.push(`maxStatCache=${msc}`);
     if (pp)   pairs.push(`pagepool=${pp}`);
     if (mbps) pairs.push(`maxMBpS=${mbps}`);
+    if (abgpl) pairs.push(`autoBuildGPL=${abgpl}`);
     cfgPrev.innerHTML = pairs.length
       ? pairs.map(p => `<div><span class="cmd-prompt">$ </span>sudo mmchconfig ${p}</div>`).join('')
       : '<div style="color:#6f6f6f"># Fill in at least one value above</div>';
@@ -5442,10 +5499,12 @@ async function applyPostConfig(action, btn) {
     const msc  = document.getElementById('pc-maxstatcache')?.value.trim();
     const pp   = document.getElementById('pc-pagepool')?.value.trim();
     const mbps = document.getElementById('pc-maxmbps')?.value.trim();
+    const abgpl = document.getElementById('pc-autobuildgpl')?.value.trim();
     if (mfc)  vals.maxFilesToCache = mfc;
     if (msc)  vals.maxStatCache   = msc;
     if (pp)   vals.pagepool       = pp;
     if (mbps) vals.maxMBpS        = mbps;
+    if (abgpl) vals.autoBuildGPL  = abgpl;
     if (!Object.keys(vals).length) { appendToTerminal(termId, '[ERROR] Enter at least one value.', 'error'); if (btn) btn.disabled = false; return; }
     const params = new URLSearchParams(vals);
     await streamToTerminal(termId, `${getBackendUrl()}/api/stream/postconfig/mmchconfig?${params}`);

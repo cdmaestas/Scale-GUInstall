@@ -1565,6 +1565,23 @@ def list_filesystem():
 
 
 # ---------------------------------------------------------------------------
+# List: Grafana Bridge
+# ---------------------------------------------------------------------------
+
+@app.route("/api/list/grafanabridge")
+def list_grafanabridge():
+    toolkit, _tk_err = resolve_path(request.args.get("toolkit", "").strip())
+    if _tk_err or not _sudo_isfile(toolkit):
+        return jsonify({"ok": False, "error": _tk_err or _diagnose_path(toolkit)}), 400
+
+    raw, rc = _run_cmd(["sudo", "-n", toolkit, "grafanabridge", "list"])
+    if rc != 0:
+        return jsonify({"ok": False, "error": raw.strip(), "raw": raw})
+
+    return jsonify({"ok": True, "raw": raw, "properties": _parse_kv(raw)})
+
+
+# ---------------------------------------------------------------------------
 # List: cluster config
 # ---------------------------------------------------------------------------
 
@@ -1702,6 +1719,20 @@ def _gen_callhome(toolkit, enable, dry_run=False, op=None):
         yield sse("error", f"[ERROR] callhome {action} exited with code {rc}.")
 
 
+def _gen_grafanabridge(toolkit, enable, dry_run=False, op=None):
+    action = "enable" if enable else "disable"
+    cmd = ["sudo", "-n", toolkit, "grafanabridge", action]
+    yield sse("info", f"$ {' '.join(cmd)}")
+    rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
+    if rc == 0:
+        msg = f"[OK] Grafana Bridge {action}d in the cluster definition."
+        if enable:
+            msg += " Run deploy to install and activate it."
+        yield sse_final_status(dry_run, msg)
+    else:
+        yield sse("error", f"[ERROR] grafanabridge {action} exited with code {rc}.")
+
+
 def _gen_perfmon(toolkit, enable, node="", dry_run=False, op=None):
     if node and not (node == "all" or _VALID_HOSTNAME_RE.fullmatch(node)):
         yield sse("error", f"[ERROR] Invalid perfmon node: {node!r}")
@@ -1802,6 +1833,70 @@ def stream_callhome():
 
 
 # ---------------------------------------------------------------------------
+# Grafana Bridge enable / disable
+# ---------------------------------------------------------------------------
+
+@app.route("/api/stream/grafanabridge", methods=["POST", "OPTIONS"])
+def stream_grafanabridge():
+    """
+    `spectrumscale grafanabridge enable|disable` — stages the Grafana
+    Bridge (gpfs.grafana-bridge) in the cluster definition. Like the
+    `enable nfs|smb|s3` protocol flags, this only stages the setting;
+    the bridge is actually installed and started during the next
+    `deploy` run, not by this call.
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+    body    = request.get_json(silent=True) or {}
+    toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
+    enable  = bool(body.get("enable", False))
+    dry_run = bool(body.get("dry_run", True))
+    source  = request.headers.get("X-Scale-Client", "web")
+
+    def generate():
+        op = None
+        try:
+            if _tk_err or not _sudo_isfile(toolkit):
+                yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
+                return
+            if not dry_run:
+                op, busy = _claim_operation("grafanabridge", source)
+                if busy:
+                    yield sse("busy", f"[BUSY] Another operation is already running: {busy['name']} "
+                                       f"(started via {busy['source']} at {_iso(busy['started_at'])}). "
+                                       "Wait for it to finish or call check_operation.")
+                    return
+            # Inlined rather than reusing _gen_grafanabridge (used by
+            # apply-cluster-config) so rc is checked here directly — see
+            # the identical note on stream_callhome above.
+            action = "enable" if enable else "disable"
+            cmd = ["sudo", "-n", toolkit, "grafanabridge", action]
+            yield sse("info", f"$ {' '.join(cmd)}")
+            rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
+            if rc == 0:
+                msg = f"[OK] Grafana Bridge {action}d in the cluster definition."
+                if enable:
+                    msg += " Run deploy to install and activate it."
+                yield sse_final_status(dry_run, msg)
+                if op:
+                    _release_operation(op, "success")
+            else:
+                yield sse("error", f"[ERROR] grafanabridge {action} exited with code {rc}.")
+                if op:
+                    _release_operation(op, "error")
+        except Exception as exc:
+            yield sse("error", f"[ERROR] {exc}")
+            if op:
+                _release_operation(op, "error")
+        finally:
+            if op is not None and op["status"] == "running":
+                _release_operation(op, "error")
+            yield sse("done", "")
+
+    return sse_response(generate())
+
+
+# ---------------------------------------------------------------------------
 # Performance monitoring enable / disable
 # ---------------------------------------------------------------------------
 
@@ -1859,13 +1954,14 @@ def stream_apply_cluster_config():
     body = request.get_json(silent=True) or {}
     toolkit, _tk_err = resolve_path(body.get("toolkit", "").strip())
 
-    gpfs_flags   = body.get("gpfs_flags", [])   # list of {flag, value}
-    callhome_on  = body.get("callhome", False)
-    perfmon_on   = body.get("perfmon", True)
-    perfmon_node = body.get("perfmon_node", "")
-    fileaudit_on = body.get("fileaudit", False)
-    fileaudit_fs = body.get("fileaudit_fs", "")
-    dry_run      = bool(body.get("dry_run", True))
+    gpfs_flags       = body.get("gpfs_flags", [])   # list of {flag, value}
+    callhome_on      = body.get("callhome", False)
+    perfmon_on       = body.get("perfmon", True)
+    perfmon_node     = body.get("perfmon_node", "")
+    fileaudit_on     = body.get("fileaudit", False)
+    fileaudit_fs     = body.get("fileaudit_fs", "")
+    grafanabridge_on = body.get("grafana_bridge", False)
+    dry_run          = bool(body.get("dry_run", True))
     source       = request.headers.get("X-Scale-Client", "web")
 
     def generate():
@@ -1910,6 +2006,9 @@ def stream_apply_cluster_config():
 
             # fileaudit
             yield from _gen_fileaudit(toolkit, fileaudit_on, fileaudit_fs, dry_run=dry_run, op=op)
+
+            # grafana bridge
+            yield from _gen_grafanabridge(toolkit, grafanabridge_on, dry_run=dry_run, op=op)
 
             if op:
                 _release_operation(op, "success")
@@ -2543,7 +2642,7 @@ def stream_guiuser():
 
 @app.route("/api/stream/postconfig/mmchconfig")
 def stream_mmchconfig():
-    allowed = {"maxFilesToCache", "maxStatCache", "pagepool", "maxMBpS"}
+    allowed = {"maxFilesToCache", "maxStatCache", "pagepool", "maxMBpS", "autoBuildGPL"}
     settings = {k: v.strip() for k, v in request.args.items() if k in allowed and v.strip()}
     # Default False — the web UI's existing call never sends this param.
     dry_run = request.args.get("dry_run", "false").lower() in ("true", "1", "yes")
@@ -2567,11 +2666,12 @@ def stream_mmchconfig():
                                        "Wait for it to finish or call check_operation.")
                     return
             for key, val in settings.items():
-                # These cache/throughput settings are persisted now and
-                # activated during a controlled GPFS daemon restart.  Do not
-                # append -i: maxFilesToCache/maxStatCache/maxMBpS are not
-                # generally immediate tunables, and even pagepool has NSD,
-                # RAID, RDMA, and dynamic-pagepool restrictions.
+                # These settings are persisted now and activated during a
+                # controlled GPFS daemon restart.  Do not append -i:
+                # maxFilesToCache/maxStatCache/maxMBpS are not generally
+                # immediate tunables, pagepool has NSD, RAID, RDMA, and
+                # dynamic-pagepool restrictions, and autoBuildGPL only takes
+                # effect on the next kernel-triggered GPL module rebuild.
                 cmd = ["sudo", "-n"] + mmcmd("mmchconfig", f"{key}={val}")
                 yield sse("info", f"$ {' '.join(cmd)}")
                 rc = yield from stream_process(cmd, dry_run=dry_run, op=op)

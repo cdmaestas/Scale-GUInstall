@@ -112,7 +112,7 @@ async def test_all_read_only_tools_are_registered():
         "probe_cluster_nodes", "spectrumscale_running", "list_nodes", "list_nsds",
         "list_filesystem", "list_config", "get_config", "check_operation",
         "checksum", "checkpython", "test_connection", "list_devices",
-        "ccr_status", "check_ansible", "check_locale",
+        "ccr_status", "check_ansible", "check_locale", "list_grafanabridge",
     }
     expected_mutating = {
         "start_format_disk", "start_nsd_add", "start_nsd_clear", "start_node_config",
@@ -123,5 +123,6 @@ async def test_all_read_only_tools_are_registered():
         "start_protocols_config", "start_protocols_enable",
         "start_profiled", "start_guiuser", "start_mmchconfig_tunables",
         "start_healthinterval", "start_nfs_core_dump", "start_afmgateway",
+        "start_grafanabridge",
     }
     assert registered == expected_read_only | expected_mutating

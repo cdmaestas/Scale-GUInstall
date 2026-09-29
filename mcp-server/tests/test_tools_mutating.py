@@ -94,6 +94,11 @@ async def test_start_callhome_dry_run_preview(backend_url, _fake_toolkit_exists)
     assert any(e["type"] == "dryrun" for e in result["events"])
 
 
+async def test_start_grafanabridge_dry_run_preview(backend_url, _fake_toolkit_exists):
+    result = await tools.start_grafanabridge(toolkit="/tmp/spectrumscale", enable=True, dry_run=True)
+    assert any(e["type"] == "dryrun" for e in result["events"])
+
+
 async def test_start_protocols_config_dry_run_preview(backend_url, _fake_toolkit_exists):
     result = await tools.start_protocols_config(
         toolkit="/tmp/spectrumscale", filesystem="cesSharedRoot",

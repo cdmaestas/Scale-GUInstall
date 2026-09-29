@@ -210,6 +210,13 @@ async def list_config(toolkit: str) -> dict:
 
 
 @mcp.tool()
+async def list_grafanabridge(toolkit: str) -> dict:
+    """List Grafana Bridge properties from the cluster definition
+    (`spectrumscale grafanabridge list`)."""
+    return await get_client().get_json("/api/list/grafanabridge", params={"toolkit": toolkit})
+
+
+@mcp.tool()
 async def get_config() -> dict:
     """Read the persisted GUI working state (configured nodes, NSDs,
     filesystem settings) shared with the web UI. Read-only in v1 — there is
@@ -513,6 +520,21 @@ async def start_callhome(toolkit: str, enable: bool = False, dry_run: bool = Tru
 
 
 @mcp.tool()
+async def start_grafanabridge(toolkit: str, enable: bool = True, dry_run: bool = True) -> dict:
+    """Run `spectrumscale grafanabridge enable|disable`. Stages the
+    Grafana Bridge (gpfs.grafana-bridge — lets Grafana query GPFS's
+    perfmon/zimon data) in the cluster definition. Like `enable
+    nfs|smb|s3`, this only stages the setting; a subsequent
+    start_phase(phase="deploy") actually installs and activates it —
+    this call never does that itself. Use check_operation to see the
+    result of a real run."""
+    return await _mutate(
+        "POST", "/api/stream/grafanabridge", dry_run,
+        json_body={"toolkit": toolkit, "enable": enable, "dry_run": dry_run},
+    )
+
+
+@mcp.tool()
 async def start_protocols_config(
     toolkit: str,
     filesystem: str,
@@ -599,20 +621,25 @@ async def start_mmchconfig_tunables(
     max_stat_cache: str = "",
     pagepool: str = "",
     max_mbps: str = "",
+    auto_build_gpl: str = "",
     dry_run: bool = True,
 ) -> dict:
-    """Persist GPFS performance settings via `mmchconfig <key>=<value>` —
-    one call per non-empty value given (maxFilesToCache, maxStatCache,
-    pagepool, maxMBpS). At least one must be set. The call deliberately
-    does not use `-i`: activation requires unmounting affected GPFS file
-    systems and restarting the GPFS daemon on the affected nodes. This tool
-    only saves the settings; it never performs that disruptive maintenance.
-    Use check_operation to see the result of a real run."""
+    """Persist GPFS performance/behavior settings via `mmchconfig
+    <key>=<value>` — one call per non-empty value given (maxFilesToCache,
+    maxStatCache, pagepool, maxMBpS, autoBuildGPL — pass "yes"/"no" for
+    autoBuildGPL). At least one must be set. The call deliberately does not
+    use `-i`: maxFilesToCache/maxStatCache/maxMBpS/pagepool activation
+    requires unmounting affected GPFS file systems and restarting the GPFS
+    daemon on the affected nodes, and autoBuildGPL only takes effect on the
+    next kernel-triggered GPL module rebuild. This tool only saves the
+    settings; it never performs that disruptive maintenance. Use
+    check_operation to see the result of a real run."""
     return await _mutate(
         "GET", "/api/stream/postconfig/mmchconfig", dry_run,
         params={
             "maxFilesToCache": max_files_to_cache, "maxStatCache": max_stat_cache,
-            "pagepool": pagepool, "maxMBpS": max_mbps, "dry_run": dry_run,
+            "pagepool": pagepool, "maxMBpS": max_mbps, "autoBuildGPL": auto_build_gpl,
+            "dry_run": dry_run,
         },
     )
 
