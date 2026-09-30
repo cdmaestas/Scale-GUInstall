@@ -425,7 +425,11 @@ async def start_phase(
     process? [y/N]" when every node is designated offline (via
     start_upgrade_offline_nodes); without confirm=true it hits EOF on
     stdin and fails with "An unexpected error occurred" instead of
-    running. Use check_operation to see the result of a real run."""
+    running. precheck-deploy/deploy with NFS enabled FATALs on any
+    protocol/CES node missing the rpcbind package ("Pre requisite
+    package not found... dnf install rpcbind") — install it on those
+    nodes first, confirmed live on a real cluster. Use check_operation
+    to see the result of a real run."""
     return await _mutate(
         "GET", "/api/stream/phase", dry_run,
         params={
@@ -564,8 +568,11 @@ async def start_protocols_config(
 async def start_protocols_enable(toolkit: str, protocols: list[str], dry_run: bool = True) -> dict:
     """Run `spectrumscale enable <protocol> [<protocol> ...]` to turn on
     one or more of s3/smb/nfs/hdfs. Requires start_protocols_config (CES
-    shared-root filesystem/mountpoint) to already be set. Use
-    check_operation to see the result of a real run."""
+    shared-root filesystem/mountpoint) to already be set. For nfs,
+    precheck-deploy/deploy will FATAL with "Pre requisite package not
+    found... dnf install rpcbind" if rpcbind isn't already installed on
+    every protocol/CES node — install it there before running deploy.
+    Use check_operation to see the result of a real run."""
     return await _mutate(
         "POST", "/api/stream/protocols/enable", dry_run,
         json_body={"toolkit": toolkit, "protocols": protocols, "dry_run": dry_run},

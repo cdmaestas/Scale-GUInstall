@@ -1964,6 +1964,7 @@
               <button class="toggle" id="nfs-toggle" onclick="toggleProtocol(this,'nfs-config')"></button>
               <span class="toggle-label">Enable NFS</span>
             </div>
+            <div class="form-help" style="margin-bottom:var(--spacing-05)">Requires the <code>rpcbind</code> package on every protocol/CES node. If it's missing, precheck-deploy fails with "Pre requisite package not found... dnf install rpcbind" — install it on those nodes before running Deploy.</div>
             <div id="nfs-config" style="display:none; padding-top:var(--spacing-05); border-top:1px solid var(--cds-border-subtle-01); margin-top:var(--spacing-04)">
               <div class="form-group">
                 <label class="form-label">NFS Version</label>
