@@ -547,6 +547,87 @@ step 1 becomes unnecessary), or have whoever provisions the environment
 document genuinely free IPs for `export_ip_pool` up front so §8 doesn't
 need this whole detour.
 
+### Second root cause found: a masked `rpcbind` blocks NFS regardless of the IP fix
+
+Confirmed on a third TechZone environment, with the export-IP conflict
+above already fixed up front (genuinely free `export_ip_pool` addresses,
+picked after manually bringing `eth1` up and checking nothing else on the
+segment answered a ping). Deploy still finished with `failed=0` everywhere,
+and this time **SMB came up `ACTIVE`** — real evidence the IP fix works —
+but CES and NFS failed their health check exactly as before:
+
+```
+NODE                    AUTH       BLOCK      NETWORK    ... NFS      ... SMB       CES
+scale-proto1-je1g6p3k   DISABLED   DISABLED   DEGRADED       FAILED       HEALTHY   FAILED
+scale-proto2-je1g6p3k   DISABLED   DISABLED   DEGRADED       FAILED       HEALTHY   FAILED
+```
+
+`mmces address list` showed both export IPs stuck **`unassigned`** — the
+toolkit's `export_ip_pool` only stages the pool; it never actually
+assigns an IP to a specific node during `deploy`. Assigning by hand
+(`mmces address add --ces-ip <ip> --ces-node <proto-node>`) failed
+immediately with `Node <node> is not currently accepting CES network
+assignments` — the stuck-`Failed`-flag problem from step 4 above,
+confirmed independently on a fresh environment.
+
+This time, `mmces node suspend`/`resume` only cleared the flag
+**transiently**: resuming a node re-triggers GPFS's own health
+re-evaluation, and since the real underlying problem was still there, the
+`Failed` flag came straight back (on both nodes, including the one that
+had briefly cleared) as soon as the check re-ran. Don't treat a
+momentarily-clean `mmces node list` after suspend/resume as confirmation
+of anything — it proves nothing if the actual cause is still broken.
+
+Chasing the actual cause with direct service checks on `scale-proto1`:
+
+```bash
+systemctl status firewalld nfs-ganesha rpcbind --no-pager
+```
+
+`firewalld` was confirmed `inactive` (not the blocker this time). The real
+finding:
+
+```
+○ rpcbind.service
+     Loaded: masked (Reason: Unit rpcbind.service is masked.)
+     Active: inactive (dead)
+```
+
+**`rpcbind.service` — and separately, `rpcbind.socket` — are masked** on
+this TechZone base image. Masking is a hard systemd block (unit
+symlinked to `/dev/null`); even GPFS's own CES startup trying
+`systemctl start rpcbind` (confirmed via `strace` on a different cluster
+in this same investigation — see the `mmremote cesopstart` /
+`Redirecting to /bin/systemctl start rpcbind.service` pattern) cannot
+start a masked unit. No rpcbind → no portmapper → NFS-Ganesha can never
+come up, regardless of whether the export IP is assigned correctly. SMB
+doesn't depend on rpcbind, which is exactly why it was the one protocol
+that came up healthy while NFS/CES stayed `FAILED`.
+
+Fix — on **every protocol node**, before/alongside the export-IP fix
+above, not instead of it:
+
+```bash
+systemctl unmask rpcbind.socket
+systemctl unmask rpcbind.service
+systemctl enable --now rpcbind.socket
+systemctl enable --now rpcbind.service
+systemctl status rpcbind.socket rpcbind.service --no-pager
+```
+
+**Not yet confirmed end-to-end as of this writing** — this was found
+right as the environment was being torn down for a fresh reservation.
+Pick up from here on the next live run: unmask rpcbind on both protocol
+nodes *before* running `deploy` (not after, as a repair step), then watch
+whether CES/NFS come up `ACTIVE` on the first attempt instead of needing
+any `address add`/suspend/resume dance at all. If it works, the permanent
+fix belongs in §8 as a prerequisite check, the same way rpcbind is
+already flagged as an NFS prerequisite in the toolkit's own
+`precheck-deploy` on some environments (see the zima-cluster session's
+`dnf install rpcbind` FATAL) — the difference here is the package is
+*installed* but masked, which `precheck-deploy` did not catch or warn
+about on this environment.
+
 ## 10. Post-configuration (optional, as needed)
 
 ```
