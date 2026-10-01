@@ -83,7 +83,11 @@ between sections, simulated typing for commands, and the two long waits
 (install ~26 min, deploy ~13 min) compressed rather than played out in
 full.
 
-Play it locally:
+Unlike the first recording, this one is **narration-paced**: each
+section holds for roughly as long as it takes to read the matching
+section of the companion narration script aloud, so it can be played
+and talked over live (via `asciinema play` + screen recording) without
+constantly pausing. Total runtime is ~5.5 minutes. Play it locally:
 
 ```bash
 brew install asciinema   # if you don't already have it
