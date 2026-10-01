@@ -15,12 +15,16 @@ first time."
 
 A terminal reenactment is at
 [`recordings/techzone-runbook-walkthrough-clean.cast`](recordings/techzone-runbook-walkthrough-clean.cast) —
-narration-paced, ~2.9 minutes, meant to be played and talked over live.
+narration-paced, ~3.6 minutes, meant to be played and talked over live.
 
 All three protocols (NFS, SMB, S3) are covered — S3 was confirmed live
 on a real environment (added to an already-running NFS/SMB cluster,
 `deploy` finished `failed=0` with `S3 ACTIVE` and NFS/SMB undisturbed)
-before being folded into this clean version.
+before being folded into this clean version. `postcheck-install` and
+`postcheck-deploy` were also run live on that same environment for
+this version — both came back clean (`SUCCESS`, `All services
+running`), confirming the toolkit's own post-phase health checks
+agree with what `deploy` already reported.
 
 This version trims out the pre-flight checks (confirming `rpcbind` is
 active, confirming floating IPs are free, confirming S3 media is
@@ -36,10 +40,11 @@ at your own risk; they're cheap to run and expensive to skip.
 | Node configuration | All 7 nodes added with roles: 2 NSD/quorum/manager servers, 1 GUI/quorum/admin, 2 protocol/manager, 2 plain clients |
 | Storage discovery + NSDs | 3 free disks per server, split into `cesSharedRoot` (shared root) + `fs1` (general use), mirrored across both servers |
 | Precheck + install | Callhome disabled and the ephemeral port range set *before* the first precheck, so it passes clean on the first try; install then runs ~25–30 min |
-| Confirm cluster | Direct `mmlscluster`/`mmgetstate`/`mmlsfs` check — all 7 nodes active, both filesystems created |
+| **Postcheck-install** | `spectrumscale install --postcheck` — the toolkit's own verification, independent of the install run's own exit status: `GPFS ACTIVE`, `NSDs ACTIVE`, `Performance Monitoring ACTIVE`, `GUI ACTIVE` |
 | Protocol configuration | `config protocols` with the floating IPs, then `enable nfs smb s3` |
 | Precheck-deploy | Clean, S3 included |
 | Deploy | `Filesystem`, `Cluster Export Services`, `S3`, `SMB`, `NFS`, `Performance Monitoring`, and `GUI` all come up `ACTIVE` on the first attempt — no retries, no manual IP assignment, nothing left broken |
+| **Postcheck-deploy** | `spectrumscale deploy --postcheck` — same idea, for the protocol deploy: every component independently reconfirmed `ACTIVE` |
 
 ## Watching the recording
 
