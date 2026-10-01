@@ -332,6 +332,15 @@ independently — restoring the tunnel and/or restarting the backend under
 
 ## 8. Protocols (NFS/SMB/S3) — do this before `deploy`, not after
 
+**Before configuring anything below, check `rpcbind` on every protocol
+node first** — confirmed on multiple TechZone environments to ship
+masked (`systemctl status rpcbind.socket rpcbind.service --no-pager`),
+which silently blocks NFS/CES from ever coming up healthy regardless of
+how correctly everything else below is configured. See the "Confirmed
+end-to-end" section under the known-issue writeup further down for the
+fix (`systemctl unmask`/`enable --now` both units) — do it now, before
+`install`, not as a repair after a failed `deploy`.
+
 **This is the step most likely to be skipped**, because `deploy` will
 "succeed" without it — it just won't actually turn any protocol on.
 `spectrumscale deploy` only installs and activates CES *infrastructure*
@@ -615,18 +624,48 @@ systemctl enable --now rpcbind.service
 systemctl status rpcbind.socket rpcbind.service --no-pager
 ```
 
-**Not yet confirmed end-to-end as of this writing** — this was found
-right as the environment was being torn down for a fresh reservation.
-Pick up from here on the next live run: unmask rpcbind on both protocol
-nodes *before* running `deploy` (not after, as a repair step), then watch
-whether CES/NFS come up `ACTIVE` on the first attempt instead of needing
-any `address add`/suspend/resume dance at all. If it works, the permanent
-fix belongs in §8 as a prerequisite check, the same way rpcbind is
-already flagged as an NFS prerequisite in the toolkit's own
-`precheck-deploy` on some environments (see the zima-cluster session's
-`dnf install rpcbind` FATAL) — the difference here is the package is
-*installed* but masked, which `precheck-deploy` did not catch or warn
-about on this environment.
+### Confirmed end-to-end on a fourth environment: unmask rpcbind *before* deploy, no workarounds needed
+
+Validated on a fresh TechZone reservation. `rpcbind.socket`/`.service`
+were confirmed masked on both protocol nodes (same symptom, different
+environment — this isn't a one-off image defect), then unmasked and
+enabled with the four commands above **before** running `install` or
+`deploy` at all — not as a post-failure repair.
+
+Result: `deploy` finished `failed=0` everywhere, and on the very first
+attempt:
+
+```
+Filesystem ACTIVE
+Cluster Export Services ACTIVE
+SMB ACTIVE
+NFS ACTIVE
+Performance Monitoring ACTIVE
+GUI ACTIVE
+SUCCESS
+Successfully installed and configured protocols. 2 protocol nodes were
+enabled. Components installed: Filesystem, Cluster Export Services, SMB,
+NFS, Performance Monitoring, GUI, FILE AUDIT LOGGING. It took 12 minutes
+33 seconds.
+```
+
+No `mmces address add` dance, no stuck `Failed` flag, no suspend/resume
+flapping — none of that was needed this time. The genuinely-free
+`export_ip_pool` fix (bring `eth1` up, confirm candidate IPs don't
+ping, use those) was *also* applied up front on this run, so both fixes
+were in place together; no attempt was made to isolate which one alone
+would have been sufficient, since doing both costs nothing extra and a
+real deploy run is far too expensive to spend isolating variables that
+don't need isolating.
+
+**This is now the recommended order of operations for §8, not just a
+troubleshooting footnote**: before running `install`, confirm
+`rpcbind.socket`/`.service` aren't masked on every protocol node
+(`systemctl status rpcbind.socket rpcbind.service --no-pager`) and fix
+if they are; and before running `config protocols`, bring `eth1` up on
+every protocol node and pick `export_ip_pool` addresses confirmed free
+on that segment — not ones pulled straight from `/etc/hosts`
+`-secondary` labels. Do both before `deploy`, not after it fails.
 
 ## 10. Post-configuration (optional, as needed)
 
