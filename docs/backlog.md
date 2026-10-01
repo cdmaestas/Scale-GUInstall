@@ -47,4 +47,45 @@ resolvable, unclaimed floating addresses.
 - The MCP/backend preflight catches the known bad-address configuration.
 - Deploy finishes with filesystem, CES, NFS, SMB, S3, monitoring, and GUI
   all active.
+
+## Client-side protocol sanity check after deploy
+
+**Priority:** Medium
+**Status:** Not started
+
+Every walkthrough built so far (clean and real) stops at "the toolkit
+reports every component `ACTIVE`" — none of them actually prove a client
+can use NFS, SMB, or S3. `scale-client1`/`scale-client2` are staged in
+the cluster but have never been touched after node config.
+
+### Known gap before this can run
+
+`spectrumscale enable nfs smb s3` only turns on the protocol daemons —
+it does not create an actual NFS export or SMB share on `fs1`. An
+export/share needs to be created first (`mmnfs export add`, `mmsmb
+export add`) or a client mount attempt will fail with "no such export,"
+which wouldn't prove anything about deploy quality, just that this
+extra step was skipped.
+
+### Work
+
+1. Check current state: `mmnfs export list` / `mmsmb export list` on an
+   admin node, to confirm whether an export/share already exists on
+   `fs1` from the earlier sessions.
+2. If none exists, create a minimal NFS export and SMB share on `fs1`.
+3. From `scale-client1`, mount the NFS export, write/read/delete a test
+   file, then unmount.
+4. From `scale-client1` (or `scale-win-client1`), connect to the SMB
+   share and confirm read/write.
+5. Basic S3 sanity check (e.g. `curl`/`aws s3 ls` against the S3
+   endpoint) if credentials/setup allow without excessive scope.
+6. If all of the above pass, add this as a final section to the clean
+   walkthrough (narration + recording), consistent with the live-first
+   pattern used for S3 and the postchecks.
+
+### Acceptance criteria
+
+- A real client can mount/read/write NFS and SMB after deploy.
+- The clean walkthrough's recording/narration reflects this as the
+  actual proof-of-success step, not just toolkit-reported `ACTIVE`.
 - The runbook contains one unambiguous, verified export-IP procedure.
