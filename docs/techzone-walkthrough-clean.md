@@ -15,12 +15,18 @@ first time."
 
 A terminal reenactment is at
 [`recordings/techzone-runbook-walkthrough-clean.cast`](recordings/techzone-runbook-walkthrough-clean.cast) —
-narration-paced, ~3.5 minutes, meant to be played and talked over live.
+narration-paced, ~2.9 minutes, meant to be played and talked over live.
 
 All three protocols (NFS, SMB, S3) are covered — S3 was confirmed live
 on a real environment (added to an already-running NFS/SMB cluster,
 `deploy` finished `failed=0` with `S3 ACTIVE` and NFS/SMB undisturbed)
 before being folded into this clean version.
+
+This version trims out the pre-flight checks (confirming `rpcbind` is
+active, confirming floating IPs are free, confirming S3 media is
+present) for a tighter demo — they still matter in a real run, and are
+exactly where the real walkthroughs' debugging stories start. Skip them
+at your own risk; they're cheap to run and expensive to skip.
 
 ## The golden path
 
@@ -29,12 +35,9 @@ before being folded into this clean version.
 | Toolkit setup | `spectrumscale setup -s <installer-ip>` |
 | Node configuration | All 7 nodes added with roles: 2 NSD/quorum/manager servers, 1 GUI/quorum/admin, 2 protocol/manager, 2 plain clients |
 | Storage discovery + NSDs | 3 free disks per server, split into `cesSharedRoot` (shared root) + `fs1` (general use), mirrored across both servers |
-| **Pre-flight: `rpcbind`** | Confirm `rpcbind.socket`/`rpcbind.service` are active on both protocol nodes *before* install — a masked `rpcbind` silently blocks NFS regardless of anything else being configured correctly. S3 doesn't depend on it, but NFS does |
-| **Pre-flight: floating IPs** | Ping-check candidate export IPs before using them — an IP that collides with what DHCP hands the interface can never be claimed by GPFS |
-| **Pre-flight: S3 media** | Confirm the extracted media's `s3_rpms/<os>/` directory actually has packages in it — `enable s3` fails on missing packages otherwise |
 | Precheck + install | Callhome disabled and the ephemeral port range set *before* the first precheck, so it passes clean on the first try; install then runs ~25–30 min |
 | Confirm cluster | Direct `mmlscluster`/`mmgetstate`/`mmlsfs` check — all 7 nodes active, both filesystems created |
-| Protocol configuration | `config protocols` with the pre-verified floating IPs, then `enable nfs smb s3` |
+| Protocol configuration | `config protocols` with the floating IPs, then `enable nfs smb s3` |
 | Precheck-deploy | Clean, S3 included |
 | Deploy | `Filesystem`, `Cluster Export Services`, `S3`, `SMB`, `NFS`, `Performance Monitoring`, and `GUI` all come up `ACTIVE` on the first attempt — no retries, no manual IP assignment, nothing left broken |
 
