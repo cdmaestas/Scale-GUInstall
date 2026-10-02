@@ -203,3 +203,20 @@ really happened and are left in.
 ```bash
 asciinema play docs/recordings/mcp-nlp-live-install.cast
 ```
+
+### Debugging a tool through the same server
+
+[`recordings/mcp-nlp-troubleshooting.cast`](recordings/mcp-nlp-troubleshooting.cast)
+(~3 minutes, narration in
+[`narration-mcp-nlp-troubleshooting.md`](narration-mcp-nlp-troubleshooting.md))
+follows one real debugging session from the same install: `test_connection`
+kept reporting "SSH connection failed (exit 255)" on nodes that `list_devices`
+reached fine. A few read-only calls and one pasted command from the operator
+traced it to a forced `-p 22` / `root@` that overrode the installer's ssh
+config (the nodes' sshd is on 2223), and to a failing remote `mmgetstate`
+being reported as an SSH failure. The operator's messages are quoted as sent;
+the code reading and fix are shown as notes since they are not MCP calls.
+
+```bash
+asciinema play docs/recordings/mcp-nlp-troubleshooting.cast
+```
