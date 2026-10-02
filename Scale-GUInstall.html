@@ -1945,7 +1945,7 @@
     <div class="page-section" id="page-protocols">
       <div class="page-header">
         <h1>Protocol Services</h1>
-        <p>Enable and configure IBM Storage Scale protocol services (NFS, SMB, Object, NFS Ganesha) on designated protocol nodes.</p>
+        <p>Enable and configure IBM Storage Scale protocol services (NFS, SMB, S3) on designated protocol nodes.</p>
       </div>
 
       <div class="notification notification-info">
@@ -1953,6 +1953,14 @@
         <div class="notification-content">
           <h4>Protocol Node Requirement</h4>
           <p>At least 2 protocol nodes are required for redundancy. Ensure you have assigned the "Protocol" role to nodes in the Node Configuration step.</p>
+        </div>
+      </div>
+
+      <div class="notification notification-info">
+        <svg width="20" height="20" viewBox="0 0 32 32" fill="currentColor" style="color:var(--cds-support-info)"><path d="M16 2a14 14 0 1014 14A14 14 0 0016 2zm-1 6h2v9h-2zm1 14a1.5 1.5 0 111.5-1.5A1.5 1.5 0 0116 22z"/></svg>
+        <div class="notification-content">
+          <h4>What this step applies</h4>
+          <p>The toolkit stages the CES shared root filesystem, its mountpoint, the interface, the export IP pool, and which protocols are enabled (<code>config protocols</code> + <code>enable</code>). The NFS/SMB option fields below (versions, export/share paths, authentication, signing) and the CES group/failover settings are not applied by the toolkit — create exports and shares after Deploy (<code>mmnfs export add</code>, <code>mmsmb export add</code>).</p>
         </div>
       </div>
 
@@ -2033,26 +2041,14 @@
         </div>
 
         <div class="panel">
-          <div class="panel-header"><div><h3>Object Storage (Swift)</h3></div></div>
+          <div class="panel-header"><div><h3>S3 Object Storage</h3></div></div>
           <div class="panel-body">
             <div class="toggle-wrapper" style="margin-bottom:var(--spacing-05)">
-              <button class="toggle" id="obj-toggle" onclick="toggleProtocol(this,'obj-config')"></button>
-              <span class="toggle-label">Enable Object Storage</span>
+              <button class="toggle" id="s3-toggle" onclick="toggleProtocol(this,'s3-config')"></button>
+              <span class="toggle-label">Enable S3</span>
             </div>
-            <div id="obj-config" style="display:none; padding-top:var(--spacing-05); border-top:1px solid var(--cds-border-subtle-01); margin-top:var(--spacing-04)">
-              <div class="form-group">
-                <label class="form-label">Swift Account</label>
-                <input type="text" class="form-input" placeholder="e.g. AUTH_admin">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Keystone Endpoint</label>
-                <input type="text" class="form-input" placeholder="e.g. http://keystone:5000/v3">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Object Store Path</label>
-                <input type="text" class="form-input" placeholder="e.g. /gpfs/data/object">
-              </div>
-            </div>
+            <div class="form-help">Runs <code>spectrumscale enable s3</code>. The S3 packages must be present on the protocol nodes before Deploy; precheck-deploy reports them if they are missing.</div>
+            <div id="s3-config" style="display:none"></div>
           </div>
         </div>
 
@@ -2060,14 +2056,23 @@
           <div class="panel-header"><div><h3>CES (Cluster Export Services)</h3></div></div>
           <div class="panel-body">
             <div class="form-group">
-              <label class="form-label">CES Shared Root Filesystem</label>
-              <input type="text" class="form-input" placeholder="e.g. gpfs0 or /gpfs/data">
-              <div class="form-help">Filesystem for CES shared configuration data</div>
+              <label class="form-label">CES Shared Root Filesystem <span class="required">*</span> <code>-f</code></label>
+              <input type="text" class="form-input" id="ces-fs" placeholder="e.g. cesSharedRoot" oninput="updateProtocolsCmdPreview()">
+              <div class="form-help">Filesystem name for CES shared configuration data</div>
             </div>
             <div class="form-group">
-              <label class="form-label">CES IP Addresses</label>
-              <textarea class="form-textarea" rows="3" placeholder="One CES floating IP per line&#10;e.g. 192.168.1.100&#10;192.168.1.101"></textarea>
-              <div class="form-help">Floating IPs used for protocol access, should be in same subnet as client network</div>
+              <label class="form-label">Mountpoint <code>-m</code></label>
+              <input type="text" class="form-input" id="ces-mount" placeholder="Defaults to /ibm/&lt;filesystem&gt;" oninput="updateProtocolsCmdPreview()">
+              <div class="form-help">Where the shared root filesystem is mounted</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Network Interface <code>-i</code></label>
+              <input type="text" class="form-input" id="ces-interface" placeholder="e.g. eth1 (optional)" oninput="updateProtocolsCmdPreview()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">CES IP Addresses <code>-e</code></label>
+              <textarea class="form-textarea" id="ces-ips" rows="3" placeholder="One CES floating IP per line&#10;e.g. 192.168.1.100&#10;192.168.1.101" oninput="updateProtocolsCmdPreview()"></textarea>
+              <div class="form-help">Floating IPs used for protocol access. They must be unused (not DHCP-assigned to any node) and in the same subnet as the client network.</div>
             </div>
             <div class="form-group">
               <label class="form-label">CES Group Name</label>
@@ -2079,6 +2084,25 @@
                 <div><span>Enable IP failover</span><span class="label-desc">Automatically reassign CES IPs on node failure</span></div>
               </label>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:var(--spacing-06)">
+        <div class="panel-header">
+          <div><h3>Apply Protocol Configuration</h3><p>Run <code>spectrumscale config protocols</code>, then <code>spectrumscale enable</code> for the selected protocols</p></div>
+          <div style="display:flex; gap:var(--spacing-03)">
+            <button class="btn btn-sm btn-secondary" onclick="clearProtocolsTerminal()">Clear</button>
+            <button class="btn btn-sm btn-primary" id="protocols-apply-btn" onclick="applyProtocolsConfig(this)">Apply Protocols</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="cmd-preview" id="protocols-cmd-preview"></div>
+        </div>
+        <div class="panel-body" style="padding:0">
+          <div class="terminal" id="protocols-terminal">
+            <div class="terminal-line muted"># config protocols / enable output will appear here</div>
+            <div class="terminal-line normal terminal-cursor"></div>
           </div>
         </div>
       </div>
@@ -3068,7 +3092,7 @@ const state = {
   nodes: [],
   nsds: [],
   filesystem: { name: '', mount: '/gpfs/data', blocksize: '256K', replication: 2 },
-  protocols: { nfs: false, smb: false, object: false },
+  protocols: { nfs: false, smb: false, s3: false },
   clusterName: '',
   toolkitPath: '/tmp/scale-pkg/installer/spectrumscale',
   dryRun: true,
@@ -4429,6 +4453,7 @@ async function loadConfigFromCluster(btn) {
 // ===== ALL PREVIEWS =====
 function updateAllPreviews() {
   updateClusterCmdPreview();
+  updateProtocolsCmdPreview();
   updatePostConfigPreview();
   updateFakeNsdPreview();
   updateNsdAddCmdPreview();
@@ -4474,6 +4499,91 @@ function toggleProtocol(btn, configId) {
   state.protocols[protoKey] = isOn;
   const count = Object.values(state.protocols).filter(Boolean).length;
   document.getElementById('stat-proto').textContent = count;
+  updateProtocolsCmdPreview();
+}
+
+// ===== PROTOCOLS: config protocols + enable =====
+function getProtocolsInputs() {
+  const fs    = document.getElementById('ces-fs')?.value.trim() || '';
+  const mount = document.getElementById('ces-mount')?.value.trim() || (fs ? `/ibm/${fs}` : '');
+  const iface = document.getElementById('ces-interface')?.value.trim() || '';
+  const ips   = (document.getElementById('ces-ips')?.value || '').split(/[\s,]+/).filter(Boolean);
+  const protos = ['nfs', 'smb', 's3'].filter(p => state.protocols[p]);
+  return { fs, mount, iface, ips, protos };
+}
+
+function protocolsCommands() {
+  const tp = state.toolkitPath;
+  const { fs, mount, iface, ips, protos } = getProtocolsInputs();
+  const cmds = [];
+  if (fs) {
+    let c = `sudo ${tp} config protocols -f ${fs} -m ${mount}`;
+    if (iface) c += ` -i ${iface}`;
+    if (ips.length) c += ` -e ${ips.join(',')}`;
+    cmds.push(c);
+  }
+  if (protos.length) cmds.push(`sudo ${tp} enable ${protos.join(' ')}`);
+  return cmds;
+}
+
+function updateProtocolsCmdPreview() {
+  const el = document.getElementById('protocols-cmd-preview');
+  if (!el) return;
+  const cmds = protocolsCommands();
+  el.innerHTML = cmds.length
+    ? cmds.map(c => `<div><span class="cmd-prompt">$ </span>${h(c)}</div>`).join('')
+    : '<div style="color:var(--cds-text-disabled)"># Enter the CES shared root filesystem and enable a protocol to preview commands</div>';
+}
+
+function clearProtocolsTerminal() {
+  document.getElementById('protocols-terminal').innerHTML =
+    '<div class="terminal-line muted"># Terminal cleared</div><div class="terminal-line normal terminal-cursor"></div>';
+}
+
+async function applyProtocolsConfig(btn) {
+  const termId = 'protocols-terminal';
+  const tp = state.toolkitPath;
+  const { fs, mount, iface, ips, protos } = getProtocolsInputs();
+
+  if (!fs) {
+    appendToTerminal(termId, '[ERROR] CES Shared Root Filesystem is required.', 'error');
+    return;
+  }
+  if (!protos.length) {
+    appendToTerminal(termId, '[ERROR] Enable at least one protocol (NFS, SMB, or S3).', 'error');
+    return;
+  }
+
+  if (state.dryRun) {
+    protocolsCommands().forEach(c => appendToTerminal(termId, `$ ${c}  # (dry run)`, 'info'));
+    appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
+    return;
+  }
+
+  try {
+    const ping = await fetch(getBackendUrl() + '/api/ping', { signal: AbortSignal.timeout(2000) });
+    if (!ping.ok) throw new Error();
+  } catch {
+    appendToTerminal(termId, `[ERROR] Backend not reachable at ${getBackendUrl()}`, 'error');
+    appendToTerminal(termId, '[ERROR] Start it with: python3 scale-server.py', 'muted');
+    return;
+  }
+
+  btn.disabled = true;
+  const url = getBackendUrl();
+  await streamToTerminalPost(termId, `${url}/api/stream/protocols/config`, {
+    toolkit: tp, filesystem: fs, mountpoint: mount, interface: iface,
+    export_ip_pool: ips.join(','), dry_run: false,
+  }, async (ok) => {
+    if (ok) {
+      await streamToTerminalPost(termId, `${url}/api/stream/protocols/enable`, {
+        toolkit: tp, protocols: protos, dry_run: false,
+      });
+    } else {
+      appendToTerminal(termId, '[ERROR] config protocols failed — enable was not run.', 'error');
+    }
+  });
+  btn.disabled = false;
 }
 
 // ===== UPGRADE TYPE =====
@@ -5959,7 +6069,7 @@ function resetConfig() {
   if (confirm('Reset all configuration? This cannot be undone.')) {
     state.nodes = []; state.nsds = [];
     state.filesystem = { name:'', mount:'/gpfs/data', blocksize:'256K', replication:2 };
-    state.protocols = { nfs:false, smb:false, object:false };
+    state.protocols = { nfs:false, smb:false, s3:false };
     state.clusterName = '';
     updateNodeDisplay(); updateNSDDisplay(); updateAllPreviews();
   }

@@ -62,12 +62,13 @@ asking the operator to go find device paths by hand."
 
 ### 6. Protocol Services
 
-"All three protocols enabled together — NFS, SMB, and Object Storage,
-the toolkit's S3-compatible protocol — with the CES shared root
-filesystem and the two floating IP addresses filled in. Notice the
-inline warning under NFS: it calls out the rpcbind package
-requirement directly, the exact root cause the second terminal
-walkthrough spent an entire investigation uncovering."
+"All three protocols enabled together — NFS, SMB, and S3 — with the CES
+shared root filesystem, interface, and floating IP addresses filled in.
+The Apply Protocols panel previews the exact config protocols and enable
+commands, and in live mode runs them in that order, skipping enable if
+config fails. Notice the inline warning under NFS: it calls out the
+rpcbind package requirement directly, the exact root cause the second
+terminal walkthrough spent an entire investigation uncovering."
 
 ### 7. Install and Deploy — the install half
 

@@ -73,18 +73,17 @@ see [Watching the recording](#watching-the-recording) below.
 > NSD-server node in parallel to list what's actually free, rather
 > than asking the operator to go find device paths by hand."
 
-### 6. Protocol Services — NFS, SMB, and Object (S3) enabled
+### 6. Protocol Services — NFS, SMB, and S3 enabled
 
 ![Protocol Services](screenshots/gui-walkthrough/06-protocol-services.jpg)
 
-> "All three protocols enabled together — NFS, SMB, and Object
-> Storage, the toolkit's S3-compatible protocol — with the CES shared
-> root filesystem and the two floating IP addresses filled in. Notice
-> the inline warning under NFS: it calls out the `rpcbind` package
-> requirement directly, the exact root cause the second terminal
-> walkthrough spent an entire investigation uncovering. That hint
-> wasn't here by accident — it's a direct product of that debugging
-> session."
+> "All three protocols enabled together — NFS, SMB, and S3 — with the CES
+> shared root filesystem, interface, and floating IP addresses filled in.
+> The Apply Protocols panel previews the exact config protocols and enable
+> commands, and in live mode runs them in that order, skipping enable if
+> config fails. Notice the inline warning under NFS: it calls out the
+> rpcbind package requirement directly, the exact root cause the second
+> terminal walkthrough spent an entire investigation uncovering."
 
 ### 7. Install & Deploy — the install half
 
