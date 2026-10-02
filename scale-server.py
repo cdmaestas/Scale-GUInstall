@@ -283,13 +283,19 @@ def _sudo_isdir(path):
     return _sudo_test("-d", path)
 
 def _sudo_listdir(path):
-    """Return list of entries in path using sudo, or empty list on failure."""
+    """Return the entries in path using sudo. Raises OSError if the listing
+    times out or `ls` fails — an empty directory and a failed listing must not
+    look the same (callers used to report "no versions found" / "no .md5 files"
+    for a timeout)."""
     try:
         r = subprocess.run(["sudo", "-n", "ls", path],
                            capture_output=True, text=True, timeout=_SUDO_CHECK_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        return []
-    return r.stdout.split() if r.returncode == 0 else []
+    except subprocess.TimeoutExpired as exc:
+        raise OSError(f"listing {path} timed out after {_SUDO_CHECK_TIMEOUT}s") from exc
+    if r.returncode != 0:
+        detail = (r.stderr or "").strip() or f"ls exited {r.returncode}"
+        raise OSError(f"cannot list {path}: {detail}")
+    return r.stdout.split()
 
 def _diagnose_path(path):
     """
@@ -315,7 +321,10 @@ def _diagnose_path(path):
     while parent and parent != "/":
         if _sudo_isdir(parent):
             if path.startswith("/usr/lpp/mmfs/"):
-                entries = _sudo_listdir(parent)
+                try:
+                    entries = _sudo_listdir(parent)
+                except OSError as exc:
+                    return f"{path} does not exist ({exc})."
                 listing = ", ".join(entries[:12]) + ("…" if len(entries) > 12 else "")
                 return f"{path} does not exist. Contents of {parent}: [{listing}]"
             return f"{path} does not exist (nearest existing directory: {parent})."
@@ -336,8 +345,13 @@ def probe_mmfs():
     if not _sudo_isdir(base):
         return jsonify({"found": False, "reason": _diagnose_path(base)})
 
+    try:
+        base_entries = _sudo_listdir(base)
+    except OSError as exc:
+        return jsonify({"found": False, "reason": str(exc)})
+
     versions = []
-    for entry in _sudo_listdir(base):
+    for entry in base_entries:
         m = ver_re.match(entry)
         if m:
             versions.append((tuple(int(x) for x in m.groups()), entry))
@@ -441,7 +455,10 @@ def browse_files():
         return jsonify({"error": err}), 400
     if not _sudo_isdir(directory):
         return jsonify({"error": _diagnose_path(directory)}), 400
-    entries = _sudo_listdir(directory)
+    try:
+        entries = _sudo_listdir(directory)
+    except OSError as exc:
+        return jsonify({"error": str(exc)}), 500
     if ext:
         entries = [e for e in entries if e.lower().endswith("." + ext)]
     entries.sort()
@@ -864,7 +881,12 @@ def stream_extract():
 
             # Find the self-extracting *-install script at the top level of dest
             installer_path = None
-            for entry in _sudo_listdir(dest):
+            try:
+                dest_entries = _sudo_listdir(dest)
+            except OSError as exc:
+                yield sse("error", f"[ERROR] {exc}")
+                return
+            for entry in dest_entries:
                 if entry.endswith("-install") and _sudo_isfile(os.path.join(dest, entry)):
                     installer_path = os.path.join(dest, entry)
                     break
@@ -904,7 +926,12 @@ def stream_checksum():
                 yield sse("error", f"[ERROR] {_diagnose_path(directory)}")
                 return
 
-            md5_files = [f for f in _sudo_listdir(directory) if f.endswith(".md5")]
+            try:
+                directory_entries = _sudo_listdir(directory)
+            except OSError as exc:
+                yield sse("error", f"[ERROR] {exc}")
+                return
+            md5_files = [f for f in directory_entries if f.endswith(".md5")]
             if not md5_files:
                 yield sse("error", f"[ERROR] No .md5 files found in {directory}")
                 yield sse("error", "[ERROR] Make sure Step 1 (extract) completed successfully.")
@@ -2436,6 +2463,8 @@ def stream_list_devices():
                 try:
                     size_bytes = int(d.get("SIZE", "0") or "0")
                 except ValueError:
+                    yield sse("warn", f"[WARN] Could not read the size of {d.get('NAME', '?')} "
+                                      f"({d.get('SIZE')!r}); reporting it as 0.")
                     size_bytes = 0
                 fstype = d.get("FSTYPE", "")
                 mount  = d.get("MOUNTPOINT", "")

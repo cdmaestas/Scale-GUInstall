@@ -43,19 +43,30 @@ class SSEEvent:
     line: str
 
 
+def _decode_event(raw: str) -> SSEEvent:
+    """Decode one `data:` payload. A payload that is not a JSON object becomes an
+    explicit error event rather than being dropped — a corrupted or truncated
+    stream must not look like an operation that simply ended without an error."""
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        payload = None
+    if not isinstance(payload, dict):
+        return SSEEvent(type="error", line=f"[ERROR] Malformed event from backend: {raw[:200]!r}")
+    return SSEEvent(type=payload.get("type", ""), line=payload.get("line", ""))
+
+
 def parse_sse_events(text: str) -> list[SSEEvent]:
     """Parse a full SSE response body (as produced by scale-server.py's
-    sse() helper) into a list of events, in order."""
+    sse() helper) into a list of events, in order. Lines that are not `data:`
+    lines (comments, keepalives) are skipped; a `data:` line that cannot be
+    decoded is reported as an error event."""
     events: list[SSEEvent] = []
     for chunk in text.split("\n\n"):
         for raw_line in chunk.splitlines():
             if not raw_line.startswith("data:"):
                 continue
-            try:
-                payload = json.loads(raw_line[len("data:"):].strip())
-            except json.JSONDecodeError:
-                continue
-            events.append(SSEEvent(type=payload.get("type", ""), line=payload.get("line", "")))
+            events.append(_decode_event(raw_line[len("data:"):].strip()))
     return events
 
 
@@ -232,10 +243,5 @@ async def read_next_sse_event(line_iter) -> SSEEvent | None:
         if line.startswith("data:"):
             data_line = line
         elif line == "" and data_line is not None:
-            try:
-                payload = json.loads(data_line[len("data:"):].strip())
-            except json.JSONDecodeError:
-                data_line = None
-                continue
-            return SSEEvent(type=payload.get("type", ""), line=payload.get("line", ""))
+            return _decode_event(data_line[len("data:"):].strip())
     return None

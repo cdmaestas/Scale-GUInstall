@@ -3535,13 +3535,23 @@ async function listAllDevices(btn) {
           const dataLine = part.split('\n').find(l => l.startsWith('data:'));
           if (!dataLine) continue;
           let msg;
-          try { msg = JSON.parse(dataLine.slice(5)); } catch { continue; }
+          try { msg = JSON.parse(dataLine.slice(5)); } catch {
+            const badDiv = document.createElement('div');
+            badDiv.className = 'terminal-line error';
+            badDiv.textContent = `[ERROR] ${node}: malformed event from backend: ${dataLine.slice(0, 200)}`;
+            term.appendChild(badDiv);
+            continue;
+          }
           if (msg.type === 'done') continue;
           if (msg.type === 'devices') {
             try {
               JSON.parse(msg.line).forEach(d => allDevices.push({ ...d, node }));
             } catch (e) {
               console.warn(`Could not parse device list from ${node}:`, e.message);
+              const badDiv = document.createElement('div');
+              badDiv.className = 'terminal-line error';
+              badDiv.textContent = `[ERROR] ${node}: could not parse the device list (${e.message}).`;
+              term.appendChild(badDiv);
             }
             continue;
           }
@@ -4970,7 +4980,11 @@ async function streamToTerminal(termId, url, onDone, onEvent) {
           const dataLine = event.split('\n').find(l => l.startsWith('data: '));
           if (!dataLine) continue;
           let msg;
-          try { msg = JSON.parse(dataLine.slice(6)); } catch { continue; }
+          try { msg = JSON.parse(dataLine.slice(6)); } catch {
+            appendToTerminal(termId, `[ERROR] Malformed event from backend: ${dataLine.slice(0, 200)}`, 'error');
+            sawError = true;
+            continue;
+          }
 
           if (msg.type === 'done') {
             if (onDone) onDone(!sawError);
@@ -5038,7 +5052,11 @@ async function streamToTerminalPost(termId, url, body, onDone) {
           const dataLine = event.split('\n').find(l => l.startsWith('data: '));
           if (!dataLine) continue;
           let msg;
-          try { msg = JSON.parse(dataLine.slice(6)); } catch { continue; }
+          try { msg = JSON.parse(dataLine.slice(6)); } catch {
+            appendToTerminal(termId, `[ERROR] Malformed event from backend: ${dataLine.slice(0, 200)}`, 'error');
+            sawError = true;
+            continue;
+          }
           if (msg.type === 'done') { if (onDone) onDone(!sawError); return; }
           if (msg.type === 'error') sawError = true;
           appendToTerminal(termId, msg.line, sseTypeToTerminalType(msg.type));
