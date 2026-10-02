@@ -76,7 +76,8 @@ def _require_token():
     return None
 
 
-_ALLOWED_ROOTS = ("/tmp", "/opt", "/usr", "/home", "/root", "/var", "/srv", "/mnt", "/data", "/ibm")
+# Allow-list of path roots the file browser/validators accept — not a temp-file location.
+_ALLOWED_ROOTS = ("/tmp", "/opt", "/usr", "/home", "/root", "/var", "/srv", "/mnt", "/data", "/ibm")  # nosec B108
 
 MMFS_BIN = "/usr/lpp/mmfs/bin"
 

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ["main"]
 
+# Least privilege: every job here only reads the repo.
+permissions:
+  contents: read
+
 jobs:
   # ── Python syntax + import check ──────────────────────────────────────────
   python-check:
@@ -95,6 +99,42 @@ jobs:
       - name: Audit installed packages
         run: .audit-venv/bin/pip-audit
 
+  # ── Python lint ────────────────────────────────────────────────────────────
+  # Small rule set (pyflakes, import order, bugbear, a few correctness rules) —
+  # see ruff.toml. Formatting is not enforced.
+  ruff:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Install ruff
+        run: pip install --quiet "ruff==0.16.10"
+
+      - name: Lint
+        run: ruff check .
+
+  # ── Static security analysis ───────────────────────────────────────────────
+  # Medium and high severity only (-ll). The low-severity subprocess notes
+  # (B603/B607/B404) are expected: every call passes an argument list, never
+  # a shell string, and the pre-commit/CI security guard forbids shell=True.
+  bandit:
+    name: bandit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Install bandit
+        run: pip install --quiet "bandit==1.9.4"
+
+      - name: Scan (medium and high severity)
+        run: bandit -r scale-server.py mcp-server/src -ll
+
+      # try/except/pass (B110) and try/except/continue (B112) swallow failures
+      # silently; any occurrence is a regression, whatever its severity.
+      - name: Scan (swallowed exceptions)
+        run: bandit -r scale-server.py mcp-server/src -t B110,B112
+
   # ── Shell script linting ──────────────────────────────────────────────────
   shellcheck:
     name: ShellCheck
@@ -135,11 +175,21 @@ jobs:
               echo "FAIL: $3 in $2:"; cat /tmp/hits; fail=1
             fi
           }
-          check 'shell\s*=\s*True' scale-server.py "shell=True (command injection risk)"
-          check '\bpickle\.(load|loads)\(' scale-server.py "unsafe pickle deserialization"
-          check '\byaml\.load\(' scale-server.py "unsafe yaml.load without SafeLoader"
-          check '\beval\(' scale-server.py "eval() of untrusted input"
-          check 'except\s*(Exception)?\s*:\s*$' scale-server.py "bare except with no body — silent-failure regression"
+          for f in scale-server.py mcp-server/src/scale_guinstall_mcp/*.py; do
+            check 'shell\s*=\s*True' "$f" "shell=True (command injection risk)"
+            check '\bpickle\.(load|loads)\(' "$f" "unsafe pickle deserialization"
+            check '\byaml\.load\(' "$f" "unsafe yaml.load without SafeLoader"
+            check '\beval\(' "$f" "eval() of untrusted input"
+            # scale-server.py: any `except:` / `except Exception:` without a binding. The MCP
+            # package has reviewed handlers that log via logger.exception, so only a truly
+            # bare `except:` is forbidden there (the bandit job's B110/B112 pass catches
+            # swallowed exceptions).
+            if [ "$f" = scale-server.py ]; then
+              check 'except\s*(Exception)?\s*:\s*$' "$f" "bare except with no body — silent-failure regression"
+            else
+              check 'except\s*:\s*$' "$f" "bare except — silent-failure regression"
+            fi
+          done
           exit "$fail"
 
       - name: innerHTML assignments must route through h()
