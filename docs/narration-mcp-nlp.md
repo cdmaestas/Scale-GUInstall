@@ -1,5 +1,7 @@
 # Narration Script — MCP NLP-to-Tool-Call Walkthrough
 
+> **Historical source material.** For the edited presentation, use the [curated recordings](recordings/README.md). Original recordings and narration are retained for provenance; see the [archive corrections](recordings/ARCHIVE.md) before reusing their examples.
+
 Companion narration for
 [`recordings/mcp-nlp-walkthrough.cast`](recordings/mcp-nlp-walkthrough.cast),
 a scripted terminal reenactment of six real prompt → tool-call → result

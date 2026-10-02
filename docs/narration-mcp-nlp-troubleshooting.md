@@ -1,5 +1,7 @@
 # Narration Script — Debugging a Tool Through the Same MCP Server
 
+> **Historical source material.** For the edited presentation, use the [curated recordings](recordings/README.md). Original recordings and narration are retained for provenance; see the [archive corrections](recordings/ARCHIVE.md) before reusing their examples.
+
 Companion narration for
 [`recordings/mcp-nlp-troubleshooting.cast`](recordings/mcp-nlp-troubleshooting.cast),
 a terminal reenactment of one real debugging session: the `test_connection`

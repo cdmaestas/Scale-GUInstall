@@ -10,6 +10,7 @@ Usage:
 Listens on http://127.0.0.1:5001 (loopback only — not accessible from the network)
 """
 
+import contextlib
 import glob
 import json
 import os
@@ -22,6 +23,7 @@ import tempfile
 import threading
 import time
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 from flask import Flask, Response, jsonify, request, stream_with_context
 
@@ -43,13 +45,42 @@ _TOKEN_HEADER = "X-Scale-Token"
 _PUBLIC_PATHS = {"/", "/Scale-GUInstall.html", "/help.html"}
 
 
+# Hostnames this backend answers to, for both the Host header and CORS origins.
+# Exact matches on the parsed hostname only — a prefix match let an attacker's
+# page at http://localhost.evil.com read the (public) HTML, and the auth token
+# embedded in it, and a missing Host check left DNS rebinding open.
+# SCALE_GUINSTALL_ALLOWED_HOSTS (comma-separated) adds names for unusual
+# port-forward setups; the default is loopback only.
+_LOCAL_HOSTNAMES = frozenset(
+    {"localhost", "127.0.0.1", "::1"}
+    | {h.strip().lower() for h in os.environ.get("SCALE_GUINSTALL_ALLOWED_HOSTS", "").split(",") if h.strip()}
+)
+
+
+def _hostname_of(netloc):
+    """Lower-cased hostname from a Host header value or URL netloc ("localhost:5001",
+    "[::1]:5001"), or None if it does not parse."""
+    try:
+        return urlsplit("//" + netloc).hostname
+    except ValueError:
+        return None
+
+
+def _is_local_origin(origin):
+    """True only for http origins whose parsed hostname is exactly an allowed local name."""
+    try:
+        parts = urlsplit(origin)
+    except ValueError:
+        return False
+    return parts.scheme == "http" and parts.hostname in _LOCAL_HOSTNAMES
+
+
 def cors(response):
     origin = request.headers.get("Origin", "")
-    # localhost/127.0.0.1 only — file:// (null origin) is no longer served
-    # as a supported delivery mode (see getBackendUrl() on the frontend);
-    # the token below is the real gate, this just narrows who can even see
-    # a response.
-    if origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1"):
+    # Loopback origins only — file:// (null origin) is no longer served as a
+    # supported delivery mode (see getBackendUrl() on the frontend); the token
+    # below is the real gate, this just narrows who can even see a response.
+    if _is_local_origin(origin):
         response.headers["Access-Control-Allow-Origin"] = origin
     response.headers["Access-Control-Allow-Headers"] = f"Content-Type, {_TOKEN_HEADER}"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
@@ -59,6 +90,18 @@ def cors(response):
 
 
 app.after_request(cors)
+
+
+@app.before_request
+def _require_local_host():
+    # Applies to every request, public pages and CORS preflights included: a
+    # DNS-rebinding page reaches this server under its own hostname, so a foreign
+    # Host header is the signal.
+    if _hostname_of(request.host) not in _LOCAL_HOSTNAMES:
+        return jsonify({"error": "Unrecognized Host header. This backend only answers on loopback "
+                                  "(localhost, 127.0.0.1, ::1); set SCALE_GUINSTALL_ALLOWED_HOSTS to "
+                                  "allow another name."}), 421
+    return None
 
 
 @app.before_request
@@ -75,7 +118,8 @@ def _require_token():
     return None
 
 
-_ALLOWED_ROOTS = ("/tmp", "/opt", "/usr", "/home", "/root", "/var", "/srv", "/mnt", "/data", "/ibm")
+# Allow-list of path roots the file browser/validators accept — not a temp-file location.
+_ALLOWED_ROOTS = ("/tmp", "/opt", "/usr", "/home", "/root", "/var", "/srv", "/mnt", "/data", "/ibm")  # nosec B108
 
 MMFS_BIN = "/usr/lpp/mmfs/bin"
 
@@ -246,10 +290,8 @@ def config_endpoint():
                     json.dump({"revision": new_revision, "data": data}, f)
                 os.replace(tmp_path, _CONFIG_PATH)
             except OSError:
-                try:
+                with contextlib.suppress(OSError):
                     os.unlink(tmp_path)
-                except OSError:
-                    pass
                 raise
         except OSError as exc:
             return jsonify({
@@ -284,13 +326,19 @@ def _sudo_isdir(path):
     return _sudo_test("-d", path)
 
 def _sudo_listdir(path):
-    """Return list of entries in path using sudo, or empty list on failure."""
+    """Return the entries in path using sudo. Raises OSError if the listing
+    times out or `ls` fails — an empty directory and a failed listing must not
+    look the same (callers used to report "no versions found" / "no .md5 files"
+    for a timeout)."""
     try:
         r = subprocess.run(["sudo", "-n", "ls", path],
                            capture_output=True, text=True, timeout=_SUDO_CHECK_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        return []
-    return r.stdout.split() if r.returncode == 0 else []
+    except subprocess.TimeoutExpired as exc:
+        raise OSError(f"listing {path} timed out after {_SUDO_CHECK_TIMEOUT}s") from exc
+    if r.returncode != 0:
+        detail = (r.stderr or "").strip() or f"ls exited {r.returncode}"
+        raise OSError(f"cannot list {path}: {detail}")
+    return r.stdout.split()
 
 def _diagnose_path(path):
     """
@@ -316,7 +364,10 @@ def _diagnose_path(path):
     while parent and parent != "/":
         if _sudo_isdir(parent):
             if path.startswith("/usr/lpp/mmfs/"):
-                entries = _sudo_listdir(parent)
+                try:
+                    entries = _sudo_listdir(parent)
+                except OSError as exc:
+                    return f"{path} does not exist ({exc})."
                 listing = ", ".join(entries[:12]) + ("…" if len(entries) > 12 else "")
                 return f"{path} does not exist. Contents of {parent}: [{listing}]"
             return f"{path} does not exist (nearest existing directory: {parent})."
@@ -337,8 +388,13 @@ def probe_mmfs():
     if not _sudo_isdir(base):
         return jsonify({"found": False, "reason": _diagnose_path(base)})
 
+    try:
+        base_entries = _sudo_listdir(base)
+    except OSError as exc:
+        return jsonify({"found": False, "reason": str(exc)})
+
     versions = []
-    for entry in _sudo_listdir(base):
+    for entry in base_entries:
         m = ver_re.match(entry)
         if m:
             versions.append((tuple(int(x) for x in m.groups()), entry))
@@ -442,7 +498,10 @@ def browse_files():
         return jsonify({"error": err}), 400
     if not _sudo_isdir(directory):
         return jsonify({"error": _diagnose_path(directory)}), 400
-    entries = _sudo_listdir(directory)
+    try:
+        entries = _sudo_listdir(directory)
+    except OSError as exc:
+        return jsonify({"error": str(exc)}), 500
     if ext:
         entries = [e for e in entries if e.lower().endswith("." + ext)]
     entries.sort()
@@ -865,7 +924,12 @@ def stream_extract():
 
             # Find the self-extracting *-install script at the top level of dest
             installer_path = None
-            for entry in _sudo_listdir(dest):
+            try:
+                dest_entries = _sudo_listdir(dest)
+            except OSError as exc:
+                yield sse("error", f"[ERROR] {exc}")
+                return
+            for entry in dest_entries:
                 if entry.endswith("-install") and _sudo_isfile(os.path.join(dest, entry)):
                     installer_path = os.path.join(dest, entry)
                     break
@@ -905,7 +969,12 @@ def stream_checksum():
                 yield sse("error", f"[ERROR] {_diagnose_path(directory)}")
                 return
 
-            md5_files = [f for f in _sudo_listdir(directory) if f.endswith(".md5")]
+            try:
+                directory_entries = _sudo_listdir(directory)
+            except OSError as exc:
+                yield sse("error", f"[ERROR] {exc}")
+                return
+            md5_files = [f for f in directory_entries if f.endswith(".md5")]
             if not md5_files:
                 yield sse("error", f"[ERROR] No .md5 files found in {directory}")
                 yield sse("error", "[ERROR] Make sure Step 1 (extract) completed successfully.")
@@ -1383,7 +1452,7 @@ def _parse_table(output):
         if not line.strip() or line.startswith('-'):
             continue
         row = {}
-        for j, (col, start) in enumerate(zip(headers, col_starts)):
+        for j, (col, start) in enumerate(zip(headers, col_starts, strict=True)):
             end = col_starts[j + 1] if j + 1 < len(col_starts) else len(line)
             row[col] = line[start:end].strip() if start < len(line) else ''
         rows.append(row)
@@ -1484,7 +1553,7 @@ def list_nodes():
         # Skip the second header line (e.g. "Node   Node   Node   Server …") and blank lines
         for line in stripped[header_idx + 2:]:
             s = line.strip()
-            if not s or s.startswith("[") or s.startswith("-"):
+            if not s or s.startswith(("[", "-")):
                 break  # end of node table
             hostname = line[hostname_col:hostname_end].strip()
             if not hostname:
@@ -2437,6 +2506,8 @@ def stream_list_devices():
                 try:
                     size_bytes = int(d.get("SIZE", "0") or "0")
                 except ValueError:
+                    yield sse("warn", f"[WARN] Could not read the size of {d.get('NAME', '?')} "
+                                      f"({d.get('SIZE')!r}); reporting it as 0.")
                     size_bytes = 0
                 fstype = d.get("FSTYPE", "")
                 mount  = d.get("MOUNTPOINT", "")
@@ -3803,7 +3874,7 @@ def stream_node_identity():
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5001))
+    port = int(os.environ.get("PORT", "5001"))
     print("IBM Storage Scale Toolkit — backend server")
     print(f"Listening on http://127.0.0.1:{port}  (loopback only)")
     print("Press Ctrl+C to stop.\n")

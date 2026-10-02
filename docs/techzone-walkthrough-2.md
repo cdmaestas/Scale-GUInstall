@@ -1,5 +1,7 @@
 # TechZone Runbook: Chasing Down CES/NFS `NOT ACTIVE` — and Fixing It
 
+> **Historical source material.** For the edited presentation, use the [curated recordings](recordings/README.md). Original recordings and narration are retained for provenance; see the [archive corrections](recordings/ARCHIVE.md) before reusing their examples.
+
 A second narrative record of executing [`techzone-runbook.md`](techzone-runbook.md)
 live against TechZone VSI environments, picking up exactly where
 [the first walkthrough](techzone-walkthrough.md) left off: the "CES/NFS

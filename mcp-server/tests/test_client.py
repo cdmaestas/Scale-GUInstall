@@ -4,9 +4,7 @@ conftest.py) — no HTTP mocking, exercising the actual token bootstrap,
 401-retry, and SSE parsing against real responses.
 """
 import pytest
-
 from scale_guinstall_mcp.client import (
-    BackendAuthError,
     BackendUnreachableError,
     ScaleBackendClient,
     parse_sse_events,
@@ -142,3 +140,35 @@ def test_parse_sse_events_ignores_malformed_lines():
     events = parse_sse_events(text)
     assert len(events) == 1
     assert events[0].line == "ok"
+
+
+def test_parse_sse_events_reports_an_undecodable_data_line_as_an_error():
+    """A corrupted or truncated stream must not look like an operation that
+    simply ended without an error: the bad frame becomes an explicit error event
+    and the good frames around it are still returned."""
+    text = (
+        'data: {"type": "info", "line": "before"}\n\n'
+        'data: {"type": "success", "line": "trunc\n\n'
+        'data: {"type": "done", "line": ""}\n\n'
+    )
+    events = parse_sse_events(text)
+    assert [e.type for e in events] == ["info", "error", "done"]
+    assert "Malformed event from backend" in events[1].line
+
+
+def test_parse_sse_events_reports_a_non_object_payload_as_an_error():
+    events = parse_sse_events('data: 5\n\n')
+    assert [e.type for e in events] == ["error"]
+
+
+async def test_read_next_sse_event_reports_an_undecodable_frame_as_an_error():
+    from scale_guinstall_mcp.client import read_next_sse_event
+
+    async def lines():
+        for line in ['data: {broken', '', 'data: {"type": "done", "line": ""}', '']:
+            yield line
+
+    it = lines()
+    first = await read_next_sse_event(it)
+    assert first.type == "error" and "Malformed event" in first.line
+    assert (await read_next_sse_event(it)).type == "done"

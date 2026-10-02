@@ -17,6 +17,15 @@ else
   echo "pre-push: WARN — pytest not installed; tests left to CI" >&2
 fi
 
+# The MCP server is its own package with its own deps and its own conftest, so
+# its tests run as a separate pytest invocation (mirrors the CI job).
+if python3 -c "import pytest, pytest_asyncio, mcp, httpx, scale_guinstall_mcp" &>/dev/null; then
+  echo "pre-push: running mcp-server pytest"
+  python3 -m pytest mcp-server/tests/ -q
+else
+  echo "pre-push: WARN — mcp-server test deps not installed (pip install -e './mcp-server[dev]'); left to CI" >&2
+fi
+
 if command -v dpkg-deb &>/dev/null || command -v rpmbuild &>/dev/null; then
   echo "pre-push: building packages"
   ./packaging/build-pkg.sh

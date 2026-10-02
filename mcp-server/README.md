@@ -33,7 +33,9 @@ pip install -e .
 ## Configure
 
 Set `SCALE_BACKEND_URL` if the backend isn't at the default
-`http://127.0.0.1:5001` (e.g. if you tunnel to a different local port).
+`http://127.0.0.1:5001` (e.g. if you tunnel to a different local port). Keep it on a loopback name
+(`127.0.0.1`, `localhost` or `::1`): the backend refuses any other `Host` header with HTTP 421 unless
+its own `SCALE_GUINSTALL_ALLOWED_HOSTS` lists that name.
 
 This is a standard stdio-transport MCP server — `scale-guinstall-mcp` is
 just a regular local process any MCP-compliant client can launch, not

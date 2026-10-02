@@ -24,7 +24,6 @@ verify wiring, not real toolkit behavior.
 import asyncio
 
 import pytest
-
 import scale_guinstall_mcp.server as tools
 
 
@@ -233,7 +232,7 @@ async def test_start_format_disk_real_run_reports_busy(backend_url, ss):
 # --- kill_spectrumscale: plain JSON, not a stream ---------------------------
 
 async def test_kill_spectrumscale_when_nothing_running(backend_url, monkeypatch, ss):
-    monkeypatch.setattr(ss, "_running_spectrumscale", lambda: [])
+    monkeypatch.setattr(ss, "_running_spectrumscale", list)
     result = await tools.kill_spectrumscale(dry_run=True)
     assert result["killed"] == []
     assert ss._current_operation is None

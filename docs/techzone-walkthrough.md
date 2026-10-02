@@ -1,5 +1,7 @@
 # TechZone Runbook: Walkthrough of a Live Run
 
+> **Historical source material.** For the edited presentation, use the [curated recordings](recordings/README.md). Original recordings and narration are retained for provenance; see the [archive corrections](recordings/ARCHIVE.md) before reusing their examples.
+
 A narrative record of actually executing [`techzone-runbook.md`](techzone-runbook.md)
 end to end, driven entirely through the `scale-guinstall` MCP tools against
 two real IBM TechZone VSI environments. Where the runbook tells you *what

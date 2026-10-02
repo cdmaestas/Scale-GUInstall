@@ -1,5 +1,7 @@
 # From Plain English to Backend Action: MCP Tool Calls in Practice
 
+> **Historical source material.** For the edited presentation, use the [curated recordings](recordings/README.md). Original recordings and narration are retained for provenance; see the [archive corrections](recordings/ARCHIVE.md) before reusing their examples.
+
 A walkthrough of how natural-language requests, given to an AI agent
 (Claude) connected to the [`scale-guinstall` MCP server](../mcp-server/),
 turned into real `scale-server.py` backend calls during the live
