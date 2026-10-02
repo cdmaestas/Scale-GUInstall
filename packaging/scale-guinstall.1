@@ -45,6 +45,18 @@ environment variable.
 .B PORT
 Override the listening port (default:
 .BR 5001 ).
+.TP
+.B SCALE_GUINSTALL_ALLOWED_HOSTS
+Comma\-separated hostnames, in addition to
+.BR localhost ,
+.B 127.0.0.1
+and
+.BR ::1 ,
+that the server will answer to.
+Needed only for an unusual port\-forward setup that reaches the server under
+another name; requests with any other
+.B Host
+header are refused with HTTP 421.
 .SH FILES
 .TP
 .B /usr/lib/scale\-guinstall/scale\-server.py
@@ -163,11 +175,20 @@ Every API call requires a per\-process auth token, generated fresh at
 startup and injected into the page only when the server serves it
 itself; a page loaded any other way gets a 401 on every real backend
 call.
-CORS is restricted to
-.B localhost
-and
+Requests are accepted only when the
+.B Host
+header is exactly
+.BR localhost ,
 .B 127.0.0.1
-origins.
+or
+.B ::1
+(otherwise HTTP 421), which prevents DNS rebinding.
+CORS headers are sent only for
+.B http
+origins whose hostname is exactly one of those names;
+look\-alike hosts such as
+.B localhost.example.com
+are refused.
 All executed commands are explicitly allowlisted; there is no generic
 shell execution endpoint.
 Credentials are transmitted via POST request bodies and never appear in

@@ -227,7 +227,7 @@ Dry Run is enabled by default. In this mode every button generates and displays 
 **Security properties:**
 - Binds to `127.0.0.1` only — not reachable from the network
 - Every API call requires a per-process auth token, generated fresh at startup and injected into the page when the server serves it — a page opened any other way (e.g. as a local `file://`) can preview commands in Dry Run but gets a 401 on every real backend call
-- CORS restricted to `localhost` and `127.0.0.1` origins
+- Requests are accepted only when the `Host` header is exactly `localhost`, `127.0.0.1` or `::1` (anything else gets a `421`), and CORS headers are sent only for `http` origins with one of those exact hostnames — look-alikes such as `localhost.evil.com` are refused. This closes DNS rebinding and keeps a hostile web page from reading the token out of the served HTML. Set `SCALE_GUINSTALL_ALLOWED_HOSTS` (comma-separated hostnames) only if you have an unusual port-forward setup that reaches the server under another name
 - Credentials (GUI user passwords, S3 secret keys) are sent in POST request bodies, never in URLs or query strings
 - All executed commands are explicit and allowlisted — no generic shell execution endpoint
 - `config gpfs` flags are validated against an explicit allowlist — unrecognised flags are rejected before reaching the subprocess
@@ -313,7 +313,7 @@ Verify the tunnel works after reloading:
 ssh -L 5001:127.0.0.1:5001 user@installer-node echo "tunnel OK"
 ```
 
-> **Direct access without a tunnel (not recommended):** Because Flask binds to `127.0.0.1`, opening port 5001 in the firewall alone does nothing — remote clients still can't reach it. To allow direct access you must also change the host binding in `scale-server.py` to `0.0.0.0`. If you do that, restrict the firewall rule to your workstation's IP only — never open port 5001 to the world, as the server has no authentication.
+> **Direct access without a tunnel (not recommended):** Because Flask binds to `127.0.0.1`, opening port 5001 in the firewall alone does nothing — remote clients still can't reach it. To allow direct access you must also change the host binding in `scale-server.py` to `0.0.0.0`. If you do that, restrict the firewall rule to your workstation's IP only — never open port 5001 to the world. The per-process token and the loopback-only `Host` check are not a substitute for network access control, and a request that reaches the server under any other hostname gets a `421` unless that name is listed in `SCALE_GUINSTALL_ALLOWED_HOSTS`.
 >
 > ```bash
 > # Allow port 5001 from a specific workstation IP only (firewalld)
@@ -343,6 +343,7 @@ Scale-GUInstall/
 ├── start.sh                    # Convenience script: finds Python, installs Flask/waitress, starts server
 ├── CHANGELOG.md                # Release history (Keep a Changelog format)
 ├── .githooks/                  # Local git hooks (pre-commit, pre-push) mirroring CI
+├── ruff.toml                   # Python lint config (pyflakes, import order, bugbear)
 ├── tests/                      # pytest unit tests for scale-server.py
 ├── mcp-server/                 # MCP server: lets an AI agent drive the backend as tools
 ├── docs/screenshots/           # README screenshots
@@ -366,10 +367,21 @@ Run the unit tests directly with:
 
 ```bash
 pip install "flask>=3.0,<4" "waitress>=3.0,<4" pytest
-pytest
+pytest                                    # backend tests (tests/)
+
+pip install -e "./mcp-server[dev]"
+pytest mcp-server/tests/                  # MCP server tests — a separate run, it has its own conftest
 ```
 
-The pre-push hook runs them automatically if `pytest` is importable, and warns (without blocking) if it isn't — CI runs them either way.
+Optional local linters (the hooks use them when installed and warn, without blocking, when not — CI runs them either way):
+
+```bash
+pip install ruff bandit
+ruff check .                              # lint (ruff.toml)
+bandit -r scale-server.py mcp-server/src -ll   # static security scan, medium and above
+```
+
+The pre-commit hook runs the compile, shellcheck, ruff, JS-syntax, forbidden-pattern and HTML checks; the pre-push hook adds both pytest suites and the package builds when their tools are available.
 
 ---
 
