@@ -185,3 +185,21 @@ script is [`narration-mcp-nlp.md`](narration-mcp-nlp.md).
 brew install asciinema   # if you don't already have it
 asciinema play docs/recordings/mcp-nlp-walkthrough.cast
 ```
+
+### A full install, end to end
+
+[`recordings/mcp-nlp-live-install.cast`](recordings/mcp-nlp-live-install.cast)
+(~5 minutes, narration in
+[`narration-mcp-nlp-live-install.md`](narration-mcp-nlp-live-install.md))
+walks one complete install on a fresh TechZone environment — setup, seven
+nodes, NSDs, cluster settings, protocols from the web UI, then every
+precheck, install, deploy, and postcheck phase. The calls and results are
+real. The operator's wording is real for the prompts it quotes as theirs
+(the backend check, the hosts paste, "add the storage for the NSDs", and
+"keep going through the runbook") and reconstructed for steps the agent ran
+on its own initiative. The two mistakes in the cluster-settings section
+really happened and are left in.
+
+```bash
+asciinema play docs/recordings/mcp-nlp-live-install.cast
+```

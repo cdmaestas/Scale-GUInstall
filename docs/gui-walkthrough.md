@@ -1,13 +1,10 @@
-# GUI Click-Through: The Golden Path, Screen by Screen
+# GUI Walkthrough: Installation and Configuration
 
-A step-by-step tour of `Scale-GUInstall.html` — the web frontend — walking
-through the exact same golden path as
-[`techzone-walkthrough-clean.md`](techzone-walkthrough-clean.md), but
-from the UI instead of a terminal. Captured against the static demo
-server (`python3 -m http.server`, no live backend attached — see
-[`.claude/launch.json`](../.claude/launch.json)'s `Scale-GUInstall`
-config), so every screen is driven and filled exactly as a real
-operator would, but no `spectrumscale` command actually runs.
+A guided tour of `Scale-GUInstall.html`, covering the settings and controls
+used to prepare and configure an IBM Storage Scale cluster. The screenshots
+come from a static demo server with no live backend attached, so no
+`spectrumscale` installation commands are running. For the terminal
+walkthrough, see [`techzone-walkthrough-clean.md`](techzone-walkthrough-clean.md).
 
 Each step below pairs a screenshot with the narration you'd use if
 talking over it live, the same pacing convention as the terminal
@@ -23,110 +20,100 @@ see [Watching the recording](#watching-the-recording) below.
 
 ![Dashboard](screenshots/gui-walkthrough/01-dashboard.jpg)
 
-> "This is the toolkit's dashboard — zero nodes, zero NSDs, zero
-> filesystems, zero protocols configured. The six-step installation
-> workflow across the top is the same golden path as the terminal
-> walkthrough: Cluster Settings, Node Configuration, NSD Storage,
-> Filesystem, Protocols, Install & Deploy. The command preview panel on
-> the right already shows the exact `spectrumscale` commands this UI
-> is going to generate."
+> "This is the toolkit’s dashboard — zero nodes, zero NSDs, zero
+> filesystems, and zero protocols configured. The workflow outlines Cluster
+> Settings, Node Configuration, NSD Storage, Filesystem, Protocols, and
+> Install and Deploy. The command preview on the right shows the commands
+> the interface generates as you configure the cluster."
 
 ### 2. Prepare Software
 
 ![Prepare Software](screenshots/gui-walkthrough/02-prepare-software.jpg)
 
-> "Before touching the cluster at all, the toolkit itself needs to be
-> on the installer node. This page extracts the Developer Edition
-> package and runs the same ansible-core and locale prerequisite
-> checks the real runbook calls out — the `ansible-core 2.23` pin and
-> the `LC_ALL` / `python3-apt` warning that trip up Ubuntu installer
-> nodes."
+> "We begin by preparing the installer node. This page brings together the
+> software download, working directory, and prerequisite checks. Before
+> installing, use these controls to check the Ansible version and locale,
+> and review the compatibility guidance shown here."
 
 ### 3. Cluster Settings
 
 ![Cluster Settings](screenshots/gui-walkthrough/03-cluster-settings.jpg)
 
-> "Cluster-wide GPFS parameters, set once before anything else runs.
-> Notice the ephemeral port range is already defaulted to
-> `60000-61000` — that's the fix for the callhome/port-range precheck
-> failure the real walkthroughs hit on the first attempt, baked into
-> the UI's defaults instead of left as a trap."
+> "Cluster-wide GPFS parameters, set once before anything else runs. Notice
+> the ephemeral port range is already defaulted to 60000 to 61000 — that's
+> the fix for the callhome and port-range precheck failure the real
+> walkthroughs hit on the first attempt, baked into the UI's defaults
+> instead of left as a trap."
 
 ### 4. Node Configuration — seven nodes, roles assigned
 
 ![Node Configuration](screenshots/gui-walkthrough/04-node-configuration.jpg)
 
-> "All seven nodes, bulk-imported by hostname and then given their
-> golden-path roles: `scale-server1`/`2` as NSD, quorum, and manager
-> nodes; `scale-gui1` as quorum, admin, and the GUI server;
-> `scale-proto1`/`2` as manager and protocol nodes; the two clients
-> left as client-only. Same role layout as every terminal walkthrough
-> in this project."
+> "Here are all seven nodes with their assigned roles: the two storage
+> servers as NSD, quorum, and manager nodes; the GUI node as quorum, admin,
+> and the GUI server; the two protocol nodes as manager and protocol; and
+> the two clients as client-only."
 
 ### 5. NSD Storage
 
 ![NSD Storage](screenshots/gui-walkthrough/05-nsd-storage.jpg)
 
-> "Disk discovery and NSD definition — this is also where the
-> filesystem layout happens, since NSDs are assigned to a filesystem
-> as they're created. 'Scan Block Devices' runs `lsblk` across every
-> NSD-server node in parallel to list what's actually free, rather
-> than asking the operator to go find device paths by hand."
+> "Next, we define the shared disks, or NSDs. Scan Block Devices lets you
+> discover disks across the storage nodes before choosing which ones to use.
+> In this example, filesystem configuration is set to happen later in the
+> IBM Storage Scale GUI, so this installer skips its filesystem step."
 
-### 6. Protocol Services — NFS, SMB, and S3 enabled
+### 6. Protocol Services — NFS, SMB, and S3 selected
 
 ![Protocol Services](screenshots/gui-walkthrough/06-protocol-services.jpg)
 
-> "All three protocols enabled together — NFS, SMB, and S3 — with the CES
-> shared root filesystem, interface, and floating IP addresses filled in.
-> The Apply Protocols panel previews the exact config protocols and enable
-> commands, and in live mode runs them in that order, skipping enable if
-> config fails. Notice the inline warning under NFS: it calls out the
-> rpcbind package requirement directly, the exact root cause the second
-> terminal walkthrough spent an entire investigation uncovering."
+> "Here we prepare NFS, SMB, and S3. The command preview shows all three
+> selected. We’ve entered the shared root filesystem name, network
+> interface, and floating IP addresses. Review those commands before
+> choosing Apply Protocols. In live mode, configuration runs first, followed
+> by protocol enablement if configuration succeeds."
 
 ### 7. Install & Deploy — the install half
 
 ![Install & Deploy](screenshots/gui-walkthrough/07-install-deploy.jpg)
 
-> "The six-stage pipeline: pre-check, install, post-check, enable
-> daemon, deploy, verify — laid out as a single flow instead of
-> separate pages, so it's obvious post-check isn't optional cleanup,
-> it's a first-class step between install and deploy. Each stage's
-> real `spectrumscale` command is shown before it runs, not hidden
-> behind a generic 'Next' button."
+> "This page brings the installation stages together. Start with the
+> pre-check, run the installation, then use the post-check to verify the
+> result. The command previews show what each button will run. The workflow
+> also includes enabling the admin daemon before moving on to deployment."
 
-### 8. Install & Deploy — the protocol deploy half
-
-![Deploy Protocol Services](screenshots/gui-walkthrough/08-deploy-protocols.jpg)
-
-> "Scrolling further down the same page: Step 3, deploying the
-> protocol services configured earlier. Same pre-check/run/post-check
-> shape as install. The callout above it about the Grafana Bridge is
-> another lesson learned baked directly into the UI — enabling it
-> alone doesn't activate it, only this Deploy step does."
-
-### 9. Post Configuration
+### 8. Post Configuration
 
 ![Post Configuration](screenshots/gui-walkthrough/09-post-configuration.jpg)
 
-> "And last, the GPFS performance tunables — `maxFilesToCache`,
-> `maxStatCache`, `pagepool`, `maxMBpS` — applied here because this is
-> the earliest point in the whole flow where a cluster and filesystem
-> actually exist to apply them to, right after install and before
-> deploy brings the protocols up."
+> "Once the cluster is installed, this page lets you save performance
+> settings for its caches, memory, and throughput. Saving them does not
+> activate them immediately. As the note explains, activation requires
+> unmounting the affected filesystems and restarting the GPFS daemon during
+> a planned maintenance window."
+
+### 9. Install & Deploy — the protocol deploy half
+
+![Deploy Protocol Services](screenshots/gui-walkthrough/08-deploy-protocols.jpg)
+
+> "Back on Install and Deploy, these controls handle protocol deployment:
+> pre-check, Run Deploy, and post-check. Before a live deployment, make sure
+> the shared root filesystem and protocol prerequisites are ready. If you
+> use the Grafana Bridge, the note here explains why it needs to be enabled
+> before deployment."
 
 ---
 
-## Why this is worth having alongside the terminal recordings
+## About this tour
 
-The terminal walkthroughs prove the *backend* sequence is correct —
-real `spectrumscale` commands, real output, real timing. This
-walkthrough proves the *UI* asks for the same inputs in the same
-order and surfaces the same hard-won lessons (the rpcbind hint, the
-Grafana Bridge timing note, the pre-filled port range) at the point an
-operator would actually need them, not buried in a separate runbook
-they have to read first.
+That completes our tour of the installation interface: preparing software,
+defining nodes and storage, configuring protocols, and reviewing the
+controls for installation and deployment. The previews and guidance help you
+check each step before running it against a live cluster.
+
+This tour explains the visible controls and command previews. It does not
+show a completed installation. Filesystem creation is deferred to the IBM
+Storage Scale GUI and is not demonstrated in these screenshots.
 
 ## Watching the recording
 
