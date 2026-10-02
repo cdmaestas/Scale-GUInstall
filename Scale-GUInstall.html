@@ -4160,7 +4160,6 @@ function updateClusterCmdPreview() {
 
   const callhomeOn  = document.getElementById('callhome-toggle')?.classList.contains('on');
   const perfmonOn   = document.getElementById('perfmon-toggle')?.classList.contains('on');
-  const perfmonNode = document.getElementById('perfmon-querynode')?.value.trim() || '';
   const fileauditOn = document.getElementById('fileaudit-toggle')?.classList.contains('on');
   const fileauditFs = document.getElementById('fileaudit-logfs')?.value.trim() || '';
   const grafanaOn   = document.getElementById('grafanabridge-toggle')?.classList.contains('on');
@@ -4270,14 +4269,12 @@ async function applyClusterConfig(btn) {
   if (ports)         gpfsFlags.push({ flag: '-e',           value: ports });
   if (gplbinDirLive) gpfsFlags.push({ flag: '--gplbin_dir', value: gplbinDirLive });
 
-  const perfmonNode = document.getElementById('perfmon-querynode')?.value.trim() || '';
 
   await streamToTerminalPost(termId, `${getBackendUrl()}/api/stream/apply-cluster-config`, {
     toolkit:      tp,
     gpfs_flags:   gpfsFlags,
     callhome:     callhomeOn,
     perfmon:      perfmonOn,
-    perfmon_node: perfmonNode,
     fileaudit:    fileauditOn,
     fileaudit_fs: fileauditFs,
     grafana_bridge: grafanaOn,

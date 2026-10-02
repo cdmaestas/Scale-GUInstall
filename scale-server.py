@@ -1733,14 +1733,9 @@ def _gen_grafanabridge(toolkit, enable, dry_run=False, op=None):
         yield sse("error", f"[ERROR] grafanabridge {action} exited with code {rc}.")
 
 
-def _gen_perfmon(toolkit, enable, node="", dry_run=False, op=None):
-    if node and not (node == "all" or _VALID_HOSTNAME_RE.fullmatch(node)):
-        yield sse("error", f"[ERROR] Invalid perfmon node: {node!r}")
-        return
+def _gen_perfmon(toolkit, enable, dry_run=False, op=None):
     pm_flag = "on" if enable else "off"
     cmd = ["sudo", "-n", toolkit, "config", "perfmon", "-r", pm_flag]
-    if node:
-        cmd += ["-N", node]
     yield sse("info", f"$ {' '.join(cmd)}")
     rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
     if rc == 0:
@@ -1970,6 +1965,11 @@ def stream_apply_cluster_config():
             if _tk_err or not _sudo_isfile(toolkit):
                 yield sse("error", f"[ERROR] Toolkit not usable: {_tk_err or _diagnose_path(toolkit)}")
                 return
+            if perfmon_node:
+                yield sse("error", "[ERROR] perfmon_node is not supported: the toolkit's `config perfmon` "
+                                   "accepts only -r on|off (it rejects -N), and places the collector itself. "
+                                   "Omit perfmon_node.")
+                return
 
             if not dry_run:
                 op, busy = _claim_operation("cluster-config-apply", source)
@@ -2002,7 +2002,7 @@ def stream_apply_cluster_config():
             yield from _gen_callhome(toolkit, callhome_on, dry_run=dry_run, op=op)
 
             # perfmon
-            yield from _gen_perfmon(toolkit, perfmon_on, perfmon_node, dry_run=dry_run, op=op)
+            yield from _gen_perfmon(toolkit, perfmon_on, dry_run=dry_run, op=op)
 
             # fileaudit
             yield from _gen_fileaudit(toolkit, fileaudit_on, fileaudit_fs, dry_run=dry_run, op=op)

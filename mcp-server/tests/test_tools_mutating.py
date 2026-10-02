@@ -165,6 +165,23 @@ async def test_start_cluster_config_apply_dry_run_preview(backend_url, _fake_too
     assert any(e["type"] == "dryrun" for e in result["events"])
 
 
+async def test_start_cluster_config_apply_has_no_perfmon_node_and_never_sends_dash_N(
+    backend_url, _fake_toolkit_exists
+):
+    """toolkit 6.0.1.1's `config perfmon` accepts only -r on|off; passing -N
+    fails with "Unrecognized arguments". The tool must not offer the argument."""
+    with pytest.raises(TypeError):
+        await tools.start_cluster_config_apply(
+            toolkit="/tmp/spectrumscale", perfmon=True, perfmon_node="scale-gui1", dry_run=True
+        )
+    result = await tools.start_cluster_config_apply(
+        toolkit="/tmp/spectrumscale", perfmon=True, dry_run=True
+    )
+    lines = [e["line"] for e in result["events"]]
+    assert any("config perfmon -r on" in line for line in lines)
+    assert not any(" -N" in line for line in lines)
+
+
 async def test_start_phase_dry_run_preview(backend_url, _fake_toolkit_exists):
     result = await tools.start_phase(toolkit="/tmp/spectrumscale", phase="install", dry_run=True)
     assert any(e["type"] == "dryrun" for e in result["events"])

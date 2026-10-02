@@ -379,7 +379,6 @@ async def start_cluster_config_apply(
     gpfs_flags: list[dict] | None = None,
     callhome: bool = False,
     perfmon: bool = True,
-    perfmon_node: str = "",
     fileaudit: bool = False,
     fileaudit_fs: str = "",
     dry_run: bool = True,
@@ -387,8 +386,9 @@ async def start_cluster_config_apply(
     """Apply cluster-wide GPFS configuration: a batch of `spectrumscale
     config gpfs <flag> [value]` calls (gpfs_flags is a list of dicts with
     keys flag and value), plus optionally enabling call home, performance
-    monitoring (perfmon_node required if perfmon is true), and file audit
-    logging (fileaudit_fs required if fileaudit is true). perfmon defaults
+    monitoring (on/off only — the toolkit rejects `config perfmon -N` and
+    places the collector itself, so there is no node argument), and file
+    audit logging (fileaudit_fs required if fileaudit is true). perfmon defaults
     to True — performance monitoring should be on by default; pass
     perfmon=False to explicitly turn it off instead. Every gpfs_flags/
     callhome/perfmon/fileaudit value is always applied explicitly (on or
@@ -403,7 +403,6 @@ async def start_cluster_config_apply(
             "gpfs_flags": gpfs_flags or [],
             "callhome": callhome,
             "perfmon": perfmon,
-            "perfmon_node": perfmon_node,
             "fileaudit": fileaudit,
             "fileaudit_fs": fileaudit_fs,
             "dry_run": dry_run,
