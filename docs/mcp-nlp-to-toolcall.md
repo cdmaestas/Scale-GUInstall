@@ -203,7 +203,8 @@ real. The operator's wording is real for the prompts it quotes as theirs
 (the backend check, the hosts paste, "add the storage for the NSDs", and
 "keep going through the runbook") and reconstructed for steps the agent ran
 on its own initiative. The two mistakes in the cluster-settings section
-really happened and are left in.
+really happened and are left in. The step-by-step source for both recordings, with every prompt labeled and
+both issues traced to their fixes, is [`nlp-capture-log.md`](nlp-capture-log.md).
 
 ```bash
 asciinema play docs/recordings/mcp-nlp-live-install.cast
