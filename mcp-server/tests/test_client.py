@@ -4,9 +4,7 @@ conftest.py) — no HTTP mocking, exercising the actual token bootstrap,
 401-retry, and SSE parsing against real responses.
 """
 import pytest
-
 from scale_guinstall_mcp.client import (
-    BackendAuthError,
     BackendUnreachableError,
     ScaleBackendClient,
     parse_sse_events,

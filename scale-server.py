@@ -10,6 +10,7 @@ Usage:
 Listens on http://127.0.0.1:5001 (loopback only — not accessible from the network)
 """
 
+import contextlib
 import glob
 import json
 import os
@@ -246,10 +247,8 @@ def config_endpoint():
                     json.dump({"revision": new_revision, "data": data}, f)
                 os.replace(tmp_path, _CONFIG_PATH)
             except OSError:
-                try:
+                with contextlib.suppress(OSError):
                     os.unlink(tmp_path)
-                except OSError:
-                    pass
                 raise
         except OSError as exc:
             return jsonify({
@@ -1383,7 +1382,7 @@ def _parse_table(output):
         if not line.strip() or line.startswith('-'):
             continue
         row = {}
-        for j, (col, start) in enumerate(zip(headers, col_starts)):
+        for j, (col, start) in enumerate(zip(headers, col_starts, strict=True)):
             end = col_starts[j + 1] if j + 1 < len(col_starts) else len(line)
             row[col] = line[start:end].strip() if start < len(line) else ''
         rows.append(row)
@@ -1484,7 +1483,7 @@ def list_nodes():
         # Skip the second header line (e.g. "Node   Node   Node   Server …") and blank lines
         for line in stripped[header_idx + 2:]:
             s = line.strip()
-            if not s or s.startswith("[") or s.startswith("-"):
+            if not s or s.startswith(("[", "-")):
                 break  # end of node table
             hostname = line[hostname_col:hostname_end].strip()
             if not hostname:
@@ -3803,7 +3802,7 @@ def stream_node_identity():
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5001))
+    port = int(os.environ.get("PORT", "5001"))
     print("IBM Storage Scale Toolkit — backend server")
     print(f"Listening on http://127.0.0.1:{port}  (loopback only)")
     print("Press Ctrl+C to stop.\n")
