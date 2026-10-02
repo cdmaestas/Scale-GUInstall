@@ -57,3 +57,8 @@ and talked over live without constantly pausing:
 brew install asciinema   # if you don't already have it
 asciinema play docs/recordings/techzone-runbook-walkthrough-clean.cast
 ```
+
+A silent animated rendering of the same cast is at
+[`recordings/techzone-runbook-walkthrough-clean.gif`](recordings/techzone-runbook-walkthrough-clean.gif) (~2.4 MB, the same narration pacing, made with
+`agg --idle-time-limit 21 --last-frame-duration 17 --font-size 16`), for viewing without asciinema installed or
+for screen-recording under the narration.

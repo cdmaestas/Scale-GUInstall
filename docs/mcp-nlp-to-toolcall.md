@@ -186,6 +186,11 @@ brew install asciinema   # if you don't already have it
 asciinema play docs/recordings/mcp-nlp-walkthrough.cast
 ```
 
+A silent animated rendering of the same cast is at
+[`recordings/mcp-nlp-walkthrough.gif`](recordings/mcp-nlp-walkthrough.gif) (~1.9 MB, the same narration pacing, made with
+`agg --idle-time-limit 21 --last-frame-duration 16 --font-size 16`), for viewing without asciinema installed or
+for screen-recording under the narration.
+
 ### A full install, end to end
 
 [`recordings/mcp-nlp-live-install.cast`](recordings/mcp-nlp-live-install.cast)
@@ -227,3 +232,8 @@ the code reading and fix are shown as notes since they are not MCP calls.
 ```bash
 asciinema play docs/recordings/mcp-nlp-troubleshooting.cast
 ```
+
+A silent animated rendering of the same cast is at
+[`recordings/mcp-nlp-troubleshooting.gif`](recordings/mcp-nlp-troubleshooting.gif) (~2.4 MB, the same narration pacing, made with
+`agg --idle-time-limit 30 --last-frame-duration 14 --font-size 16`), for viewing without asciinema installed or
+for screen-recording under the narration.

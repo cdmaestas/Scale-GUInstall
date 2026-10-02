@@ -94,6 +94,11 @@ brew install asciinema   # if you don't already have it
 asciinema play docs/recordings/techzone-runbook-walkthrough-2.cast
 ```
 
+A silent animated rendering of the same cast is at
+[`recordings/techzone-runbook-walkthrough-2.gif`](recordings/techzone-runbook-walkthrough-2.gif) (~6.9 MB, the same narration pacing, made with
+`agg --idle-time-limit 40 --last-frame-duration 18 --font-size 16`), for viewing without asciinema installed or
+for screen-recording under the narration.
+
 Or convert it to a shareable GIF/video with
 [`agg`](https://github.com/asciinema/agg) or upload it to
 [asciinema.org](https://asciinema.org) with `asciinema upload`.
