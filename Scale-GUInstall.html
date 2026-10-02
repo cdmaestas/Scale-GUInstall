@@ -2646,11 +2646,11 @@
             </div>
             <div class="form-group">
               <label class="form-label">SSH User</label>
-              <input type="text" class="form-input" id="pop-user" value="root" placeholder="root">
+              <input type="text" class="form-input" id="pop-user" value="" placeholder="ssh config default">
             </div>
             <div class="form-group">
               <label class="form-label">SSH Port</label>
-              <input type="number" class="form-input" id="pop-port" value="22" placeholder="22">
+              <input type="number" class="form-input" id="pop-port" value="" placeholder="ssh config default">
             </div>
             <div class="checkbox-group" style="margin-bottom:var(--spacing-05)">
               <label class="checkbox-item">
@@ -5787,13 +5787,13 @@ async function loadClusterNodes(btn) {
 
 async function testConnection(btn) {
   const node = document.getElementById('pop-node').value.trim();
-  const user = document.getElementById('pop-user')?.value.trim() || 'root';
-  const port = document.getElementById('pop-port')?.value.trim() || '22';
+  const user = document.getElementById('pop-user')?.value.trim() || '';
+  const port = document.getElementById('pop-port')?.value.trim() || '';
   const termId = 'pop-terminal';
   if (!node) { alert('Enter a cluster node first'); return; }
 
   if (state.dryRun) {
-    appendToTerminal(termId, `$ sudo ssh -p ${port} ${user}@${node} mmgetstate -a  # (dry run)`, 'info');
+    appendToTerminal(termId, `$ sudo ssh ${port ? `-p ${port} ` : ''}${user ? `${user}@` : ''}${node} true && mmgetstate -a  # (dry run)`, 'info');
     appendToTerminal(termId, '[DRY RUN] Command preview only — nothing executed.', 'muted');
     return;
   }
@@ -5808,7 +5808,9 @@ async function testConnection(btn) {
   }
 
   if (btn) btn.disabled = true;
-  const params = new URLSearchParams({ node, user, port });
+  const params = new URLSearchParams({ node });
+  if (user) params.set('user', user);
+  if (port) params.set('port', port);
   await streamToTerminal(termId, `${getBackendUrl()}/api/stream/test-connection?${params}`);
   if (btn) btn.disabled = false;
 }

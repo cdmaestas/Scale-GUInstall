@@ -126,3 +126,20 @@ async def test_all_read_only_tools_are_registered():
         "start_grafanabridge",
     }
     assert registered == expected_read_only | expected_mutating
+
+
+async def test_test_connection_sends_user_and_port_only_when_given(monkeypatch):
+    """Defaulting to root/22 overrode the installer node's ssh config and failed
+    where the nodes' sshd isn't on 22 (TechZone: 2223); empty means "let ssh decide"."""
+    calls = []
+
+    class FakeClient:
+        async def get_sse(self, path, params=None):
+            calls.append((path, params))
+            return []
+
+    monkeypatch.setattr(tools, "get_client", lambda: FakeClient())
+    await tools.test_connection(node="n1")
+    await tools.test_connection(node="n1", user="itzuser", port="2223")
+    assert calls[0] == ("/api/stream/test-connection", {"node": "n1"})
+    assert calls[1] == ("/api/stream/test-connection", {"node": "n1", "user": "itzuser", "port": "2223"})

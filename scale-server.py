@@ -2306,8 +2306,12 @@ def stream_nsd_clear():
 @app.route("/api/stream/test-connection")
 def stream_test_connection():
     node = request.args.get("node", "").strip()
-    user = request.args.get("user", "root").strip() or "root"
-    port = request.args.get("port", "22").strip() or "22"
+    # user/port are optional and NOT defaulted: forcing root@:22 overrode the
+    # ssh config that every other SSH-based endpoint (list_devices, format_disk)
+    # relies on, and failed outright where the nodes' sshd is on another port
+    # (TechZone nodes use 2223) — found live.
+    user = request.args.get("user", "").strip()
+    port = request.args.get("port", "").strip()
 
     def generate():
         try:
@@ -2317,25 +2321,30 @@ def stream_test_connection():
             if not _VALID_HOSTNAME_RE.fullmatch(node):
                 yield sse("error", f"[ERROR] Invalid node hostname: {node!r}")
                 return
-            if not _VALID_SSH_USER_RE.fullmatch(user):
+            if user and not _VALID_SSH_USER_RE.fullmatch(user):
                 yield sse("error", f"[ERROR] Invalid SSH user: {user!r}")
                 return
-            if not port.isdigit() or not (1 <= int(port) <= 65535):
+            if port and (not port.isdigit() or not (1 <= int(port) <= 65535)):
                 yield sse("error", f"[ERROR] Invalid port: {port!r}")
                 return
             # sudo elevates the local ssh client to root before it connects —
             # see stream_list_devices for why. The target login is still
             # whatever was entered (root by default, matching GPFS's
             # root-to-root SSH trust); sudo just unlocks root's own key.
-            target = f"{user}@{node}"
-            # Full path: a non-interactive ssh session doesn't source the
-            # profile that puts MMFS_BIN on PATH, so a bare "mmgetstate"
-            # fails with "command not found" — confirmed live.
-            mmgetstate = f"{MMFS_BIN}/mmgetstate"
-            cmd = ["sudo", "-n", "ssh", "-o", "StrictHostKeyChecking=accept-new",
-                   *_SSH_OPTS, "-p", port, target, mmgetstate, "-a"]
-            yield sse("info", f"$ sudo ssh -p {port} {target} {mmgetstate} -a")
-            stdout, rc = _run_cmd(cmd, timeout=15)
+            target = f"{user}@{node}" if user else node
+            port_args = ["-p", port] if port else []
+            ssh_base = ["sudo", "-n", "ssh", "-o", "StrictHostKeyChecking=accept-new",
+                        *_SSH_OPTS, *port_args, target]
+            shown = "sudo ssh " + " ".join([*port_args, target])
+
+            # Reachability first, with a command that cannot fail on the
+            # remote side. A remote command's own exit status (ssh passes it
+            # through) is not an SSH failure — mmgetstate exits non-zero on a
+            # node where GPFS isn't installed or running, which this endpoint
+            # used to report as "SSH connection failed" even though SSH was
+            # fine (list_devices reached the same nodes).
+            yield sse("info", f"$ {shown} true")
+            stdout, rc = _run_cmd([*ssh_base, "true"], timeout=15)
             for line in stdout.splitlines():
                 if line.strip():
                     yield sse("normal", line)
@@ -2343,6 +2352,20 @@ def stream_test_connection():
                 yield sse("error", f"[ERROR] SSH connection to {node} failed (exit {rc}).")
                 return
             yield sse("success", f"[OK] SSH connection to {node} successful.")
+
+            # Full path: a non-interactive ssh session doesn't source the
+            # profile that puts MMFS_BIN on PATH, so a bare "mmgetstate"
+            # fails with "command not found" — confirmed live.
+            mmgetstate = f"{MMFS_BIN}/mmgetstate"
+            yield sse("info", f"$ {shown} {mmgetstate} -a")
+            stdout, rc = _run_cmd([*ssh_base, mmgetstate, "-a"], timeout=30)
+            for line in stdout.splitlines():
+                if line.strip():
+                    yield sse("normal", line)
+            if rc != 0:
+                yield sse("warn", f"[WARN] SSH works, but `mmgetstate -a` on {node} exited {rc} — "
+                                  "GPFS may not be installed or running there.")
+                return
             if "active" in stdout.lower():
                 yield sse("success", "[OK] GPFS is running on target node.")
             else:

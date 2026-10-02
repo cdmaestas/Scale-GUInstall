@@ -252,11 +252,20 @@ async def checkpython() -> list[dict]:
 
 
 @mcp.tool()
-async def test_connection(node: str, user: str = "root", port: str = "22") -> list[dict]:
+async def test_connection(node: str, user: str = "", port: str = "") -> list[dict]:
     """Test SSH connectivity and GPFS daemon state (`mmgetstate -a`) on a
-    remote node from the installer node."""
-    return _events(await get_client().get_sse(
-        "/api/stream/test-connection", params={"node": node, "user": user, "port": port}))
+    remote node from the installer node. SSH reachability and the GPFS check
+    are reported separately: a node where SSH works but `mmgetstate` fails
+    (GPFS absent/down, permission denied) is a warning, not an SSH failure.
+    user and port are optional — leave them empty to use the installer
+    node's own ssh config, which is what list_devices does. Only set them
+    to override it (e.g. port="2223" if sshd on the nodes is not on 22)."""
+    params = {"node": node}
+    if user:
+        params["user"] = user
+    if port:
+        params["port"] = port
+    return _events(await get_client().get_sse("/api/stream/test-connection", params=params))
 
 
 @mcp.tool()
