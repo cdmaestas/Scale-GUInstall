@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GUI Click-Through Walkthrough — Recording</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --panel: #161616;
+    --border: #2a2a2a;
+    --text: #e8e8e8;
+    --text-dim: #9a9a9a;
+    --accent: #0f62fe;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    height: 100%; overflow: hidden;
+  }
+  #stage {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100vh; padding: 24px; gap: 20px;
+  }
+  #slide-title {
+    font-size: 22px; font-weight: 600; color: var(--text);
+    text-align: center;
+  }
+  #slide-counter {
+    font-size: 13px; color: var(--text-dim); letter-spacing: 0.04em;
+  }
+  #image-wrap {
+    flex: 1; width: 100%; max-width: 1100px; display: flex;
+    align-items: center; justify-content: center; min-height: 0;
+  }
+  #image-wrap img {
+    max-width: 100%; max-height: 100%; border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    object-fit: contain;
+  }
+  #text-slide {
+    max-width: 760px; font-size: 26px; line-height: 1.5; text-align: center;
+    color: var(--text); padding: 40px;
+  }
+  #caption {
+    max-width: 900px; font-size: 17px; line-height: 1.6; color: var(--text-dim);
+    text-align: center; min-height: 3.2em;
+  }
+  #controls {
+    display: flex; align-items: center; gap: 16px; padding: 10px 0;
+  }
+  button {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 16px; font-size: 14px; cursor: pointer;
+  }
+  button:hover { background: #222; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  #progress-track {
+    width: 100%; max-width: 1100px; height: 4px; background: var(--border);
+    border-radius: 2px; overflow: hidden;
+  }
+  #progress-fill {
+    height: 100%; width: 0%; background: var(--accent); transition: width 0.1s linear;
+  }
+  #hint {
+    position: fixed; bottom: 10px; right: 16px; font-size: 11px; color: #555;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="slide-counter"></div>
+  <div id="slide-title"></div>
+  <div id="image-wrap"></div>
+  <div id="caption"></div>
+  <div id="progress-track"><div id="progress-fill"></div></div>
+  <div id="controls">
+    <button id="prev">&larr; Prev</button>
+    <button id="playpause">Pause</button>
+    <button id="next">Next &rarr;</button>
+  </div>
+</div>
+<div id="hint">space = play/pause &middot; &larr;/&rarr; = navigate</div>
+
+<script>
+// Narration-paced slide deck mirroring docs/narration-gui-walkthrough.md.
+// Durations = (narration word count / 2.5 wps) + 2s buffer, same method
+// used for the asciinema .cast recordings in this project.
+const slides = [
+  {
+    title: "GUI Click-Through: The Golden Path, Screen by Screen",
+    text: "This is the same golden path as the terminal walkthrough, but from the web UI — Scale-GUInstall.html — driven and filled out exactly as a real operator would, against a static demo server with no live backend attached.",
+    duration: 17.2
+  },
+  {
+    title: "1. Dashboard",
+    image: "../screenshots/gui-walkthrough/01-dashboard.jpg",
+    caption: "Zero nodes, zero NSDs, zero filesystems, zero protocols configured. The six-step installation workflow across the top is the golden path: Cluster Settings, Node Configuration, NSD Storage, Filesystem, Protocols, Install & Deploy. The command preview panel already shows the exact spectrumscale commands this UI will generate.",
+    duration: 26.4
+  },
+  {
+    title: "2. Prepare Software",
+    image: "../screenshots/gui-walkthrough/02-prepare-software.jpg",
+    caption: "Before touching the cluster, the toolkit itself needs to be on the installer node. This page extracts the Developer Edition package and runs the ansible-core and locale prerequisite checks the real runbook calls out — the ansible-core 2.23 pin and the LC_ALL / python3-apt warning that trip up Ubuntu installer nodes.",
+    duration: 23.6
+  },
+  {
+    title: "3. Cluster Settings",
+    image: "../screenshots/gui-walkthrough/03-cluster-settings.jpg",
+    caption: "Cluster-wide GPFS parameters, set once before anything else runs. The ephemeral port range is already defaulted to 60000-61000 — the fix for the callhome / port-range precheck failure the real walkthroughs hit on the first attempt, baked into the UI's defaults instead of left as a trap.",
+    duration: 22.4
+  },
+  {
+    title: "4. Node Configuration",
+    image: "../screenshots/gui-walkthrough/04-node-configuration.jpg",
+    caption: "All seven nodes, bulk-imported by hostname and given their golden-path roles: two storage servers as NSD/quorum/manager; the GUI node as quorum/admin/GUI server; two protocol nodes as manager/protocol; two clients left as client-only. Same role layout as every terminal walkthrough in this project.",
+    duration: 24.4
+  },
+  {
+    title: "5. NSD Storage",
+    image: "../screenshots/gui-walkthrough/05-nsd-storage.jpg",
+    caption: "Disk discovery and NSD definition — also where the filesystem layout happens, since NSDs are assigned to a filesystem as they're created. Scan Block Devices runs lsblk across every NSD-server node in parallel, rather than asking the operator to find device paths by hand.",
+    duration: 22.8
+  },
+  {
+    title: "6. Protocol Services",
+    image: "../screenshots/gui-walkthrough/06-protocol-services.jpg",
+    caption: "All three protocols enabled together — NFS, SMB, and Object Storage (S3-compatible) — with the CES shared root filesystem and floating IPs filled in. The inline warning under NFS calls out the rpcbind package requirement directly, the exact root cause the second terminal walkthrough spent an entire investigation uncovering.",
+    duration: 24.8
+  },
+  {
+    title: "7. Install & Deploy — install",
+    image: "../screenshots/gui-walkthrough/07-install-deploy.jpg",
+    caption: "The six-stage pipeline: pre-check, install, post-check, enable daemon, deploy, verify — laid out as one flow, so post-check reads as a first-class step between install and deploy, not optional cleanup. Each stage's real spectrumscale command is shown before it runs.",
+    duration: 20.4
+  },
+  {
+    title: "8. Install & Deploy — protocol deploy",
+    image: "../screenshots/gui-walkthrough/08-deploy-protocols.jpg",
+    caption: "Further down the same page: deploying the protocol services configured earlier. Same pre-check/run/post-check shape as install. The Grafana Bridge callout is another lesson baked into the UI — enabling it alone doesn't activate it, only this Deploy step does.",
+    duration: 20.0
+  },
+  {
+    title: "9. Post Configuration",
+    image: "../screenshots/gui-walkthrough/09-post-configuration.jpg",
+    caption: "The GPFS performance tunables — maxFilesToCache, maxStatCache, pagepool, maxMBpS — applied here because this is the earliest point in the flow where a cluster and filesystem actually exist to apply them to, right after install and before deploy brings the protocols up.",
+    duration: 23.2
+  },
+  {
+    title: "Closing",
+    text: "The terminal walkthroughs prove the backend sequence is correct. This one proves the UI asks for the same inputs in the same order, and surfaces the same hard-won lessons right where an operator would actually need them.",
+    duration: 16.8
+  }
+];
+
+let idx = 0;
+let playing = true;
+let elapsed = 0;
+let lastTick = null;
+let rafId = null;
+
+const elTitle = document.getElementById("slide-title");
+const elCounter = document.getElementById("slide-counter");
+const elImageWrap = document.getElementById("image-wrap");
+const elCaption = document.getElementById("caption");
+const elFill = document.getElementById("progress-fill");
+const elPlayPause = document.getElementById("playpause");
+
+function render() {
+  const s = slides[idx];
+  elCounter.textContent = `${idx + 1} / ${slides.length}`;
+  elTitle.textContent = s.title;
+  elImageWrap.innerHTML = "";
+  if (s.image) {
+    const img = document.createElement("img");
+    img.src = s.image;
+    img.alt = s.title;
+    elImageWrap.appendChild(img);
+    elCaption.textContent = s.caption || "";
+  } else if (s.text) {
+    const div = document.createElement("div");
+    div.id = "text-slide";
+    div.textContent = s.text;
+    elImageWrap.appendChild(div);
+    elCaption.textContent = "";
+  }
+  elFill.style.width = "0%";
+  elapsed = 0;
+}
+
+function tick(ts) {
+  if (lastTick === null) lastTick = ts;
+  const dt = (ts - lastTick) / 1000;
+  lastTick = ts;
+  if (playing) {
+    elapsed += dt;
+    const s = slides[idx];
+    elFill.style.width = Math.min(100, (elapsed / s.duration) * 100) + "%";
+    if (elapsed >= s.duration) {
+      goNext(true);
+    }
+  }
+  rafId = requestAnimationFrame(tick);
+}
+
+function goNext(auto) {
+  if (idx < slides.length - 1) {
+    idx++;
+    render();
+  } else if (auto) {
+    playing = false;
+    elPlayPause.textContent = "Play";
+  }
+}
+
+function goPrev() {
+  if (idx > 0) {
+    idx--;
+    render();
+  }
+}
+
+function togglePlay() {
+  playing = !playing;
+  elPlayPause.textContent = playing ? "Pause" : "Play";
+}
+
+document.getElementById("next").addEventListener("click", () => goNext(false));
+document.getElementById("prev").addEventListener("click", goPrev);
+document.getElementById("playpause").addEventListener("click", togglePlay);
+document.addEventListener("keydown", (e) => {
+  if (e.key === " ") { e.preventDefault(); togglePlay(); }
+  if (e.key === "ArrowRight") goNext(false);
+  if (e.key === "ArrowLeft") goPrev();
+});
+
+render();
+rafId = requestAnimationFrame(tick);
+</script>
+</body>
+</html>

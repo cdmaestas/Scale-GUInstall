@@ -172,3 +172,16 @@ The MCP layer never requires the user to know which of the ~43 tools
 exists, what its parameters are called, or what the underlying
 `spectrumscale`/`mm*` command looks like — that mapping is the agent's
 job, every time.
+
+## Watching the recording
+
+[`recordings/mcp-nlp-walkthrough.cast`](recordings/mcp-nlp-walkthrough.cast)
+is a scripted terminal reenactment of the six exchanges above, built
+the same way as the TechZone terminal walkthroughs: narration-paced
+(~2m24s total) so it can be played and talked over live. The companion
+script is [`narration-mcp-nlp.md`](narration-mcp-nlp.md).
+
+```bash
+brew install asciinema   # if you don't already have it
+asciinema play docs/recordings/mcp-nlp-walkthrough.cast
+```

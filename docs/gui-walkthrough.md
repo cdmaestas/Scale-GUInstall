@@ -13,6 +13,10 @@ Each step below pairs a screenshot with the narration you'd use if
 talking over it live, the same pacing convention as the terminal
 `.cast` recordings.
 
+A self-paced recording of this sequence is at
+[`recordings/gui-walkthrough.html`](recordings/gui-walkthrough.html) —
+see [Watching the recording](#watching-the-recording) below.
+
 ---
 
 ### 1. Dashboard
@@ -124,3 +128,23 @@ order and surfaces the same hard-won lessons (the rpcbind hint, the
 Grafana Bridge timing note, the pre-filled port range) at the point an
 operator would actually need them, not buried in a separate runbook
 they have to read first.
+
+## Watching the recording
+
+[`recordings/gui-walkthrough.html`](recordings/gui-walkthrough.html)
+is a self-contained, narration-paced slideshow of the nine screenshots
+above — each slide holds for roughly as long as its narration takes to
+read, the same pacing convention as the terminal `.cast` recordings.
+The companion script is
+[`narration-gui-walkthrough.md`](narration-gui-walkthrough.md).
+
+Open it from a local server so the relative image paths resolve (some
+browsers restrict local-file image loading from a bare double-click):
+
+```bash
+python3 -m http.server 8765   # from the repo root
+```
+
+then visit `http://localhost:8765/docs/recordings/gui-walkthrough.html`
+and screen-record it while reading the narration aloud. Space bar
+pauses/resumes; arrow keys move between slides manually.
