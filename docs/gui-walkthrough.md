@@ -133,18 +133,12 @@ they have to read first.
 
 [`recordings/gui-walkthrough.html`](recordings/gui-walkthrough.html)
 is a self-contained, narration-paced slideshow of the nine screenshots
-above — each slide holds for roughly as long as its narration takes to
-read, the same pacing convention as the terminal `.cast` recordings.
-The companion script is
+above (images embedded inline, no external files or server needed) —
+each slide holds for roughly as long as its narration takes to read,
+the same pacing convention as the terminal `.cast` recordings. The
+companion script is
 [`narration-gui-walkthrough.md`](narration-gui-walkthrough.md).
 
-Open it from a local server so the relative image paths resolve (some
-browsers restrict local-file image loading from a bare double-click):
-
-```bash
-python3 -m http.server 8765   # from the repo root
-```
-
-then visit `http://localhost:8765/docs/recordings/gui-walkthrough.html`
+Just open the file directly in a browser (double-click, or drag it in)
 and screen-record it while reading the narration aloud. Space bar
 pauses/resumes; arrow keys move between slides manually.
