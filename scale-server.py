@@ -23,6 +23,7 @@ import tempfile
 import threading
 import time
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 from flask import Flask, Response, jsonify, request, stream_with_context
 
@@ -44,13 +45,42 @@ _TOKEN_HEADER = "X-Scale-Token"
 _PUBLIC_PATHS = {"/", "/Scale-GUInstall.html", "/help.html"}
 
 
+# Hostnames this backend answers to, for both the Host header and CORS origins.
+# Exact matches on the parsed hostname only — a prefix match let an attacker's
+# page at http://localhost.evil.com read the (public) HTML, and the auth token
+# embedded in it, and a missing Host check left DNS rebinding open.
+# SCALE_GUINSTALL_ALLOWED_HOSTS (comma-separated) adds names for unusual
+# port-forward setups; the default is loopback only.
+_LOCAL_HOSTNAMES = frozenset(
+    {"localhost", "127.0.0.1", "::1"}
+    | {h.strip().lower() for h in os.environ.get("SCALE_GUINSTALL_ALLOWED_HOSTS", "").split(",") if h.strip()}
+)
+
+
+def _hostname_of(netloc):
+    """Lower-cased hostname from a Host header value or URL netloc ("localhost:5001",
+    "[::1]:5001"), or None if it does not parse."""
+    try:
+        return urlsplit("//" + netloc).hostname
+    except ValueError:
+        return None
+
+
+def _is_local_origin(origin):
+    """True only for http origins whose parsed hostname is exactly an allowed local name."""
+    try:
+        parts = urlsplit(origin)
+    except ValueError:
+        return False
+    return parts.scheme == "http" and parts.hostname in _LOCAL_HOSTNAMES
+
+
 def cors(response):
     origin = request.headers.get("Origin", "")
-    # localhost/127.0.0.1 only — file:// (null origin) is no longer served
-    # as a supported delivery mode (see getBackendUrl() on the frontend);
-    # the token below is the real gate, this just narrows who can even see
-    # a response.
-    if origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1"):
+    # Loopback origins only — file:// (null origin) is no longer served as a
+    # supported delivery mode (see getBackendUrl() on the frontend); the token
+    # below is the real gate, this just narrows who can even see a response.
+    if _is_local_origin(origin):
         response.headers["Access-Control-Allow-Origin"] = origin
     response.headers["Access-Control-Allow-Headers"] = f"Content-Type, {_TOKEN_HEADER}"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
@@ -60,6 +90,18 @@ def cors(response):
 
 
 app.after_request(cors)
+
+
+@app.before_request
+def _require_local_host():
+    # Applies to every request, public pages and CORS preflights included: a
+    # DNS-rebinding page reaches this server under its own hostname, so a foreign
+    # Host header is the signal.
+    if _hostname_of(request.host) not in _LOCAL_HOSTNAMES:
+        return jsonify({"error": "Unrecognized Host header. This backend only answers on loopback "
+                                  "(localhost, 127.0.0.1, ::1); set SCALE_GUINSTALL_ALLOWED_HOSTS to "
+                                  "allow another name."}), 421
+    return None
 
 
 @app.before_request
