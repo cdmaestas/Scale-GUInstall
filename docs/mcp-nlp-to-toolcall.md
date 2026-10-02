@@ -204,6 +204,13 @@ really happened and are left in.
 asciinema play docs/recordings/mcp-nlp-live-install.cast
 ```
 
+A silent animated rendering of the same cast is at
+[`recordings/mcp-nlp-live-install.gif`](recordings/mcp-nlp-live-install.gif)
+(~5.8 MB, 983×739, the same ~5-minute pacing, made with
+`agg --idle-time-limit 60 --font-size 16 --last-frame-duration 16`), for
+viewing without asciinema installed or for screen-recording under the
+narration.
+
 ### Debugging a tool through the same server
 
 [`recordings/mcp-nlp-troubleshooting.cast`](recordings/mcp-nlp-troubleshooting.cast)
