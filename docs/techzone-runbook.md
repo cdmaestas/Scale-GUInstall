@@ -715,11 +715,22 @@ temporary one you rotate immediately after first login, or run the
 
 ```
 mmgetstate -a          # from any cluster node directly — confirm GPFS active everywhere
-                        # (test_connection's built-in mmgetstate check has a known bug:
-                        #  it runs the bare command over non-interactive ssh, which
-                        #  doesn't have /usr/lpp/mmfs/bin on PATH — fixed in 1.3.0, but
-                        #  confirm your backend version has the fix)
 ```
+
+The same check works from the installer through `test_connection(node)`:
+call it with just the node name. It checks SSH reachability first, then runs
+`mmgetstate -a` as a separate step, so "SSH works but GPFS isn't running"
+is reported as a warning with the command's output rather than as an SSH
+failure. Leave `user` and `port` empty so the installer's own ssh config
+decides — the same way `list_devices` already reaches the nodes. On
+TechZone the nodes' sshd is on port 2223, which that config handles.
+
+If it reports `SSH connection to <node> failed (exit 255)` with no output
+while `list_devices` works, your backend is older than commit `b81f1aa`:
+it forced `-p 22` and `root@`, overriding the ssh config. Update the
+backend, or pass `port="2223"` as a workaround. (An earlier version of this
+check also failed on a bare `mmgetstate` not being on the non-interactive
+ssh `PATH`; that was fixed before this one.)
 
 Also worth eyeballing directly on a node if anything reported `NOT ACTIVE`
 during deploy:
