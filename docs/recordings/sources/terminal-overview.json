@@ -1,0 +1,158 @@
+{
+  "title": "Clean terminal installation overview",
+  "description": "Instructional reenactment with assumed prerequisites and explicit verification.",
+  "words_per_minute": 135,
+  "buffer_seconds": 2,
+  "scenes": [
+    {
+      "title": "Clean terminal overview",
+      "lines": [
+        "INSTRUCTIONAL REENACTMENT — not one literal live run",
+        "Assumes toolkit, SSH, rpcbind, reserved CES IPs and S3 media ready.",
+        "Seven nodes; NFS, SMB and S3.",
+        "Preflight details remain in the current runbook."
+      ],
+      "narration": "This is a concise instructional reenactment of the installation sequence. It assumes the toolkit, SSH access, RPC bind, reserved protocol addresses, and S3 media are ready. Those prerequisites still need checking in a real environment. Here we focus on configuration, installation, deployment, and verification.",
+      "source": {
+        "file": "techzone-runbook-walkthrough-clean.cast",
+        "start": 0.6,
+        "end": 21.45
+      }
+    },
+    {
+      "title": "1. Start the toolkit setup service",
+      "lines": [
+        "spectrumscale setup -s <installer-ip>",
+        "",
+        "Installer selected; package distribution service ready.",
+        "Use the installer address assigned to your environment."
+      ],
+      "narration": "First, start the toolkit setup service on the installer node. Use the address assigned to that installer in your environment. Once the service is ready, the next steps define the nodes and storage that the toolkit will manage.",
+      "source": {
+        "file": "techzone-runbook-walkthrough-clean.cast",
+        "start": 21.45,
+        "end": 32.66
+      }
+    },
+    {
+      "title": "2. Configure seven nodes",
+      "lines": [
+        "Two storage servers: NSD, quorum, manager",
+        "One GUI node: GUI, quorum, admin",
+        "Two protocol nodes: protocol, manager",
+        "Two clients: client-only",
+        "",
+        "Review all seven entries and role assignments."
+      ],
+      "narration": "Add the seven nodes with their intended roles. Two storage servers provide NSDs, quorum, and management. A GUI node also provides administration and quorum. Two protocol nodes serve the protocols, and two nodes remain clients. Review the resulting configuration before continuing.",
+      "source": {
+        "file": "techzone-runbook-walkthrough-clean.cast",
+        "start": 32.66,
+        "end": 56.51
+      }
+    },
+    {
+      "title": "3. Define NSDs and filesystem placement",
+      "lines": [
+        "Three available disks on each storage server.",
+        "One per server -> cesSharedRoot",
+        "Two per server -> fs1",
+        "Separate failure groups for the two servers.",
+        "",
+        "Verify replica settings separately; placement is not proof of mirroring."
+      ],
+      "narration": "Inspect the disks and define the NSDs. This layout places one disk from each server in the shared root and the remaining disks in the main filesystem. Failure groups distinguish the servers. Verify filesystem replication separately; the placement shown here is not itself evidence of mirroring.",
+      "source": {
+        "file": "techzone-runbook-walkthrough-clean.cast",
+        "start": 56.51,
+        "end": 77.24
+      }
+    },
+    {
+      "title": "4. Precheck and install",
+      "lines": [
+        "Resolve callhome configuration before the precheck.",
+        "Set the intended GPFS port range.",
+        "",
+        "spectrumscale install --precheck",
+        "spectrumscale install",
+        "",
+        "Long installation output is summarized in this overview."
+      ],
+      "narration": "Resolve the cluster settings before running the installation precheck. In the source example, callhome is disabled and the port range is set. Once the precheck passes, installation creates the cluster and its configured storage. The long-running output is summarized rather than replayed in full.",
+      "source": {
+        "file": "techzone-runbook-walkthrough-clean.cast",
+        "start": 77.24,
+        "end": 103.93
+      }
+    },
+    {
+      "title": "5. Verify the installation",
+      "lines": [
+        "spectrumscale install --postcheck",
+        "",
+        "GPFS ACTIVE",
+        "NSDs ACTIVE",
+        "Performance monitoring ACTIVE",
+        "GUI ACTIVE",
+        "All services running."
+      ],
+      "narration": "Run the installation postcheck as a separate verification step. It checks GPFS, the NSDs, performance monitoring, and the GUI. Reviewing those results gives a clearer basis for continuing than relying on the installation command’s completion alone.",
+      "source": {
+        "file": "techzone-runbook-walkthrough-clean.cast",
+        "start": 103.93,
+        "end": 126.38
+      }
+    },
+    {
+      "title": "6. Configure and precheck the protocols",
+      "lines": [
+        "Configure CES filesystem, mountpoint, interface and reserved IPs.",
+        "spectrumscale enable nfs smb s3",
+        "spectrumscale deploy --precheck",
+        "",
+        "Review NFS, SMB, S3 and shared protocol checks."
+      ],
+      "narration": "Now configure the protocol shared root, mountpoint, network interface, and reserved floating addresses. Enable NFS, SMB, and S3, then run the deployment precheck. Review each protocol’s result and address any missing prerequisites before starting the actual deployment.",
+      "source": {
+        "file": "techzone-runbook-walkthrough-clean.cast",
+        "start": 126.38,
+        "end": 154.16
+      }
+    },
+    {
+      "title": "7. Deploy the services",
+      "lines": [
+        "spectrumscale deploy",
+        "",
+        "Review both task results and final service health.",
+        "Filesystem, CES, NFS, SMB and S3 ACTIVE.",
+        "Monitoring and GUI ACTIVE.",
+        "This is the illustrated successful path."
+      ],
+      "narration": "Deployment installs and starts the selected protocol services. In this illustrated successful path, the filesystem, Cluster Export Services, NFS, SMB, S3, monitoring, and GUI all become active. Check both the task results and the final service health before considering this stage complete.",
+      "source": {
+        "file": "techzone-runbook-walkthrough-clean.cast",
+        "start": 154.16,
+        "end": 177.01
+      }
+    },
+    {
+      "title": "8. Verify the final state",
+      "lines": [
+        "spectrumscale deploy --postcheck",
+        "",
+        "Independently check the deployed components.",
+        "Confirm all intended services are running.",
+        "",
+        "Use the runbook for prerequisites and environment-specific commands."
+      ],
+      "narration": "Finish with the deployment postcheck. It independently checks the components that deployment brought up. This overview shows the order and verification points; the current runbook supplies the prerequisite details and environment-specific commands needed to carry out a real installation.",
+      "source": {
+        "file": "techzone-runbook-walkthrough-clean.cast",
+        "start": 177.01,
+        "end": 214.241
+      }
+    }
+  ]
+}

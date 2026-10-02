@@ -1,0 +1,67 @@
+{
+  "title": "MCP examples: context recovery and adding S3",
+  "description": "Two distinct historical examples, not a continuous run.",
+  "words_per_minute": 135,
+  "buffer_seconds": 2,
+  "scenes": [
+    {
+      "title": "Two additional MCP examples",
+      "lines": [
+        "SEPARATE HISTORICAL EXAMPLES",
+        "Edited reenactments based on project sessions.",
+        "These are not continuations of the three-protocol install."
+      ],
+      "narration": "Two examples from separate historical sessions show context recovery and adding S3. These are edited reenactments, not one continuous run.",
+      "source": {
+        "file": "mcp-nlp-walkthrough.cast",
+        "start": 0,
+        "end": 18.8
+      }
+    },
+    {
+      "title": "1. Recover the operation context",
+      "lines": [
+        "check_operation()",
+        "Large operation log returned through the tool harness.",
+        "Saved output reviewed for failures, recap and completion.",
+        "",
+        "Summarize the evidence before deciding the next action."
+      ],
+      "narration": "The agent retrieves an operation’s output and checks the saved log for failures and completion evidence. This recovers the state before another action, rather than assuming a quiet operation has finished.",
+      "source": {
+        "file": "mcp-nlp-walkthrough.cast",
+        "start": 56,
+        "end": 74
+      }
+    },
+    {
+      "title": "2. Add S3 to an existing cluster",
+      "lines": [
+        "DIFFERENT SESSION: NFS and SMB already running",
+        "Enable S3 -> deploy precheck -> deploy",
+        "",
+        "Recorded result: S3 ACTIVE; NFS and SMB remain active.",
+        "This is an extension, not the earlier fresh installation."
+      ],
+      "narration": "In another session, NFS and SMB already run. The agent enables S3, runs the precheck, and deploys. The recorded result shows S3 active with the existing protocols undisturbed.",
+      "source": {
+        "file": "mcp-nlp-walkthrough.cast",
+        "start": 90.4,
+        "end": 108
+      }
+    },
+    {
+      "title": "Closing",
+      "lines": [
+        "CHECK STATE -> MAKE THE CHANGE -> VERIFY",
+        "See the full MCP story for an end-to-end example."
+      ],
+      "narration": "Each example connects a short request to a verified result.",
+      "source": {
+        "file": "mcp-nlp-walkthrough.cast",
+        "start": 126,
+        "end": 126.9
+      }
+    }
+  ]
+}

@@ -25,6 +25,12 @@ A single-file web frontend for the IBM Storage Scale Installation Toolkit (`spec
 
 ---
 
+## Walkthroughs and narration
+
+[Open the recording index](docs/recordings/README.md) for the GUI tour, clean terminal overview, and combined MCP installation and debugging story. Short companion examples and clearly labeled historical originals are linked there.
+
+---
+
 ## Installing via Package (RPM / DEB)
 
 For production installer nodes, use the pre-built packages instead of running from source. The package installs Flask and waitress into a self-contained virtual environment — no manual pip, no cloning, no Python version hunting.

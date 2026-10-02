@@ -1,0 +1,227 @@
+{
+  "mcp-install-and-debug": {
+    "seconds": 406.67,
+    "chapters": [
+      {
+        "title": "A cluster install, then a diagnostic fix",
+        "start": 0,
+        "duration": 15.78
+      },
+      {
+        "title": "1. Check the installer",
+        "start": 15.78,
+        "duration": 14.89
+      },
+      {
+        "title": "2. Inspect nodes and disks",
+        "start": 30.67,
+        "duration": 21.56
+      },
+      {
+        "title": "3. Read the environment details",
+        "start": 52.23,
+        "duration": 15.33
+      },
+      {
+        "title": "4. Start the toolkit service",
+        "start": 67.56,
+        "duration": 21.56
+      },
+      {
+        "title": "5. Assign the seven node roles",
+        "start": 89.12,
+        "duration": 22.0
+      },
+      {
+        "title": "6. Define the storage",
+        "start": 111.12,
+        "duration": 18.89
+      },
+      {
+        "title": "7. Recover from configuration errors",
+        "start": 130.01,
+        "duration": 23.78
+      },
+      {
+        "title": "8. Configure the protocols",
+        "start": 153.79,
+        "duration": 21.11
+      },
+      {
+        "title": "9. Install and verify",
+        "start": 174.9,
+        "duration": 20.22
+      },
+      {
+        "title": "10. Deploy and check the outcome",
+        "start": 195.12,
+        "duration": 23.33
+      },
+      {
+        "title": "11. Confirm, then investigate",
+        "start": 218.45,
+        "duration": 21.56
+      },
+      {
+        "title": "12. Reproduce the misleading error",
+        "start": 240.01,
+        "duration": 22.0
+      },
+      {
+        "title": "13. Compare the tools",
+        "start": 262.01,
+        "duration": 18.44
+      },
+      {
+        "title": "14. Check the operator\u2019s evidence",
+        "start": 280.45,
+        "duration": 16.67
+      },
+      {
+        "title": "15. Separate two kinds of failure",
+        "start": 297.12,
+        "duration": 22.89
+      },
+      {
+        "title": "16. Fix the diagnostic",
+        "start": 320.01,
+        "duration": 18.0
+      },
+      {
+        "title": "17. Explain the incomplete redeploy",
+        "start": 338.01,
+        "duration": 23.33
+      },
+      {
+        "title": "18. Restart and confirm",
+        "start": 361.34,
+        "duration": 22.44
+      },
+      {
+        "title": "Closing",
+        "start": 383.78,
+        "duration": 22.89
+      }
+    ]
+  },
+  "terminal-overview": {
+    "seconds": 181.11,
+    "chapters": [
+      {
+        "title": "Clean terminal overview",
+        "start": 0,
+        "duration": 21.56
+      },
+      {
+        "title": "1. Start the toolkit setup service",
+        "start": 21.56,
+        "duration": 18.89
+      },
+      {
+        "title": "2. Configure seven nodes",
+        "start": 40.45,
+        "duration": 20.22
+      },
+      {
+        "title": "3. Define NSDs and filesystem placement",
+        "start": 60.67,
+        "duration": 22.44
+      },
+      {
+        "title": "4. Precheck and install",
+        "start": 83.11,
+        "duration": 21.56
+      },
+      {
+        "title": "5. Verify the installation",
+        "start": 104.67,
+        "duration": 18.0
+      },
+      {
+        "title": "6. Configure and precheck the protocols",
+        "start": 122.67,
+        "duration": 18.44
+      },
+      {
+        "title": "7. Deploy the services",
+        "start": 141.11,
+        "duration": 20.67
+      },
+      {
+        "title": "8. Verify the final state",
+        "start": 161.78,
+        "duration": 19.33
+      }
+    ]
+  },
+  "mcp-extra-examples": {
+    "seconds": 47.55,
+    "chapters": [
+      {
+        "title": "Two additional MCP examples",
+        "start": 0,
+        "duration": 10.89
+      },
+      {
+        "title": "1. Recover the operation context",
+        "start": 10.89,
+        "duration": 15.78
+      },
+      {
+        "title": "2. Add S3 to an existing cluster",
+        "start": 26.67,
+        "duration": 14.44
+      },
+      {
+        "title": "Closing",
+        "start": 41.11,
+        "duration": 6.44
+      }
+    ]
+  },
+  "ces-nfs-case-study": {
+    "seconds": 172.9,
+    "chapters": [
+      {
+        "title": "Why CES and NFS stayed inactive",
+        "start": 0,
+        "duration": 19.78
+      },
+      {
+        "title": "1. Task success was not service health",
+        "start": 19.78,
+        "duration": 21.11
+      },
+      {
+        "title": "2. Address assignment remains blocked",
+        "start": 40.89,
+        "duration": 21.56
+      },
+      {
+        "title": "3. Inspect the services",
+        "start": 62.45,
+        "duration": 21.11
+      },
+      {
+        "title": "4. Confirm and fix in a fresh environment",
+        "start": 83.56,
+        "duration": 21.56
+      },
+      {
+        "title": "5. Install, then verify directly",
+        "start": 105.12,
+        "duration": 22.89
+      },
+      {
+        "title": "6. Prepare protocol deployment",
+        "start": 128.01,
+        "duration": 22.89
+      },
+      {
+        "title": "7. Confirm the new deployment",
+        "start": 150.9,
+        "duration": 22.0
+      }
+    ]
+  }
+}

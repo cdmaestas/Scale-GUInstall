@@ -1,5 +1,7 @@
 # TechZone Runbook: Clean End-to-End Walkthrough
 
+> **Historical source material.** For the edited presentation, use the [curated recordings](recordings/README.md). Original recordings and narration are retained for provenance; see the [archive corrections](recordings/ARCHIVE.md) before reusing their examples.
+
 A straight-through demo path for [`techzone-runbook.md`](techzone-runbook.md):
 toolkit setup through a fully active NFS/SMB/S3 deployment, with no detours.
 
