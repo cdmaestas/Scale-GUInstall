@@ -4803,7 +4803,19 @@ async function probeMmfs() {
     }).join('');
 
     // Prefill override input with the toolkit path for the latest version
-    document.getElementById('mmfs-toolkit-override').value = _mmfsToolkitForVersion(data.version);
+    const detected = _mmfsToolkitForVersion(data.version);
+    document.getElementById('mmfs-toolkit-override').value = detected;
+
+    // An extracted toolkit is the real binary, so use it everywhere instead of
+    // the /tmp/scale-pkg placeholder, unless the user already changed the path
+    // (Settings, or a different Prepare working directory).
+    const settingsEl = document.getElementById('settings-toolkit-path');
+    const untouched = settingsEl && settingsEl.value === settingsEl.defaultValue;
+    if (data.version_map?.[data.version] != null && untouched) {
+      _setToolkitPath(detected);
+      document.querySelector('[data-step="4"]')?.setAttribute('data-mmfs-applied', '1');
+      updateAllPreviews();
+    }
 
     document.getElementById('mmfs-detected-banner').style.display = 'flex';
   } catch {
@@ -4846,15 +4858,19 @@ function onMmfsVersionChange() {
   if (ver) document.getElementById('mmfs-toolkit-override').value = _mmfsToolkitForVersion(ver);
 }
 
-function applyMmfsDetected() {
-  const toolkitPath = document.getElementById('mmfs-toolkit-override')?.value.trim();
-  if (!toolkitPath) return;
-
-  // Set global toolkit path used by all other pages
+// Set the global toolkit path used by every page's command previews and runs.
+function _setToolkitPath(toolkitPath) {
   state.toolkitPath = toolkitPath;
   document.getElementById('toolkit-path').value = toolkitPath;
   const settingsEl = document.getElementById('settings-toolkit-path');
   if (settingsEl) settingsEl.value = toolkitPath;
+}
+
+function applyMmfsDetected() {
+  const toolkitPath = document.getElementById('mmfs-toolkit-override')?.value.trim();
+  if (!toolkitPath) return;
+
+  _setToolkitPath(toolkitPath);
 
   // Update Step 4 setup preview to use the detected toolkit path directly
   // (overrides the working-dir-derived path in updatePreparePreviews)
@@ -6143,6 +6159,7 @@ function setDryRunState(enabled) {
 
 // ===== INIT =====
 updateAllPreviews();
+probeMmfs();  // adopt an already-extracted toolkit path before any panel builds commands
 setDryRunState(true);
 applyFsViaGuiMode();  // default ON: hide the Filesystem nav item + skip its step
 renderDashboardSetupStatus();  // Dashboard is the default active page on load
