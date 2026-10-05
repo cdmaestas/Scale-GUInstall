@@ -443,6 +443,35 @@ Performance Monitoring ACTIVE
 GUI ACTIVE
 ```
 
+### Expected after a clean deploy: `TIPS` on SMB and S3 (perfmon sensors only)
+
+`mmces state show -a` can show `TIPS` for SMB, S3 and CES on a deploy that
+is otherwise fully healthy (confirmed on a fresh environment: install 26m,
+deploy about 17m, `postcheck-deploy` SUCCESS, NFS/SMB/S3 running, both
+export IPs assigned). `TIPS` is not a failure state. `mmhealth node show
+SMB -v` (or `S3 -v`) shows what it is:
+
+```
+smb_sensors_not_configured  SMB  TIP  The SMB perfmon sensor SMBGlobalStats is not configured.
+smb_sensors_not_configured  SMB  TIP  The SMB perfmon sensor SMBStats is not configured.
+cess3_sensor_not_configured S3   TIP  The CES S3 perfmon sensor CesS3 is not configured.
+```
+
+These only mean performance statistics for that protocol are not being
+collected. The service events beneath them are healthy (`ctdb_up`,
+`smbd_up`, `smbport_up`, `s3_active`, ...). The CES `TIPS` is rolled up from
+the component ones, and the S3 sensor can be configured on one protocol node
+and not the other. Performance Monitoring is set up during `install`, before
+the protocols exist, and the SMB/S3 sensors were not added afterwards on
+this toolkit version (6.0.1.1). That cause is the likely one but was not
+confirmed, so don't treat it as established.
+
+Left as-is on purpose: the fix would be a `mmperfmon config update` for
+those sensors, which changes cluster-wide Performance Monitoring config.
+Do it only if you need SMB or S3 performance metrics. Anything other than a
+`*_sensor*` TIP (or any `FAILED`/`DEGRADED`/`NOT ACTIVE`) is a real problem,
+so go to the known issue below.
+
 ### Known issue: CES/NFS `NOT ACTIVE` despite `failed=0` everywhere
 
 **Seen live twice, on two independent TechZone environments** — this
