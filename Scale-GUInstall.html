@@ -774,6 +774,12 @@
       <button class="btn btn-sm btn-secondary" style="margin-left:auto" onclick="location.reload()">Reload</button>
     </div>
 
+    <!-- CONFIG SAVE FAILED BANNER: autosave keeps retrying with backoff; cleared by the next successful save -->
+    <div id="config-save-failed-banner" style="display:none; background:rgba(255,131,43,0.1); border-bottom:1px solid var(--cds-support-warning); padding:8px var(--spacing-06); align-items:center; gap:var(--spacing-04); font-size:13px; color:var(--cds-support-warning);">
+      <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor" style="flex-shrink:0"><path d="M29 26H3L16 3zm-13-4h2v-8h-2zm0 4h2v-2h-2z"/></svg>
+      <span><strong>Configuration is not being saved.</strong> <span id="config-save-failed-detail"></span> Autosave keeps retrying with a growing delay; your changes stay in this page until it succeeds.</span>
+    </div>
+
     <!-- toolkit-path hidden input: derived from Prepare Software working directory -->
     <input type="hidden" id="toolkit-path" value="/tmp/scale-pkg/installer/spectrumscale">
 
@@ -6065,9 +6071,28 @@ async function loadPersistedConfig() {
 }
 
 let _configSaveInFlight = false;
+let _configSaveFailures = 0;
+let _configRetryAt = 0;
+
+// A failed save is retried with a doubling delay (2s up to 60s) instead of
+// every second, and the reason is shown once in a banner rather than as a
+// stream of identical errors.
+function _noteConfigSaveFailure(detail) {
+  _configSaveFailures++;
+  _configRetryAt = Date.now() + Math.min(60000, 2000 * 2 ** (_configSaveFailures - 1));
+  document.getElementById('config-save-failed-detail').textContent = detail;
+  document.getElementById('config-save-failed-banner').style.display = 'flex';
+  if (_configSaveFailures === 1) console.warn('Config autosave failed, retrying with backoff:', detail);
+}
+
+function _noteConfigSaveSuccess() {
+  _configSaveFailures = 0;
+  _configRetryAt = 0;
+  document.getElementById('config-save-failed-banner').style.display = 'none';
+}
 
 async function autosaveConfigTick() {
-  if (_configConflict || _configSaveInFlight) return;
+  if (_configConflict || _configSaveInFlight || Date.now() < _configRetryAt) return;
   const token = document.querySelector('meta[name="scale-guinstall-token"]')?.content;
   if (!token) return;
   const current = JSON.stringify(state);
@@ -6085,12 +6110,17 @@ async function autosaveConfigTick() {
       document.getElementById('config-conflict-banner').style.display = 'flex';
       return;
     }
-    if (!res.ok) { console.warn('Config autosave failed: HTTP', res.status); return; }
+    if (!res.ok) {
+      const err = await res.json().then(b => b.error, () => null);
+      _noteConfigSaveFailure(err || `HTTP ${res.status}`);
+      return;
+    }
     const body = await res.json();
     _configRevision = body.revision;
     _lastSavedConfigJSON = current;
+    _noteConfigSaveSuccess();
   } catch (e) {
-    console.warn('Config autosave failed:', e.message);
+    _noteConfigSaveFailure(e.message);
   } finally {
     _configSaveInFlight = false;
   }
