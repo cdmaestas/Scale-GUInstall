@@ -1,9 +1,9 @@
 # Narration Script — GUI Click-Through Walkthrough
 
 Companion narration for
-[`recordings/gui-walkthrough.html`](recordings/gui-walkthrough.html), a
+[`recordings/gui-walkthrough.html`](player.html), a
 self-paced slideshow of the nine screenshots in
-[`gui-walkthrough.md`](gui-walkthrough.md). Open the recording in a
+[`gui-walkthrough.md`](README.md). Open the recording in a
 browser and screen-record it while reading this aloud — each slide
 holds for roughly as long as its narration takes to read, the same
 pacing convention used for the terminal `.cast` recordings.

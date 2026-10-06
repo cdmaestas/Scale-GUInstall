@@ -1,15 +1,17 @@
 # Recording cleanup completed
 
+> **Historical record.** This report describes the layout before the `docs/walkthroughs/` restructure; the links below were repointed to the files' new locations, but file names in the prose (for example `build_recordings.py`) are the old ones. See the [walkthroughs index](../walkthroughs/README.md).
+
 The primary presentation is now an edited MCP installation followed chronologically by its diagnostic repair. Three shorter companions cover the terminal sequence, unique MCP examples, and the CES/NFS case. The GUI screenshot tour remains separate and unchanged.
 
 ## Watch and narrate
 
 | Recording | Measured GIF duration | Chapters | Player | GIF | Script |
 |---|---:|---:|---|---|---|
-| MCP install and diagnostic repair | **6:46.67** | 20 | [Open](recordings/mcp-install-and-debug.html) | [Preview](recordings/mcp-install-and-debug.gif) | [Narration](narration-mcp-install-and-debug.md) |
-| Clean terminal overview | **3:01.11** | 9 | [Open](recordings/terminal-overview.html) | [Preview](recordings/terminal-overview.gif) | [Narration](narration-terminal-overview.md) |
-| Extra MCP examples | **0:47.55** | 4 | [Open](recordings/mcp-extra-examples.html) | [Preview](recordings/mcp-extra-examples.gif) | [Narration](narration-mcp-extra-examples.md) |
-| CES/NFS case study | **2:52.90** | 8 | [Open](recordings/ces-nfs-case-study.html) | [Preview](recordings/ces-nfs-case-study.gif) | [Narration](narration-ces-nfs-case-study.md) |
+| MCP install and diagnostic repair | **6:46.67** | 20 | [Open](../walkthroughs/mcp/install-and-debug.html) | [Preview](../walkthroughs/mcp/install-and-debug.gif) | [Narration](../walkthroughs/mcp/install-and-debug.narration.md) |
+| Clean terminal overview | **3:01.11** | 9 | [Open](../walkthroughs/cli/overview.html) | [Preview](../walkthroughs/cli/overview.gif) | [Narration](../walkthroughs/cli/overview.narration.md) |
+| Extra MCP examples | **0:47.55** | 4 | [Open](../walkthroughs/mcp/extra-examples.html) | [Preview](../walkthroughs/mcp/extra-examples.gif) | [Narration](../walkthroughs/mcp/extra-examples.narration.md) |
+| CES/NFS case study | **2:52.90** | 8 | [Open](../walkthroughs/mcp/ces-nfs-case-study.html) | [Preview](../walkthroughs/mcp/ces-nfs-case-study.gif) | [Narration](../walkthroughs/mcp/ces-nfs-case-study.narration.md) |
 
 The new players start paused. Use chapter selection, previous/next, pause, restart or pace controls while narrating; collapse the narration panel for a cleaner screen recording. GIFs are silent, play once, and stop on the closing frame. These are concise chapter summaries regenerated from source material, not cuts of scrolling terminal footage. Narration is supplied as text, not recorded audio.
 
@@ -27,11 +29,11 @@ The combined story is about seven seconds longer than the approximate 6:40 targe
 
 ## Files delivered
 
-- Four source JSON files under [recordings/sources](recordings/sources/), carrying screen text, narration and original source ranges.
+- Four source JSON files under [recordings/sources](../walkthroughs/_build/sources/), carrying screen text, narration and original source ranges.
 - Four generated sets of `.html`, `.cast` and `.gif` files, linked above.
 - Four synchronized `narration-*.md` scripts, linked above.
-- [Viewing index](recordings/README.md), [historical archive](recordings/ARCHIVE.md), [build recipe](recordings/BUILD.md), [timing manifest](recordings/timings.json).
-- [Exporter](recordings/build_recordings.py) and [player logic checks](recordings/check_players.cjs).
+- [Viewing index](../walkthroughs/README.md), [historical archive](README.md), [build recipe](../walkthroughs/_build/BUILD.md), [timing manifest](../walkthroughs/_build/timings.json).
+- [Exporter](../walkthroughs/_build/build.py) and [player logic checks](../walkthroughs/_build/check_players.cjs).
 - Root README discovery link and historical-source notices on the three older walkthrough pages, the MCP article and three old MCP narration scripts.
 
 ## Validation

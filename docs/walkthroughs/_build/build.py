@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build curated recordings from JSON scenes; originals are never overwritten.
+"""Build the curated walkthrough outputs from JSON scenes; originals are never overwritten.
 
 Python 3.10+; GIF export requires agg 1.9.0 (tested). --check uses Pillow.
 """
@@ -12,9 +12,21 @@ import subprocess
 import textwrap
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-SLUGS = ('mcp-install-and-debug', 'terminal-overview', 'mcp-extra-examples', 'ces-nfs-case-study')
+ROOT = Path(__file__).resolve().parent           # docs/walkthroughs/_build (sources, timings)
+OUT = ROOT.parent                                 # docs/walkthroughs (gui/, mcp/, cli/)
+ARCHIVE = ROOT.parents[1] / 'archive' / 'recordings'  # original casts cited by each scene's source range
+# source slug -> output stem under docs/walkthroughs/ (adds .cast, .html, .gif, .narration.md)
+SLUGS = {
+    'mcp-install-and-debug': 'mcp/install-and-debug',
+    'terminal-overview': 'cli/overview',
+    'mcp-extra-examples': 'mcp/extra-examples',
+    'ces-nfs-case-study': 'mcp/ces-nfs-case-study',
+}
 COLS, ROWS = 88, 24
+
+
+def out(slug, suffix):
+    return OUT / f'{SLUGS[slug]}{suffix}'
 
 
 def load(slug):
@@ -27,7 +39,7 @@ def load(slug):
         scene['start'] = round(elapsed, 2)
         elapsed += scene['duration']
         ref = scene['source']
-        source = ROOT / ref['file']
+        source = ARCHIVE / ref['file']
         assert source.exists() and ref['start'] < ref['end']
         events = [json.loads(line) for line in source.read_text().splitlines()[1:]]
         assert ref['end'] <= events[-1][0] + .001
@@ -98,38 +110,38 @@ def build(slug, export_gif):
                   duration=data['duration'], env={'TERM': 'xterm-256color'})
     events = [json.dumps(header)]
     narration = [f'# {data["title"]} — narration', '', data['description'], '',
-                 'Generated from the matching JSON in `recordings/sources/`. Edit that source, then rebuild.', '',
+                 'Generated from the matching JSON in `docs/walkthroughs/_build/sources/`. Edit that source, then rebuild.', '',
                  f'Pace: {data["words_per_minute"]} words/minute + {data["buffer_seconds"]} seconds per chapter. Total: {stamp(data["duration"])}.', '']
     for i, scene in enumerate(data['scenes']):
         events.append(json.dumps([scene['start'], 'o', terminal_screen(screen_lines(data, scene, i))]))
         narration += [f'## {stamp(scene["start"])} — {scene["title"]}', '', scene['narration'], '',
                       f'Source: `{scene["source"]["file"]}` {scene["source"]["start"]}–{scene["source"]["end"]} seconds. Hold {scene["duration"]:.2f}s.', '']
-    (ROOT / f'{slug}.cast').write_text('\n'.join(events) + '\n')
-    (ROOT / f'{slug}.html').write_text(player(data))
-    (ROOT.parent / f'narration-{slug}.md').write_text('\n'.join(narration))
+    (out(slug, '.cast')).write_text('\n'.join(events) + '\n')
+    (out(slug, '.html')).write_text(player(data))
+    (out(slug, '.narration.md')).write_text('\n'.join(narration))
     if export_gif:
         subprocess.run(['agg', '--font-family', 'Menlo', '--font-size', '20', '--theme', 'github-dark',
                         '--idle-time-limit', '120', '--last-frame-duration', str(data['scenes'][-1]['duration']),
-                        '--no-loop', str(ROOT / f'{slug}.cast'), str(ROOT / f'{slug}.gif')], check=True)
+                        '--no-loop', str(out(slug, '.cast')), str(out(slug, '.gif'))], check=True)
     return data
 
 
 def check(slug, gif):
     data = load(slug)
-    events = [json.loads(s) for s in (ROOT / f'{slug}.cast').read_text().splitlines()]
+    events = [json.loads(s) for s in (out(slug, '.cast')).read_text().splitlines()]
     assert len(events) == len(data['scenes']) + 1
     assert events[0]['duration'] == data['duration']
-    page = (ROOT / f'{slug}.html').read_text()
+    page = (out(slug, '.html')).read_text()
     embedded = json.loads(re.search(r'const data=(.*);\nlet index=', page).group(1))
     assert embedded == data
-    narration = (ROOT.parent / f'narration-{slug}.md').read_text()
+    narration = (out(slug, '.narration.md')).read_text()
     for i, scene in enumerate(data['scenes']):
         assert events[i + 1] == [scene['start'], 'o', terminal_screen(screen_lines(data, scene, i))]
         assert scene['narration'] in narration
     result = {'slug': slug, 'chapters': len(data['scenes']), 'seconds': data['duration']}
     if gif:
         from PIL import Image
-        im = Image.open(ROOT / f'{slug}.gif')
+        im = Image.open(out(slug, '.gif'))
         assert im.info.get('loop', 1) != 0, 'Preview must not loop forever'
         delays = []
         for i in range(im.n_frames):
@@ -140,7 +152,7 @@ def check(slug, gif):
         # One scene per frame: verify each chapter's hold, not only total time.
         assert all(abs(d - s['duration']) < .02 for d, s in zip(delays, data['scenes'], strict=True))
         result.update(gif_seconds=round(sum(delays), 2), frames=im.n_frames,
-                      dimensions=list(im.size), bytes=(ROOT / f'{slug}.gif').stat().st_size)
+                      dimensions=list(im.size), bytes=(out(slug, '.gif')).stat().st_size)
     return result
 
 

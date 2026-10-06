@@ -1,6 +1,6 @@
-# Rebuilding the curated recordings
+# Rebuilding the MCP and CLI walkthrough players
 
-The four JSON files in `sources/` are the editable source of truth. Each chapter contains a title, short screen text, exact narration, and the original cast section used as evidence. Do not edit the generated HTML, cast, GIF or narration separately.
+The four JSON files in `_build/sources/` are the editable source of truth. The GUI walkthrough is separate and is not generated here. Each chapter contains a title, short screen text, exact narration, and the original cast section used as evidence. Do not edit the generated HTML, cast, GIF or narration separately.
 
 ## Requirements and commands
 
@@ -10,19 +10,19 @@ From the repository root:
 
 ```sh
 # Build text outputs only (Python standard library).
-python3 docs/recordings/build_recordings.py
+python3 docs/walkthroughs/_build/build.py
 
 # Build all outputs and validate the GIFs (agg + Pillow required).
-python3 docs/recordings/build_recordings.py --gif
+python3 docs/walkthroughs/_build/build.py --gif
 
 # Validate existing exports without changing them.
-python3 docs/recordings/build_recordings.py --check --gif
+python3 docs/walkthroughs/_build/build.py --check --gif
 
 # Rebuild one recording.
-python3 docs/recordings/build_recordings.py --gif --only mcp-install-and-debug
+python3 docs/walkthroughs/_build/build.py --gif --only mcp-install-and-debug
 
 # Check player logic and generated-file consistency.
-node docs/recordings/check_players.cjs
+node docs/walkthroughs/_build/check_players.cjs
 ```
 
 The builder invokes `agg` with Menlo at 20 pixels, an 88 × 24 terminal, the github-dark background, explicit high-contrast true-color text, no looping, and an idle limit of 120 seconds. The final hold equals the final chapter's duration. Font and renderer versions can change pixel output; timing and content are validated independently.
@@ -33,12 +33,12 @@ The builder checks source ranges, line width, screen height, scene order, cast t
 
 ## Files and boundaries
 
-- `sources/*.json`: four curated story definitions with source timestamps.
-- `build_recordings.py`: reproducible generation and consistency checks.
-- Four same-name `.cast`, `.gif`, `.html` outputs.
-- `../narration-<name>.md`: generated narration scripts.
-- `timings.json`: generated chapter/timing manifest.
-- `README.md`: editorial viewing index; update totals when narration changes.
-- `ARCHIVE.md`: original file links and historical caveats.
+- `_build/sources/*.json`: four story definitions, each chapter citing a time range of an original cast.
+- `_build/build.py`: reproducible generation and consistency checks.
+- `_build/check_players.cjs`: player-logic checks.
+- `_build/timings.json`: generated chapter and timing manifest.
+- Outputs, next to each track: `mcp/install-and-debug`, `mcp/extra-examples`, `mcp/ces-nfs-case-study` and `cli/overview`, each as `.html`, `.cast`, `.gif` and `.narration.md`.
+- The original casts that the source ranges cite are in `../../archive/recordings/`, unchanged.
+- `../README.md` is the editorial index; update its totals when narration changes.
 
-The builder only writes the four allow-listed curated names. It does not regenerate or overwrite any historical original, the existing GUI walkthrough, or historical narration. Source ranges refer to original cast time, not GIF time, because the old exports have differing final holds and idle handling.
+The builder only writes the four allow-listed names above. It does not regenerate or overwrite any archived original, the GUI walkthrough, or historical narration. Source ranges refer to original cast time, not GIF time, because the old exports have differing final holds and idle handling.

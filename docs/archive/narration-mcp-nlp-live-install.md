@@ -1,6 +1,6 @@
 # Narration Script — A Live Install, Driven in Plain Language
 
-> **Historical source material.** For the edited presentation, use the [curated recordings](recordings/README.md). Original recordings and narration are retained for provenance; see the [archive corrections](recordings/ARCHIVE.md) before reusing their examples.
+> **Historical source material.** For the edited presentation, use the [curated recordings](../walkthroughs/README.md). Original recordings and narration are retained for provenance; see the [archive corrections](README.md) before reusing their examples.
 
 Companion narration for
 [`recordings/mcp-nlp-live-install.cast`](recordings/mcp-nlp-live-install.cast),

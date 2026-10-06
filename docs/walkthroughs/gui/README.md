@@ -4,21 +4,21 @@ A guided tour of `Scale-GUInstall.html`, covering the settings and controls
 used to prepare and configure an IBM Storage Scale cluster. The screenshots
 come from a static demo server with no live backend attached, so no
 `spectrumscale` installation commands are running. For the terminal
-walkthrough, see [`techzone-walkthrough-clean.md`](techzone-walkthrough-clean.md).
+walkthrough, see [the CLI walkthrough](../cli/README.md).
 
 Each step below pairs a screenshot with the narration you'd use if
 talking over it live, the same pacing convention as the terminal
 `.cast` recordings.
 
 A self-paced recording of this sequence is at
-[`recordings/gui-walkthrough.html`](recordings/gui-walkthrough.html) —
+[`recordings/gui-walkthrough.html`](player.html) —
 see [Watching the recording](#watching-the-recording) below.
 
 ---
 
 ### 1. Dashboard
 
-![Dashboard](screenshots/gui-walkthrough/01-dashboard.jpg)
+![Dashboard](screenshots/01-dashboard.jpg)
 
 > "This is the toolkit’s dashboard — zero nodes, zero NSDs, zero
 > filesystems, and zero protocols configured. The workflow outlines Cluster
@@ -28,7 +28,7 @@ see [Watching the recording](#watching-the-recording) below.
 
 ### 2. Prepare Software
 
-![Prepare Software](screenshots/gui-walkthrough/02-prepare-software.jpg)
+![Prepare Software](screenshots/02-prepare-software.jpg)
 
 > "We begin by preparing the installer node. This page brings together the
 > software download, working directory, and prerequisite checks. Before
@@ -37,7 +37,7 @@ see [Watching the recording](#watching-the-recording) below.
 
 ### 3. Cluster Settings
 
-![Cluster Settings](screenshots/gui-walkthrough/03-cluster-settings.jpg)
+![Cluster Settings](screenshots/03-cluster-settings.jpg)
 
 > "Cluster-wide GPFS parameters, set once before anything else runs. Notice
 > the ephemeral port range is already defaulted to 60000 to 61000 — that's
@@ -47,7 +47,7 @@ see [Watching the recording](#watching-the-recording) below.
 
 ### 4. Node Configuration — seven nodes, roles assigned
 
-![Node Configuration](screenshots/gui-walkthrough/04-node-configuration.jpg)
+![Node Configuration](screenshots/04-node-configuration.jpg)
 
 > "Here are all seven nodes with their assigned roles: the two storage
 > servers as NSD, quorum, and manager nodes; the GUI node as quorum, admin,
@@ -56,7 +56,7 @@ see [Watching the recording](#watching-the-recording) below.
 
 ### 5. NSD Storage
 
-![NSD Storage](screenshots/gui-walkthrough/05-nsd-storage.jpg)
+![NSD Storage](screenshots/05-nsd-storage.jpg)
 
 > "Next, we define the shared disks, or NSDs. Scan Block Devices lets you
 > discover disks across the storage nodes before choosing which ones to use.
@@ -65,7 +65,7 @@ see [Watching the recording](#watching-the-recording) below.
 
 ### 6. Protocol Services — NFS, SMB, and S3 selected
 
-![Protocol Services](screenshots/gui-walkthrough/06-protocol-services.jpg)
+![Protocol Services](screenshots/06-protocol-services.jpg)
 
 > "Here we prepare NFS, SMB, and S3. The command preview shows all three
 > selected. We’ve entered the shared root filesystem name, network
@@ -75,7 +75,7 @@ see [Watching the recording](#watching-the-recording) below.
 
 ### 7. Install & Deploy — the install half
 
-![Install & Deploy](screenshots/gui-walkthrough/07-install-deploy.jpg)
+![Install & Deploy](screenshots/07-install-deploy.jpg)
 
 > "This page brings the installation stages together. Start with the
 > pre-check, run the installation, then use the post-check to verify the
@@ -84,7 +84,7 @@ see [Watching the recording](#watching-the-recording) below.
 
 ### 8. Post Configuration
 
-![Post Configuration](screenshots/gui-walkthrough/09-post-configuration.jpg)
+![Post Configuration](screenshots/09-post-configuration.jpg)
 
 > "Once the cluster is installed, this page lets you save performance
 > settings for its caches, memory, and throughput. Saving them does not
@@ -94,7 +94,7 @@ see [Watching the recording](#watching-the-recording) below.
 
 ### 9. Install & Deploy — the protocol deploy half
 
-![Deploy Protocol Services](screenshots/gui-walkthrough/08-deploy-protocols.jpg)
+![Deploy Protocol Services](screenshots/08-deploy-protocols.jpg)
 
 > "Back on Install and Deploy, these controls handle protocol deployment:
 > pre-check, Run Deploy, and post-check. Before a live deployment, make sure
@@ -117,13 +117,13 @@ Storage Scale GUI and is not demonstrated in these screenshots.
 
 ## Watching the recording
 
-[`recordings/gui-walkthrough.html`](recordings/gui-walkthrough.html)
+[`recordings/gui-walkthrough.html`](player.html)
 is a self-contained, narration-paced slideshow of the nine screenshots
 above (images embedded inline, no external files or server needed) —
 each slide holds for roughly as long as its narration takes to read,
 the same pacing convention as the terminal `.cast` recordings. The
 companion script is
-[`narration-gui-walkthrough.md`](narration-gui-walkthrough.md).
+[`narration-gui-walkthrough.md`](narration.md).
 
 Just open the file directly in a browser (double-click, or drag it in)
 and screen-record it while reading the narration aloud. Space bar
