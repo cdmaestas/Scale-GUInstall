@@ -9,7 +9,7 @@ The primary presentation is now an edited MCP installation followed chronologica
 | Recording | Measured GIF duration | Chapters | Player | GIF | Script |
 |---|---:|---:|---|---|---|
 | MCP install and diagnostic repair | **6:46.67** | 20 | [Open](../walkthroughs/mcp/install-and-debug.html) | [Preview](../walkthroughs/mcp/install-and-debug.gif) | [Narration](../walkthroughs/mcp/install-and-debug.narration.md) |
-| Clean terminal overview | **3:01.11** | 9 | [Open](../walkthroughs/cli/overview.html) | [Preview](../walkthroughs/cli/overview.gif) | [Narration](../walkthroughs/cli/overview.narration.md) |
+| Clean terminal overview | **3:01.11** | 9 | [Open](recordings/terminal-overview.html) | [Preview](recordings/terminal-overview.gif) | [Narration](narration-terminal-overview.md) |
 | Extra MCP examples | **0:47.55** | 4 | [Open](../walkthroughs/mcp/extra-examples.html) | [Preview](../walkthroughs/mcp/extra-examples.gif) | [Narration](../walkthroughs/mcp/extra-examples.narration.md) |
 | CES/NFS case study | **2:52.90** | 8 | [Open](../walkthroughs/mcp/ces-nfs-case-study.html) | [Preview](../walkthroughs/mcp/ces-nfs-case-study.gif) | [Narration](../walkthroughs/mcp/ces-nfs-case-study.narration.md) |
 

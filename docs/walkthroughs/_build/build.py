@@ -15,10 +15,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent           # docs/walkthroughs/_build (sources, timings)
 OUT = ROOT.parent                                 # docs/walkthroughs (gui/, mcp/, cli/)
 ARCHIVE = ROOT.parents[1] / 'archive' / 'recordings'  # original casts cited by each scene's source range
+CAPTURES = ROOT / 'captures'                      # verbatim excerpts of a real run's operation logs
 # source slug -> output stem under docs/walkthroughs/ (adds .cast, .html, .gif, .narration.md)
 SLUGS = {
     'mcp-install-and-debug': 'mcp/install-and-debug',
-    'terminal-overview': 'cli/overview',
+    'cli-run': 'cli/install-run',
     'mcp-extra-examples': 'mcp/extra-examples',
     'ces-nfs-case-study': 'mcp/ces-nfs-case-study',
 }
@@ -27,6 +28,63 @@ COLS, ROWS = 88, 24
 
 def out(slug, suffix):
     return OUT / f'{SLUGS[slug]}{suffix}'
+
+
+TOOLKIT = '/usr/lpp/mmfs/6.0.1.1/ansible-toolkit/'
+
+
+class Pre(str):
+    """A quoted table row: kept on one line (it must still fit the screen) instead of being re-wrapped."""
+_captures = {}
+
+
+def capture(name):
+    if name not in _captures:
+        _captures[name] = json.loads((CAPTURES / f'{name}.json').read_text())
+    return _captures[name]
+
+
+def display(line):
+    """Screen form of a logged line: drop the INFO marker and shorten the toolkit path; nothing else changes."""
+    line = re.sub(r'^\[ INFO\s+\] ?', '', line)
+    return line.replace(TOOLKIT, '.../').rstrip()
+
+
+def span(seconds):
+    m, sec = divmod(round(seconds, 1), 60)
+    return f'{int(m)}m {sec:04.1f}s' if m else f'{sec:.1f}s'
+
+
+def resolve(items, cap):
+    """Turn a scene's line list into screen strings. Plain strings are editorial; dict items are looked up in the
+    capture and the build fails if the logged text they name does not exist."""
+    out = []
+    for item in items:
+        if isinstance(item, str):
+            out.append(item)
+            continue
+        ph = cap['phases'][item.get('cmd') or item.get('out') or item.get('count') or item['duration']]
+        if 'cmd' in item:
+            out.append('$ ' + display(ph['commands'][item.get('n', 0)]))
+        elif 'duration' in item:
+            from datetime import datetime
+            a, b = (datetime.fromisoformat(ph[k]) for k in ('started_at', 'finished_at'))
+            out.append(f"{item.get('label', item['duration']):<21}{span((b - a).total_seconds())}")
+        elif 'count' in item:
+            hits = [line for line in ph['lines'] if item['has'] in line]
+            assert hits and all(item.get('all_have', '') in line for line in hits), item
+            out.append(item['text'].format(n=len(hits)))
+        elif 'from' in item:
+            lines = ph['lines']
+            first = next(i for i, line in enumerate(lines) if item['from'] in line)
+            last = next(i for i, line in enumerate(lines) if i >= first and item['to'] in line)
+            out.extend(Pre(display(line)) for line in lines[first:last + 1])
+        else:
+            hits = [line for line in ph['lines'] if item['has'] in line]
+            assert hits, ('not in capture', item)
+            out.append(display(hits[item.get('nth', 0)]))
+    assert all('\x1b' not in line for line in out)
+    return out
 
 
 def load(slug):
@@ -39,6 +97,11 @@ def load(slug):
         scene['start'] = round(elapsed, 2)
         elapsed += scene['duration']
         ref = scene['source']
+        if 'capture' in ref:
+            cap = capture(ref['capture'])
+            assert all(ph in cap['phases'] for ph in ref['phases']), ref
+            scene['lines'] = resolve(scene['lines'], cap)
+            continue
         source = ARCHIVE / ref['file']
         assert source.exists() and ref['start'] < ref['end']
         events = [json.loads(line) for line in source.read_text().splitlines()[1:]]
@@ -55,9 +118,12 @@ def screen_lines(data, scene, index):
     # Hard-wrap each independent source line; never retain another scene's scrollback.
     lines = [f'{index + 1:02d}/{len(data["scenes"]):02d}  {scene["title"]}', '']
     for line in scene['lines']:
+        if isinstance(line, Pre):
+            lines.append(str(line))
+            continue
         lines.extend(textwrap.wrap(line, width=COLS - 4, break_long_words=False,
                                    break_on_hyphens=False) or [''])
-    lines += ['', 'EDITED REENACTMENT | Silent preview; narration supplied separately.']
+    lines += ['', data.get('footer', 'EDITED REENACTMENT | Silent preview; narration supplied separately.')]
     assert all(len(line) <= COLS - 2 for line in lines), scene['title']
     assert len(lines) <= ROWS - 1, (scene['title'], len(lines))
     return lines
@@ -80,7 +146,7 @@ main{max-width:1180px;margin:auto;padding:24px}h1{font-size:26px;margin:0 0 12px
 pre{font:clamp(13px,1.65vw,20px)/1.55 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;color:#f3f4f6}
 #narration{max-width:1000px;font-size:19px;min-height:100px}button,select{font:inherit;padding:8px 14px;background:#243b53;color:white;border:1px solid #94a3b8;border-radius:5px}button:disabled{opacity:.4}nav{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0}progress{width:100%;height:12px}#position,.note,summary{color:#cbd5e1;font-size:15px}a{color:#8be9fd}#chapters{max-width:100%}
 </style></head><body><main><h1>__TITLE__</h1>
-<p class="note">Edited reenactment. Silent playback; read the synchronized narration aloud. Starts paused.</p>
+<p class="note">__NOTE__</p>
 <nav><button id="prev">Previous</button><button id="play">Play</button><button id="next">Next</button><button id="restart">Restart</button><label>Chapter <select id="chapters"></select></label><label>Pace <select id="speed"><option value="0.85">Slower</option><option value="1" selected>Normal</option><option value="1.15">Faster</option></select></label></nav>
 <div id="position"></div><progress id="progress" max="1" value="0"></progress>
 <section id="screen"><h2 id="heading"></h2><pre id="body"></pre></section>
@@ -101,7 +167,9 @@ document.addEventListener('keydown',e=>{if(['SELECT','BUTTON'].includes(document
 function tick(t){if(last!==null&&playing){elapsed+=(t-last)/1000*Number(el('speed').value);if(elapsed>=data.scenes[index].duration){if(index<data.scenes.length-1){go(index+1)}else{elapsed=data.scenes[index].duration;playing=false}}update()}last=t;requestAnimationFrame(tick)}
 render();requestAnimationFrame(tick);
 </script></body></html>'''
-    return template.replace('__TITLE__', html.escape(data['title'])).replace('__DATA__', payload)
+    note = data.get('note', 'Edited reenactment. Silent playback; read the synchronized narration aloud. Starts paused.')
+    return (template.replace('__TITLE__', html.escape(data['title'])).replace('__NOTE__', html.escape(note))
+            .replace('__DATA__', payload))
 
 
 def build(slug, export_gif):
@@ -115,7 +183,9 @@ def build(slug, export_gif):
     for i, scene in enumerate(data['scenes']):
         events.append(json.dumps([scene['start'], 'o', terminal_screen(screen_lines(data, scene, i))]))
         narration += [f'## {stamp(scene["start"])} — {scene["title"]}', '', scene['narration'], '',
-                      f'Source: `{scene["source"]["file"]}` {scene["source"]["start"]}–{scene["source"]["end"]} seconds. Hold {scene["duration"]:.2f}s.', '']
+                      (f'Source: capture `{scene["source"]["capture"]}`, phases {", ".join(scene["source"]["phases"])}. Hold {scene["duration"]:.2f}s.'
+                       if 'capture' in scene['source'] else
+                       f'Source: `{scene["source"]["file"]}` {scene["source"]["start"]}–{scene["source"]["end"]} seconds. Hold {scene["duration"]:.2f}s.'), '']
     (out(slug, '.cast')).write_text('\n'.join(events) + '\n')
     (out(slug, '.html')).write_text(player(data))
     (out(slug, '.narration.md')).write_text('\n'.join(narration))

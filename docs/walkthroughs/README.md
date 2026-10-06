@@ -6,7 +6,7 @@ Three ways to drive the same install, plus the procedure they all follow.
 |---|---|---|---|
 | **[GUI](gui/README.md)** | The web interface, step by step: Prepare Software through Install & Deploy. A static tour of the controls. | [Player](gui/player.html) · 3:38 | [Page](gui/README.md) · [Narration](gui/narration.md) |
 | **[MCP](mcp/README.md)** | Driving the install in plain language through the `scale-guinstall` MCP tools, then fixing a problem the same way. | [Player](mcp/install-and-debug.html) · [GIF](mcp/install-and-debug.gif) · 6:47 | [Page](mcp/README.md) · [Narration](mcp/install-and-debug.narration.md) |
-| **[CLI](cli/README.md)** | The raw `spectrumscale` command sequence on the installer node, in order. | [Player](cli/overview.html) · [GIF](cli/overview.gif) · 3:01 | [Page](cli/README.md) · [Narration](cli/overview.narration.md) |
+| **[CLI](cli/README.md)** | The `spectrumscale` commands of one real run, in order, with the toolkit's own output. | [Player](cli/install-run.html) · [GIF](cli/install-run.gif) · 6:27 | [Page](cli/README.md) · [Narration](cli/install-run.narration.md) |
 
 The step-by-step procedure, with every gotcha found on real environments, is the **[TechZone runbook](../techzone-runbook.md)**. The walkthroughs show the shape of the work; the runbook is what to follow.
 
@@ -20,7 +20,7 @@ New chapter players are paced at 135 words per minute plus two seconds per chapt
 
 - **They are edited summaries, not footage.** Each chapter is a clean screen of text regenerated from a source file, not a cut of scrolling terminal output. Where an operator request was reconstructed rather than quoted, or a bug has since been fixed, the chapter says so.
 - **The GUI tour is static.** Its screenshots come from a demo with no backend attached, so it shows the controls, not a live installation.
-- **The CLI overview is an instructional reenactment.** Prerequisites are assumed, and it is not a literal run.
+- **The CLI walkthrough is built from a real run.** Its commands and output lines are quoted from the operation logs of the 2026-10-05 installation, and the build fails if a quoted line is missing from the capture. Per-line timing was not recorded, so the pacing is generated.
 - **Provenance** for the MCP material is in the [capture log](../archive/nlp-capture-log.md).
 
 ## Not captured yet
@@ -28,7 +28,7 @@ New chapter players are paced at 135 words per minute plus two seconds per chapt
 These need a fresh TechZone environment, because the previous one is gone:
 
 - A GUI tour against a real cluster (7 nodes, 6 NSDs, protocols, install and deploy previews) instead of the empty-state demo.
-- Real recorded `spectrumscale`, `mmgetstate`, `mmces` and `mmhealth` output for the CLI walkthrough.
+- A real-time recording (`asciinema`) of the same commands, if timing as well as content should be real.
 - An MCP walkthrough built from a single clean run, with no reconstructed requests.
 
 ## More

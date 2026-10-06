@@ -4,9 +4,10 @@ These originals remain unchanged for provenance and existing links. Start with t
 
 | Historical original | Cast | GIF | Replacement / context |
 |---|---|---|---|
-| Original fast runbook | [Source](recordings/techzone-runbook-walkthrough.cast) | [1:10](recordings/techzone-runbook-walkthrough.gif) | [Terminal overview](../walkthroughs/cli/overview.html); original failed run, compressed pacing |
+| Original fast runbook | [Source](recordings/techzone-runbook-walkthrough.cast) | [1:10](recordings/techzone-runbook-walkthrough.gif) | [CLI walkthrough](../walkthroughs/cli/install-run.html); original failed run, compressed pacing |
 | CES/NFS investigation | [Source](recordings/techzone-runbook-walkthrough-2.cast) | [5:35](recordings/techzone-runbook-walkthrough-2.gif) | [Condensed case](../walkthroughs/mcp/ces-nfs-case-study.html) |
-| Clean instructional runbook | [Source](recordings/techzone-runbook-walkthrough-clean.cast) | [3:34](recordings/techzone-runbook-walkthrough-clean.gif) | [Updated overview](../walkthroughs/cli/overview.html) |
+| Clean instructional runbook | [Source](recordings/techzone-runbook-walkthrough-clean.cast) | [3:34](recordings/techzone-runbook-walkthrough-clean.gif) | [CLI walkthrough](../walkthroughs/cli/install-run.html) |
+| Terminal overview (edited reenactment, superseded) | [Source](recordings/terminal-overview.cast) | [3:01](recordings/terminal-overview.gif) | [CLI walkthrough](../walkthroughs/cli/install-run.html); built from a real run instead; [player](recordings/terminal-overview.html), [narration](narration-terminal-overview.md) |
 | Six MCP examples | [Source](recordings/mcp-nlp-walkthrough.cast) | [2:23](recordings/mcp-nlp-walkthrough.gif) | [Unique extra examples](../walkthroughs/mcp/extra-examples.html) |
 | Full MCP installation | [Source](recordings/mcp-nlp-live-install.cast) | [5:04](recordings/mcp-nlp-live-install.gif) | [Combined install and debugging](../walkthroughs/mcp/install-and-debug.html) |
 | MCP diagnostic repair | [Source](recordings/mcp-nlp-troubleshooting.cast) | [3:16](recordings/mcp-nlp-troubleshooting.gif) | [Combined install and debugging](../walkthroughs/mcp/install-and-debug.html) |

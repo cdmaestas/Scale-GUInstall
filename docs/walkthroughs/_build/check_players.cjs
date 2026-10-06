@@ -4,7 +4,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 // Players live next to their track (docs/walkthroughs/<track>/<name>.html).
-const players = ['mcp/install-and-debug','cli/overview','mcp/extra-examples','mcp/ces-nfs-case-study'];
+const players = ['mcp/install-and-debug','cli/install-run','mcp/extra-examples','mcp/ces-nfs-case-study'];
 for (const slug of players) {
   const file = fs.readFileSync(path.join(__dirname, '..', slug+'.html'), 'utf8');
   const js = file.match(/<script>([\s\S]*?)<\/script>/)[1];

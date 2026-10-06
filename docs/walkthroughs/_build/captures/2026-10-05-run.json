@@ -1,0 +1,483 @@
+{
+ "run": "2026-10-05 TechZone run",
+ "environment": "IBM TechZone VSI environment: installer = bastion 10.249.129.127; seven cluster nodes (2 NSD/manager/quorum, 1 GUI/quorum/admin, 2 protocol/manager, 2 clients); RHEL 9; IBM Storage Scale Developer 6.0.1.1. The environment no longer exists.",
+ "provenance": "Commands are the lines the backend echoed for each operation; output lines are verbatim from the operation log, with terminal colour codes removed. Install and deploy are headline lines extracted in order from the saved logs; other phases are copied from the output returned during the run. Per-line timestamps were not recorded, so playback pacing is generated.",
+ "toolkit_path": "/usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale",
+ "phases": {
+  "setup": {
+   "commands": [
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale setup -s 10.249.129.127"
+   ],
+   "started_at": "2026-10-05T20:17:24.148587+00:00",
+   "finished_at": "2026-10-05T20:17:26.924943+00:00",
+   "lines": [
+    "[ INFO  ] Installing prerequisites for install node",
+    "[ INFO  ] Found existing Ansible installation on system.",
+    "[ INFO  ] Install Toolkit setup type is set to IBM Storage Scale (default). If an ESS is in the cluster, run this command to set ESS mode: ./spectrumscale setup -s server_ip -st ess",
+    "[ INFO  ] Your ansible controller node has been configured to use the IP 10.249.129.127 to communicate with other nodes.",
+    "[ INFO  ] Port 10080 will be used for package distribution.",
+    "[ INFO  ] SUCCESS",
+    "[ INFO  ] Tip : Designate protocol, nsd and admin nodes in your environment to use during install:./spectrumscale -v node add <node> -p  -a -n"
+   ],
+   "note": "The backend echoes the first line after the command; terminal colour codes removed from the \"Found existing Ansible\" line."
+  },
+  "node-config": {
+   "commands": [
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale node delete scale-server1",
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale node add scale-client1"
+   ],
+   "started_at": "2026-10-05T20:17:33.927301+00:00",
+   "finished_at": null,
+   "lines": [
+    "[ FATAL ] Node scale-server1-rqhtc64k does not exist in the current configuration. Check environment with 'spectrumscale node list'.",
+    "[ WARN  ] Found a mis-ordered line in the /etc/hosts file on scale-server1-rqhtc64k which is incorrectly formatted. This may affect initial cluster creation. In case of failure during initial cluster creation, please format the entries in the /etc/hosts as '<IP> <FQDN> <ALIAS>') and retry",
+    "[ INFO  ] Adding node scale-server1-rqhtc64k as a GPFS node.",
+    "[ INFO  ] Adding node scale-server1-rqhtc64k as a quorum node.",
+    "[ INFO  ] Adding node scale-server1-rqhtc64k as a manager node.",
+    "[ INFO  ] Adding node scale-server1-rqhtc64k as an NSD server.",
+    "[ INFO  ] Configuration updated.",
+    "[ INFO  ] Setting scale-gui1-rqhtc64k as an admin node.",
+    "[ INFO  ] Setting scale-gui1-rqhtc64k as a GUI server.",
+    "[ INFO  ] Setting scale-proto1-rqhtc64k as a protocol node.",
+    "[ INFO  ] Adding node scale-proto1-rqhtc64k as a manager node."
+   ],
+   "note": "One node delete and add per node (seven nodes). Only the two commands above were observed echoed; role flags for the others are not shown. Finish time was not captured."
+  },
+  "node-list": {
+   "commands": [
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale node list"
+   ],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "[ INFO  ] List of nodes in current configuration:",
+    "[ INFO  ] [Installer Node]",
+    "[ INFO  ] 10.249.129.127",
+    "[ INFO  ]  ",
+    "[ INFO  ] [Cluster Details]",
+    "[ INFO  ] No cluster name configured",
+    "[ INFO  ] Setup Type: IBM Storage Scale",
+    "[ INFO  ]  ",
+    "[ INFO  ] [Protocols]",
+    "[ INFO  ] S3     : Enabled",
+    "[ INFO  ] SMB    : Enabled",
+    "[ INFO  ] NFS    : Enabled",
+    "[ INFO  ] HDFS   : Disabled",
+    "[ INFO  ]  ",
+    "[ INFO  ] [Extended Features]",
+    "[ INFO  ] File Audit logging     : Disabled",
+    "[ INFO  ] Management GUI         : Enabled",
+    "[ INFO  ] Performance Monitoring : Enabled",
+    "[ INFO  ] Callhome               : Disabled",
+    "[ INFO  ]  ",
+    "[ INFO  ] GPFS                   Admin  Quorum  Manager   NSD   Protocol   GUI     OS   Arch ",
+    "[ INFO  ] Node                    Node   Node     Node   Server   Node    Server             ",
+    "[ INFO  ] scale-client1-rqhtc64k                                                 rhel9  x86_64",
+    "[ INFO  ] scale-client2-rqhtc64k                                                 rhel9  x86_64",
+    "[ INFO  ] scale-gui1-rqhtc64k      X       X                                X    rhel9  x86_64",
+    "[ INFO  ] scale-proto1-rqhtc64k                    X                X            rhel9  x86_64",
+    "[ INFO  ] scale-proto2-rqhtc64k                    X                X            rhel9  x86_64",
+    "[ INFO  ] scale-server1-rqhtc64k           X       X       X                     rhel9  x86_64",
+    "[ INFO  ] scale-server2-rqhtc64k           X       X       X                     rhel9  x86_64",
+    "[ INFO  ]  ",
+    "[ INFO  ] [Export IP address]",
+    "[ INFO  ] 10.249.128.200 (pool)",
+    "[ INFO  ] 10.249.128.201 (pool)"
+   ],
+   "note": "Read after the protocols were applied, so the Protocols block shows them enabled."
+  },
+  "nsd-add": {
+   "commands": [
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale nsd add -p scale-server1 -u dataAndMetadata -fg 1 -fs cesSharedRoot /dev/vdd",
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale nsd add -p scale-server2 -u dataAndMetadata -fg 2 -fs cesSharedRoot /dev/vdd",
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale nsd add -p scale-server2 -u dataOnly -fg 2 -po data -fs fs1 /dev/vdf"
+   ],
+   "started_at": "2026-10-05T20:18:22.877092+00:00",
+   "finished_at": "2026-10-05T20:18:32.252199+00:00",
+   "lines": [
+    "[ INFO  ] The installer will create the new file system cesSharedRoot if it does not exist.",
+    "[ INFO  ] Adding NSD nsd1 on scale-server1-rqhtc64k using device /dev/vdd.",
+    "[ INFO  ] The installer will create the new file system fs1 if it does not exist.",
+    "[ INFO  ] Adding NSD nsd2 on scale-server1-rqhtc64k using device /dev/vde.",
+    "[ INFO  ] Adding NSD nsd3 on scale-server1-rqhtc64k using device /dev/vdf.",
+    "[ INFO  ] Adding NSD nsd4 on scale-server2-rqhtc64k using device /dev/vdd.",
+    "[ INFO  ] Adding NSD nsd5 on scale-server2-rqhtc64k using device /dev/vde.",
+    "[ INFO  ] Adding NSD nsd6 on scale-server2-rqhtc64k using device /dev/vdf."
+   ],
+   "note": "Six nsd add calls; only three were observed echoed (the others were not)."
+  },
+  "nsd-list": {
+   "commands": [
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale nsd list"
+   ],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "[ INFO  ] Name FS            Size(GB) Usage           FG Pool    Device   Servers",
+    "[ INFO  ] nsd1 cesSharedRoot 100.0    dataAndMetadata 1  system  /dev/vdd scale-server1-rqhtc64k",
+    "[ INFO  ] nsd2 fs1           100.0    dataAndMetadata 1  Default /dev/vde scale-server1-rqhtc64k",
+    "[ INFO  ] nsd3 fs1           100.0    dataOnly        1  data    /dev/vdf scale-server1-rqhtc64k",
+    "[ INFO  ] nsd4 cesSharedRoot 100.0    dataAndMetadata 2  Default /dev/vdd scale-server2-rqhtc64k",
+    "[ INFO  ] nsd5 fs1           100.0    dataAndMetadata 2  Default /dev/vde scale-server2-rqhtc64k",
+    "[ INFO  ] nsd6 fs1           100.0    dataOnly        2  data    /dev/vdf scale-server2-rqhtc64k"
+   ]
+  },
+  "callhome": {
+   "commands": [
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale callhome disable"
+   ],
+   "started_at": "2026-10-05T20:18:45.520744+00:00",
+   "finished_at": "2026-10-05T20:18:46.212724+00:00",
+   "lines": [
+    "[ INFO  ] Disabling the callhome.",
+    "[ INFO  ] Configuration updated."
+   ]
+  },
+  "cluster-config": {
+   "commands": [
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale config gpfs --ephemeral_port_range 60000-61000"
+   ],
+   "started_at": "2026-10-05T20:18:52.454133+00:00",
+   "finished_at": "2026-10-05T20:18:55.900675+00:00",
+   "lines": [
+    "[ INFO  ] Setting ephemeral_port_range to 60000-61000",
+    "[ INFO  ] Callhome is already Disabled.",
+    "[ INFO  ] Setting perfmon to on",
+    "[ INFO  ] Disabling file audit logging in the cluster configuration file.",
+    "[ INFO  ] Disabling grafana bridge in the cluster configuration file."
+   ]
+  },
+  "protocols": {
+   "commands": [
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale config protocols -f cesSharedRoot -m /ibm/cesSharedRoot -i eth1 -e 10.249.128.200,10.249.128.201",
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale enable nfs smb s3"
+   ],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "[ INFO ] Setting export_ip_pool to ['10.249.128.200', '10.249.128.201']",
+    "[ INFO ] Setting filesystem to cesSharedRoot",
+    "[ INFO ] Setting mountpoint to /ibm/cesSharedRoot",
+    "[ WARN ] CIDR value has not been passed with Export ces ip's, Installer will continue to work on Legacy mode.",
+    "[ INFO ] Setting interface to eth1",
+    "[ INFO ] Tip :Enable NFS, S3, SMB or HDFS protocols as appropriate:./spectrumscale enable nfs|s3|smb|hdfs",
+    "[OK] Protocol configuration set.",
+    "[ INFO ] Enabling NFS on all protocol nodes.",
+    "[ INFO ] Enabling SMB on all protocol nodes.",
+    "[ INFO ] Enabling S3 on all protocol nodes.",
+    "[OK] Enabled: nfs, smb, s3."
+   ],
+   "note": "Run from the GUI's Apply Protocols panel; the commands and output are copied from its terminal pane (single space inside the [ INFO ] marker)."
+  },
+  "precheck-install": {
+   "commands": [
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale install --precheck"
+   ],
+   "started_at": "2026-10-05T20:26:54.399508+00:00",
+   "finished_at": "2026-10-05T20:28:19.238201+00:00",
+   "lines": [
+    "[ INFO  ] Validating configuration",
+    "[ WARN  ] Ensure that base OS repositories are configured and enabled so that package dependencies can be satisfied during installation.",
+    "[ WARN  ] NSDs on the node scale-server1-rqhtc64k may not be load-balanced",
+    "[ WARN  ] NSDs on the node scale-server2-rqhtc64k may not be load-balanced",
+    "[ WARN  ] Only one GUI server specified. The Graphical User Interface will not be highly available.",
+    "[ INFO  ] Install toolkit will not configure file audit logging as it has been disabled.",
+    "[ INFO  ] Skipping license validation as no existing GPFS cluster detected.",
+    "[ INFO  ] No cluster name specified. Installer will automatically setting cluster name as 'scale-gui1-rqhtc64k'.",
+    "[ INFO  ] GPFS precheck OK",
+    "[ WARN  ] The NSD nsd1 only has one server configured. This may affect the ability to run concurrent maintenance on this cluster.",
+    "[ INFO  ] Network check from admin node scale-gui1-rqhtc64k to all other nodes in the cluster passed",
+    "[ INFO  ] Network check from protocol node scale-proto1-rqhtc64k to all other protocol nodes in the cluster passed",
+    "[ INFO  ] scale-server1-rqhtc64k     : ok=10   changed=0    unreachable=0    failed=0    skipped=30   rescued=0    ignored=0",
+    "[ INFO  ] Pre-check successful for install.",
+    "[ INFO  ] Tip : ./spectrumscale install"
+   ]
+  },
+  "install": {
+   "commands": [
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale install"
+   ],
+   "started_at": "2026-10-05T21:21:15.812579+00:00",
+   "finished_at": "2026-10-05T21:47:45.047256+00:00",
+   "lines": [
+    "[ INFO  ] Checking cluster defnition json file inventory is ansible/vars/scale_clusterdefinition.json",
+    "[ INFO  ] Logging to file: /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/logs/INSTALL-05-10-2026_21:21:18.log",
+    "[ INFO  ] Validating configuration",
+    "[ WARN  ] Ensure that base OS repositories are configured and enabled so that package dependencies can be satisfied during installation.",
+    "[ WARN  ] NSDs on the node scale-server1-rqhtc64k may not be load-balanced",
+    "[ WARN  ] NSDs on the node scale-server2-rqhtc64k may not be load-balanced",
+    "[ WARN  ] NSDs may not be load-balanced between servers.  In order to balance NSDs, set some",
+    "[ WARN  ] NSDs to different primary NSD servers.  Use './spectrumscale nsd servers' command to shift servers on other servers",
+    "[ WARN  ] to balance NSDs between servers.",
+    "[ WARN  ] Only one GUI server specified. The Graphical User Interface will not be highly available.",
+    "[ INFO  ] Install toolkit will not configure file audit logging as it has been disabled.",
+    "[ INFO  ] Running pre-install checks",
+    "[ INFO  ] Running environment checks",
+    "[ INFO  ] Skipping license validation as no existing GPFS cluster detected.",
+    "[ INFO  ] Checking pre-requisites for portability layer.",
+    "[ INFO  ] GPFS precheck OK",
+    "[ WARN  ] The NSD nsd1 only has one server configured. This may affect the ability to run concurrent maintenance on this cluster.",
+    "[ WARN  ] The NSD nsd2 only has one server configured. This may affect the ability to run concurrent maintenance on this cluster.",
+    "[ WARN  ] The NSD nsd3 only has one server configured. This may affect the ability to run concurrent maintenance on this cluster.",
+    "[ WARN  ] The NSD nsd4 only has one server configured. This may affect the ability to run concurrent maintenance on this cluster.",
+    "[ WARN  ] The NSD nsd5 only has one server configured. This may affect the ability to run concurrent maintenance on this cluster.",
+    "[ WARN  ] The NSD nsd6 only has one server configured. This may affect the ability to run concurrent maintenance on this cluster.",
+    "[ INFO  ] Running environment checks for Performance Monitoring",
+    "[ INFO  ] Running environment checks for file  Audit logging",
+    "[ INFO  ] Network check from admin node scale-gui1-rqhtc64k to all other nodes in the cluster passed",
+    "[ INFO  ] Network check from protocol node scale-proto2-rqhtc64k to all other nodes in the cluster passed",
+    "[ INFO  ] Network check from protocol node scale-proto1-rqhtc64k to all other nodes in the cluster passed",
+    "[ INFO  ] Network check from protocol node scale-proto2-rqhtc64k to all other protocol nodes in the cluster passed",
+    "[ INFO  ] Network check from protocol node scale-proto1-rqhtc64k to all other protocol nodes in the cluster passed",
+    "[ INFO  ] The install toolkit will not configure call home as it is disabled. To enable call home, use the following CLI command: ./spectrumscale callhome enable",
+    "[ INFO  ] Preparing nodes for install",
+    "[ INFO  ] the implicit localhost does not match 'all'",
+    "[ INFO  ] RUNNING HANDLER [ibm.spectrum_scale.core_install : yum-clean-metadata] *********",
+    "[ INFO  ] TASK [ibm.spectrum_scale.core_configure : cluster | Create new cluster] ********",
+    "[ INFO  ] RUNNING HANDLER [ibm.spectrum_scale.core_configure : accept-server-licenses] ***",
+    "[ INFO  ] RUNNING HANDLER [ibm.spectrum_scale.core_configure : accept-client-licenses] ***",
+    "[ INFO  ] FAILED - RETRYING: [scale-server1-rqhtc64k]: wait-daemon-active (10 retries left).",
+    "[ INFO  ] FAILED - RETRYING: [scale-server1-rqhtc64k]: wait-daemon-active (9 retries left).",
+    "[ INFO  ] FAILED - RETRYING: [scale-server1-rqhtc64k]: wait-daemon-active (8 retries left).",
+    "[ INFO  ] FAILED - RETRYING: [scale-server1-rqhtc64k]: wait-daemon-active (7 retries left).",
+    "[ INFO  ] RUNNING HANDLER [ibm.spectrum_scale.core_configure : wait-daemon-active] *******",
+    "[ INFO  ] TASK [ibm.spectrum_scale.core_configure : storage | Create new NSDs] ***********",
+    "[ INFO  ] TASK [ibm.spectrum_scale.core_configure : storage | Create new filesystem(s)] ***",
+    "[ INFO  ] RUNNING HANDLER [ibm.spectrum_scale.core_common : yum-clean-metadata] **********",
+    "[ INFO  ] RUNNING HANDLER [ibm.spectrum_scale.core_common : yum-clean-metadata] **********",
+    "[ INFO  ] RUNNING HANDLER [ibm.spectrum_scale.core_common : yum-clean-metadata] **********",
+    "[ INFO  ] FAILED - RETRYING: [scale-gui1-rqhtc64k]: Wait until gpfsgui is up and running (20 retries left).",
+    "[ INFO  ] FAILED - RETRYING: [scale-gui1-rqhtc64k]: Wait until gpfsgui is up and running (19 retries left).",
+    "[ INFO  ] RUNNING HANDLER [ibm.spectrum_scale.core_common : yum-clean-metadata] **********",
+    "[ INFO  ] PLAY RECAP *********************************************************************",
+    "[ INFO  ] localhost                  : ok=3    changed=1    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0",
+    "[ INFO  ] scale-client1-rqhtc64k     : ok=80   changed=15   unreachable=0    failed=0    skipped=175  rescued=0    ignored=0",
+    "[ INFO  ] scale-client2-rqhtc64k     : ok=80   changed=15   unreachable=0    failed=0    skipped=175  rescued=0    ignored=0",
+    "[ INFO  ] scale-gui1-rqhtc64k        : ok=90   changed=18   unreachable=0    failed=0    skipped=165  rescued=0    ignored=0",
+    "[ INFO  ] scale-proto1-rqhtc64k      : ok=80   changed=15   unreachable=0    failed=0    skipped=175  rescued=0    ignored=0",
+    "[ INFO  ] scale-proto2-rqhtc64k      : ok=80   changed=15   unreachable=0    failed=0    skipped=175  rescued=0    ignored=0",
+    "[ INFO  ] scale-server1-rqhtc64k     : ok=160  changed=38   unreachable=0    failed=0    skipped=362  rescued=0    ignored=0",
+    "[ INFO  ] scale-server2-rqhtc64k     : ok=80   changed=15   unreachable=0    failed=0    skipped=176  rescued=0    ignored=0",
+    "[ INFO  ] Grafana node is scale-server1-rqhtc64k",
+    "[ INFO  ] Destroying repository...",
+    "[ INFO  ] Checking for a successful install",
+    "[ INFO  ] Checking state of GPFS",
+    "[ INFO  ] 5 server licenses and 2 client licenses enabled on the cluster. Ensure enough licenses are owned for this configuration.",
+    "[ INFO  ] Checking state of GPFS on all nodes",
+    "[ INFO  ] GPFS active on all nodes",
+    "[ INFO  ] GPFS ACTIVE",
+    "[ INFO  ] Checking state of NSDs",
+    "[ INFO  ] NSDs ACTIVE",
+    "[ INFO  ] Checking state of Performance Monitoring",
+    "[ INFO  ] Running Performance Monitoring post-install checks",
+    "[ INFO  ] pmcollector running on all nodes",
+    "[ INFO  ] pmsensors running on all nodes",
+    "[ INFO  ] Performance Monitoring ACTIVE",
+    "[ INFO  ] Checking state of GUI",
+    "[ INFO  ] Running Graphical User Interface  post-install checks",
+    "[ INFO  ] Graphical User Interface running on all GUI servers",
+    "[ INFO  ] Enter one of the following addresses into a web browser to access the Graphical User Interface: scale-gui1-rqhtc64k",
+    "[ INFO  ] GUI ACTIVE",
+    "[ INFO  ] SUCCESS",
+    "[ INFO  ] All services running",
+    "[ INFO  ] StanzaFile and NodeDesc file for NSD, filesystem, and cluster setup have been saved to /usr/lpp/mmfs folder on node: scale-gui1-rqhtc64k",
+    "[ INFO  ] Installation successful. 7 GPFS nodes active in cluster scale-gui1-rqhtc64k. Completed in 26 minutes 27 seconds.",
+    "[ INFO  ] Tip :If all node designations and any required protocol configurations are complete, proceed to check the deploy configuration:./spectrumscale deploy --precheck"
+   ],
+   "note": "Headline lines only, extracted in order from the saved operation log (1,233 lines); Ansible per-task and per-host lines omitted except the cluster, NSD and filesystem creation tasks and the recap."
+  },
+  "postcheck-install": {
+   "commands": [
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale install --postcheck"
+   ],
+   "started_at": "2026-10-05T21:48:09.025980+00:00",
+   "finished_at": "2026-10-05T21:48:21.773188+00:00",
+   "lines": [
+    "[ INFO  ] 5 server licenses and 2 client licenses enabled on the cluster. Ensure enough licenses are owned for this configuration.",
+    "[ INFO  ] GPFS active on all nodes",
+    "[ INFO  ] GPFS ACTIVE",
+    "[ INFO  ] NSDs ACTIVE",
+    "[ INFO  ] pmcollector running on all nodes",
+    "[ INFO  ] pmsensors running on all nodes",
+    "[ INFO  ] Performance Monitoring ACTIVE",
+    "[ INFO  ] Graphical User Interface running on all GUI servers",
+    "[ INFO  ] GUI ACTIVE",
+    "[ INFO  ] SUCCESS",
+    "[ INFO  ] All services running"
+   ]
+  },
+  "precheck-deploy": {
+   "commands": [
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale deploy --precheck"
+   ],
+   "started_at": "2026-10-05T22:05:11.770200+00:00",
+   "finished_at": "2026-10-05T22:09:06.937648+00:00",
+   "lines": [
+    "[ INFO  ] NSDs are in a valid state",
+    "[ INFO  ] protocol precheck OK",
+    "[ INFO  ] S3 precheck OK",
+    "[ INFO  ] SMB precheck OK",
+    "[ INFO  ] NFS precheck OK",
+    "[ INFO  ] Network check from protocol node scale-proto1-rqhtc64k to all other protocol nodes in the cluster passed",
+    "[ INFO  ] scale-proto1-rqhtc64k      : ok=10   changed=0    unreachable=0    failed=0    skipped=22   rescued=0    ignored=0",
+    "[ INFO  ] Pre-check successful for deploy.",
+    "[ INFO  ] Tip : ./spectrumscale deploy"
+   ]
+  },
+  "deploy": {
+   "commands": [
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale deploy"
+   ],
+   "started_at": "2026-10-05T22:09:45.137963+00:00",
+   "finished_at": "2026-10-05T22:27:13.343047+00:00",
+   "lines": [
+    "[ INFO  ] Logging to file: /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/logs/DEPLOY-05-10-2026_22:09:49.log",
+    "[ INFO  ] Validating configuration",
+    "[ WARN  ] Ensure that base OS repositories are configured and enabled so that package dependencies can be satisfied during installation.",
+    "[ WARN  ] Only one GUI server specified. The Graphical User Interface will not be highly available.",
+    "[ INFO  ] Install toolkit will not configure file audit logging as it has been disabled.",
+    "[ INFO  ] Running pre-install checks",
+    "[ INFO  ] NSDs are in a valid state",
+    "[ INFO  ] Running environment checks for protocols",
+    "[ INFO  ] Checking state of GPFS on all nodes",
+    "[ INFO  ] GPFS active on all nodes",
+    "[ INFO  ] Checking state of GPFS on all nodes",
+    "[ INFO  ] GPFS active on all nodes",
+    "[ INFO  ] protocol precheck OK",
+    "[ INFO  ] Running environment checks for S3",
+    "[ INFO  ] S3 precheck OK",
+    "[ INFO  ] Running environment checks for SMB",
+    "[ INFO  ] SMB precheck OK",
+    "[ INFO  ] Running environment checks for NFS",
+    "[ INFO  ] NFS precheck OK",
+    "[ INFO  ] Running environment checks for Performance Monitoring",
+    "[ INFO  ] Running environment checks for file  Audit logging",
+    "[ INFO  ] Network check from admin node scale-gui1-rqhtc64k to all other nodes in the cluster passed",
+    "[ INFO  ] Network check from protocol node scale-proto2-rqhtc64k to all other nodes in the cluster passed",
+    "[ INFO  ] Network check from protocol node scale-proto1-rqhtc64k to all other nodes in the cluster passed",
+    "[ INFO  ] Network check from protocol node scale-proto2-rqhtc64k to all other protocol nodes in the cluster passed",
+    "[ INFO  ] Network check from protocol node scale-proto1-rqhtc64k to all other protocol nodes in the cluster passed",
+    "[ INFO  ] The install toolkit will not configure call home as it is disabled. To enable call home, use the following CLI command: ./spectrumscale callhome enable",
+    "[ INFO  ] Preparing nodes for install",
+    "[ INFO  ] the implicit localhost does not match 'all'",
+    "[ INFO  ] ASYNC FAILED on scale-server1-rqhtc64k: jid=j57012116952.106400",
+    "[ INFO  ] RUNNING HANDLER [ibm.spectrum_scale.core_common : yum-clean-metadata] **********",
+    "[ INFO  ] RUNNING HANDLER [ibm.spectrum_scale.core_common : yum-clean-metadata] **********",
+    "[ INFO  ] PLAY RECAP *********************************************************************",
+    "[ INFO  ] localhost                  : ok=3    changed=1    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0",
+    "[ INFO  ] scale-client1-rqhtc64k     : ok=98   changed=11   unreachable=0    failed=0    skipped=158  rescued=0    ignored=0",
+    "[ INFO  ] scale-client2-rqhtc64k     : ok=98   changed=11   unreachable=0    failed=0    skipped=158  rescued=0    ignored=0",
+    "[ INFO  ] scale-gui1-rqhtc64k        : ok=105  changed=12   unreachable=0    failed=0    skipped=151  rescued=0    ignored=0",
+    "[ INFO  ] scale-proto1-rqhtc64k      : ok=112  changed=19   unreachable=0    failed=0    skipped=144  rescued=0    ignored=0",
+    "[ INFO  ] scale-proto2-rqhtc64k      : ok=112  changed=19   unreachable=0    failed=0    skipped=144  rescued=0    ignored=0",
+    "[ INFO  ] scale-server1-rqhtc64k     : ok=155  changed=26   unreachable=0    failed=0    skipped=260  rescued=0    ignored=0",
+    "[ INFO  ] scale-server2-rqhtc64k     : ok=98   changed=11   unreachable=0    failed=0    skipped=158  rescued=0    ignored=0",
+    "[ INFO  ] the implicit localhost does not match 'all'",
+    "[ INFO  ] PLAY RECAP *********************************************************************",
+    "[ INFO  ] localhost                  : ok=3    changed=1    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0",
+    "[ INFO  ] scale-client1-rqhtc64k     : ok=35   changed=2    unreachable=0    failed=0    skipped=71   rescued=0    ignored=0",
+    "[ INFO  ] scale-client2-rqhtc64k     : ok=35   changed=2    unreachable=0    failed=0    skipped=71   rescued=0    ignored=0",
+    "[ INFO  ] scale-gui1-rqhtc64k        : ok=35   changed=2    unreachable=0    failed=0    skipped=71   rescued=0    ignored=0",
+    "[ INFO  ] scale-proto1-rqhtc64k      : ok=34   changed=2    unreachable=0    failed=0    skipped=72   rescued=0    ignored=0",
+    "[ INFO  ] scale-proto2-rqhtc64k      : ok=34   changed=2    unreachable=0    failed=0    skipped=72   rescued=0    ignored=0",
+    "[ INFO  ] scale-server1-rqhtc64k     : ok=60   changed=11   unreachable=0    failed=0    skipped=116  rescued=0    ignored=0",
+    "[ INFO  ] scale-server2-rqhtc64k     : ok=35   changed=2    unreachable=0    failed=0    skipped=71   rescued=0    ignored=0",
+    "[ INFO  ] Destroying repository...",
+    "[ INFO  ] Checking for a successful install",
+    "[ INFO  ] Checking state of Filesystem",
+    "[ INFO  ] File systems have been created successfully",
+    "[ INFO  ] Filesystem ACTIVE",
+    "[ INFO  ] Checking state of Cluster Export Services",
+    "[ INFO  ] Checking state of CES on all nodes",
+    "[ INFO  ] Checking state of CES on all nodes",
+    "[ INFO  ] 5 server licenses and 2 client licenses enabled on the cluster. Ensure enough licenses are owned for this configuration.",
+    "[ INFO  ] Cluster Export Services ACTIVE",
+    "[ INFO  ] Checking state of S3",
+    "[ INFO  ] Running S3 post-install checks",
+    "[ INFO  ] Checking state of S3 on all nodes",
+    "[ INFO  ] Checking state of S3 on all nodes",
+    "[ INFO  ] S3 ACTIVE",
+    "[ INFO  ] Checking state of SMB",
+    "[ INFO  ] Running SMB post-install checks",
+    "[ INFO  ] Checking state of SMB on all nodes",
+    "[ INFO  ] Checking state of SMB on all nodes",
+    "[ INFO  ] SMB ACTIVE",
+    "[ INFO  ] Checking state of NFS",
+    "[ INFO  ] Running NFS post-install checks",
+    "[ INFO  ] Checking state of NFS on all nodes",
+    "[ INFO  ] Checking state of NFS on all nodes",
+    "[ INFO  ] NFS ACTIVE",
+    "[ INFO  ] Checking state of Performance Monitoring",
+    "[ INFO  ] Running Performance Monitoring post-install checks",
+    "[ INFO  ] pmcollector running on all nodes",
+    "[ INFO  ] pmsensors running on all nodes",
+    "[ INFO  ] Performance Monitoring ACTIVE",
+    "[ INFO  ] Checking state of GUI",
+    "[ INFO  ] Running Graphical User Interface  post-install checks",
+    "[ INFO  ] Graphical User Interface running on all GUI servers",
+    "[ INFO  ] Enter one of the following addresses into a web browser to access the Graphical User Interface: scale-gui1-rqhtc64k",
+    "[ INFO  ] GUI ACTIVE",
+    "[ INFO  ] SUCCESS",
+    "[ INFO  ] All services running",
+    "[ INFO  ] StanzaFile and NodeDesc file for NSD, filesystem, and cluster setup have been saved to /usr/lpp/mmfs folder on node: scale-gui1-rqhtc64k",
+    "[ INFO  ] Successfully installed and configured protocols. 2 protocol nodes were enabled. Components installed: Filesystem, Cluster Export Services, S3, SMB, NFS, Performance Monitoring, GUI, FILE AUDIT LOGGING. It took 17 minutes 26 seconds."
+   ],
+   "note": "Headline lines only, extracted in order from the saved operation log (2,051 lines); ASYNC OK/POLL and per-task lines omitted."
+  },
+  "postcheck-deploy": {
+   "commands": [
+    "sudo -n /usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale deploy --postcheck"
+   ],
+   "started_at": "2026-10-05T22:27:44.614437+00:00",
+   "finished_at": "2026-10-05T22:27:53.960729+00:00",
+   "lines": [
+    "[ INFO  ] File systems have been created successfully",
+    "[ INFO  ] Filesystem ACTIVE",
+    "[ INFO  ] Cluster Export Services ACTIVE",
+    "[ INFO  ] S3 ACTIVE",
+    "[ INFO  ] SMB ACTIVE",
+    "[ INFO  ] NFS ACTIVE",
+    "[ INFO  ] Performance Monitoring ACTIVE",
+    "[ INFO  ] GUI ACTIVE",
+    "[ INFO  ] SUCCESS",
+    "[ INFO  ] All services running"
+   ]
+  },
+  "ces-verify": {
+   "commands": [
+    "sudo /usr/lpp/mmfs/bin/mmces address list",
+    "sudo /usr/lpp/mmfs/bin/mmces service list -a"
+   ],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "Address          Node                    Ces Group   Attributes",
+    "---------------- ----------------------- ----------- ------------ ",
+    "10.249.128.200   scale-proto1-rqhtc64k   none        none",
+    "10.249.128.201   scale-proto2-rqhtc64k   none        none",
+    "Enabled services: NFS SMB S3",
+    "scale-proto2-rqhtc64k:  NFS is running, SMB is running, S3 is running",
+    "scale-proto1-rqhtc64k:  NFS is running, SMB is running, S3 is running"
+   ],
+   "note": "Run on scale-proto1 over SSH from the installer node."
+  },
+  "mmhealth-smb": {
+   "commands": [
+    "sudo /usr/lpp/mmfs/bin/mmhealth node show SMB -v"
+   ],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "Component     Status        Status Change            Reasons & Notices",
+    "-------------------------------------------------------------------------------",
+    "SMB           TIPS          2026-10-05 22:16:36      smb_sensors_not_configured(SMBGlobalStats, SMBStats)",
+    "smb_sensors_not_configured  SMB        TIP         2026-10-05 22:16:36  The SMB perfmon sensor SMBGlobalStats is not configured.",
+    "smb_sensors_not_configured  SMB        TIP         2026-10-05 22:16:36  The SMB perfmon sensor SMBStats is not configured.",
+    "ctdb_state_up               SMB        INFO        2026-10-05 22:16:36  The CTDB state is healthy.",
+    "smbd_up                     SMB        INFO        2026-10-05 22:16:36  SMBD process is now running.",
+    "smbport_up                  SMB        INFO        2026-10-05 22:16:36  SMB port 445 is now active."
+   ],
+   "note": "Run on scale-proto1 over SSH from the installer node."
+  }
+ }
+}

@@ -104,53 +104,88 @@
       }
     ]
   },
-  "terminal-overview": {
-    "seconds": 181.11,
+  "cli-run": {
+    "seconds": 387.53,
     "chapters": [
       {
-        "title": "Clean terminal overview",
+        "title": "A real run, command by command",
         "start": 0,
-        "duration": 21.56
+        "duration": 26.44
       },
       {
-        "title": "1. Start the toolkit setup service",
-        "start": 21.56,
-        "duration": 18.89
+        "title": "1. Start the installation service",
+        "start": 26.44,
+        "duration": 21.11
       },
       {
-        "title": "2. Configure seven nodes",
-        "start": 40.45,
-        "duration": 20.22
+        "title": "2. Define the seven nodes",
+        "start": 47.55,
+        "duration": 25.11
       },
       {
-        "title": "3. Define NSDs and filesystem placement",
-        "start": 60.67,
+        "title": "3. Read back the node table",
+        "start": 72.66,
+        "duration": 26.89
+      },
+      {
+        "title": "4. Define the storage",
+        "start": 99.55,
+        "duration": 26.44
+      },
+      {
+        "title": "5. Call home and cluster settings",
+        "start": 125.99,
+        "duration": 17.11
+      },
+      {
+        "title": "6. Configure and enable the protocols",
+        "start": 143.1,
+        "duration": 26.89
+      },
+      {
+        "title": "7. Precheck the install",
+        "start": 169.99,
+        "duration": 30.0
+      },
+      {
+        "title": "8. Run the install",
+        "start": 199.99,
+        "duration": 31.33
+      },
+      {
+        "title": "9. Check the install",
+        "start": 231.32,
+        "duration": 23.78
+      },
+      {
+        "title": "10. Precheck the deploy",
+        "start": 255.1,
+        "duration": 19.33
+      },
+      {
+        "title": "11. Deploy the protocols",
+        "start": 274.43,
+        "duration": 37.11
+      },
+      {
+        "title": "12. Check the deploy",
+        "start": 311.54,
+        "duration": 10.89
+      },
+      {
+        "title": "13. Verify the export addresses",
+        "start": 322.43,
         "duration": 22.44
       },
       {
-        "title": "4. Precheck and install",
-        "start": 83.11,
-        "duration": 21.56
+        "title": "14. The SMB TIPS status",
+        "start": 344.87,
+        "duration": 24.22
       },
       {
-        "title": "5. Verify the installation",
-        "start": 104.67,
-        "duration": 18.0
-      },
-      {
-        "title": "6. Configure and precheck the protocols",
-        "start": 122.67,
+        "title": "What the run took",
+        "start": 369.09,
         "duration": 18.44
-      },
-      {
-        "title": "7. Deploy the services",
-        "start": 141.11,
-        "duration": 20.67
-      },
-      {
-        "title": "8. Verify the final state",
-        "start": 161.78,
-        "duration": 19.33
       }
     ]
   },
