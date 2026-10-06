@@ -1,9 +1,9 @@
 # From Plain English to Backend Action: MCP Tool Calls in Practice
 
-> **Historical source material.** For the edited presentation, use the [curated recordings](recordings/README.md). Original recordings and narration are retained for provenance; see the [archive corrections](recordings/ARCHIVE.md) before reusing their examples.
+> **Historical source material.** For the edited presentation, use the [curated recordings](../walkthroughs/README.md). Original recordings and narration are retained for provenance; see the [archive corrections](README.md) before reusing their examples.
 
 A walkthrough of how natural-language requests, given to an AI agent
-(Claude) connected to the [`scale-guinstall` MCP server](../mcp-server/),
+(Claude) connected to the [`scale-guinstall` MCP server](../../mcp-server/),
 turned into real `scale-server.py` backend calls during the live
 TechZone sessions this project's other walkthroughs are built from.
 
@@ -11,7 +11,7 @@ Nothing here is paraphrased after the fact — every "User said" / "Claude
 called" pair below is a real exchange from this project's development
 sessions, reduced to the essential ask and the tool call it produced.
 The full tool signatures are documented in
-[`mcp-server/README.md`](../mcp-server/README.md); this doc is about the
+[`mcp-server/README.md`](../../mcp-server/README.md); this doc is about the
 *mapping* from intent to call, not the API reference.
 
 ## Why this matters

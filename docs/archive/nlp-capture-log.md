@@ -205,4 +205,4 @@ was live (the `true` step appeared) but the agent's MCP client still sent the ol
 ## Related
 
 - [`mcp-nlp-to-toolcall.md`](mcp-nlp-to-toolcall.md) — the shorter prompt → tool call → result walkthrough, with all the recordings linked.
-- [`techzone-runbook.md`](techzone-runbook.md) — the runbook this install followed.
+- [`techzone-runbook.md`](../techzone-runbook.md) — the runbook this install followed.

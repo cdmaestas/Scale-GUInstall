@@ -1,0 +1,727 @@
+{
+ "title": "CLI walkthrough: a real installation, command by command",
+ "description": "The spectrumscale commands the backend ran during one real installation on 2026-10-05, with lines quoted from the toolkit's own output. Pacing is generated.",
+ "words_per_minute": 135,
+ "buffer_seconds": 2,
+ "footer": "RECORDED RUN 2026-10-05 | Real commands and output; generated pacing.",
+ "note": "Built from the logged output of one real run. Silent playback; read the synchronized narration aloud. Starts paused.",
+ "scenes": [
+  {
+   "title": "A real run, command by command",
+   "lines": [
+    "REAL RUN | 2026-10-05 | IBM Storage Scale 6.0.1.1",
+    "Installer node plus seven cluster nodes | NFS, SMB and S3",
+    "",
+    "Commands are the ones the backend executed on the installer",
+    "node. Output lines are quoted from its operation logs.",
+    "The toolkit path is shortened to \".../\" and INFO markers are",
+    "dropped. Pacing is generated: per-line timing was not recorded.",
+    "",
+    "The GUI and the MCP tools run these same commands."
+   ],
+   "narration": "This is the command line behind one real installation. Each screen shows the spectrumscale commands the backend ran on the installer node, with lines quoted from the toolkit's own output. Nobody typed these here: they were issued through the MCP tools and the GUI. The pacing is generated, but the commands and output are real.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": []
+   }
+  },
+  {
+   "title": "1. Start the installation service",
+   "lines": [
+    {
+     "cmd": "setup",
+     "n": 0
+    },
+    {
+     "out": "setup",
+     "has": "Your ansible controller",
+     "nth": 0
+    },
+    {
+     "out": "setup",
+     "has": "Port 10080",
+     "nth": 0
+    },
+    {
+     "out": "setup",
+     "has": "SUCCESS",
+     "nth": 0
+    },
+    "",
+    {
+     "duration": "setup",
+     "label": "Operation time"
+    }
+   ],
+   "narration": "First the toolkit installs its installation service on the installer node. The command is spectrumscale setup with the installer's address. The output confirms the Ansible controller will use that address and that port 10080 serves the packages. It finished in under three seconds.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "setup"
+    ]
+   }
+  },
+  {
+   "title": "2. Define the seven nodes",
+   "lines": [
+    {
+     "cmd": "node-config",
+     "n": 0
+    },
+    {
+     "cmd": "node-config",
+     "n": 1
+    },
+    "(one delete and one add for each of the seven nodes)",
+    {
+     "out": "node-config",
+     "has": "does not exist",
+     "nth": 0
+    },
+    {
+     "out": "node-config",
+     "has": "mis-ordered",
+     "nth": 0
+    },
+    {
+     "out": "node-config",
+     "has": "as a quorum node",
+     "nth": 0
+    },
+    {
+     "out": "node-config",
+     "has": "as an NSD server",
+     "nth": 0
+    },
+    {
+     "out": "node-config",
+     "has": "as an admin node",
+     "nth": 0
+    },
+    {
+     "out": "node-config",
+     "has": "as a protocol node",
+     "nth": 0
+    }
+   ],
+   "narration": "Next the seven nodes are defined, one node delete and one node add each. The FATAL line is expected on a first run, because the delete finds nothing to remove. The warning about hosts file ordering is also expected; the runbook notes both. The info lines show the roles each node receives.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "node-config"
+    ]
+   }
+  },
+  {
+   "title": "3. Read back the node table",
+   "lines": [
+    {
+     "out": "node-list",
+     "from": "GPFS                   Admin",
+     "to": "scale-server2"
+    },
+    "",
+    {
+     "out": "node-list",
+     "from": "[Protocols]",
+     "to": "HDFS"
+    },
+    "",
+    "Read after the protocols were applied (step 6)."
+   ],
+   "narration": "The node list shows the result. Two nodes are NSD, manager and quorum; the GUI node is admin, quorum and GUI; the two protocol nodes are managers and protocol nodes; the two clients have no roles. This listing was read after the protocols were applied, so its protocol block already shows S3, SMB and NFS enabled.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "node-list"
+    ]
+   }
+  },
+  {
+   "title": "4. Define the storage",
+   "lines": [
+    {
+     "cmd": "nsd-add",
+     "n": 0
+    },
+    {
+     "cmd": "nsd-add",
+     "n": 2
+    },
+    "(six NSD adds in all; the other four were not seen echoed)",
+    "",
+    {
+     "out": "nsd-list",
+     "from": "Name FS",
+     "to": "nsd6"
+    }
+   ],
+   "narration": "Six NSDs are defined from the three free disks on each storage server: one for the CES shared root filesystem and two for fs1, with failure groups one and two. Two of the six add commands are shown, and the table below is the toolkit's own listing. The dataOnly disks join a pool named data.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "nsd-add",
+     "nsd-list"
+    ]
+   }
+  },
+  {
+   "title": "5. Call home and cluster settings",
+   "lines": [
+    {
+     "cmd": "callhome",
+     "n": 0
+    },
+    {
+     "out": "callhome",
+     "has": "Disabling",
+     "nth": 0
+    },
+    "",
+    {
+     "cmd": "cluster-config",
+     "n": 0
+    },
+    {
+     "out": "cluster-config",
+     "has": "ephemeral",
+     "nth": 0
+    },
+    {
+     "out": "cluster-config",
+     "has": "perfmon",
+     "nth": 0
+    },
+    "",
+    "Call home is on by default; it must be configured or",
+    "disabled before the install precheck will pass."
+   ],
+   "narration": "Call home is on by default, and without settings the precheck fails, so it is disabled here. The cluster settings set the ephemeral port range to 60000 through 61000 and leave performance monitoring on.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "callhome",
+     "cluster-config"
+    ]
+   }
+  },
+  {
+   "title": "6. Configure and enable the protocols",
+   "lines": [
+    {
+     "cmd": "protocols",
+     "n": 0
+    },
+    {
+     "out": "protocols",
+     "has": "export_ip_pool",
+     "nth": 0
+    },
+    {
+     "out": "protocols",
+     "has": "Setting filesystem",
+     "nth": 0
+    },
+    {
+     "out": "protocols",
+     "has": "Setting mountpoint",
+     "nth": 0
+    },
+    {
+     "out": "protocols",
+     "has": "CIDR",
+     "nth": 0
+    },
+    {
+     "out": "protocols",
+     "has": "Setting interface",
+     "nth": 0
+    },
+    {
+     "out": "protocols",
+     "has": "Protocol configuration set",
+     "nth": 0
+    },
+    "",
+    {
+     "cmd": "protocols",
+     "n": 1
+    },
+    {
+     "out": "protocols",
+     "has": "Enabled: nfs",
+     "nth": 0
+    }
+   ],
+   "narration": "The CES settings name the shared root filesystem, its mount point, the network interface and two export addresses. These two commands were run from the GUI's Apply Protocols panel, which prints the same command and output. The warning about CIDR notation only means the toolkit stays in legacy mode. Then NFS, SMB and S3 are enabled.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "protocols"
+    ]
+   }
+  },
+  {
+   "title": "7. Precheck the install",
+   "lines": [
+    {
+     "cmd": "precheck-install",
+     "n": 0
+    },
+    {
+     "out": "precheck-install",
+     "has": "GPFS precheck OK",
+     "nth": 0
+    },
+    {
+     "out": "precheck-install",
+     "has": "Network check from admin",
+     "nth": 0
+    },
+    {
+     "out": "precheck-install",
+     "has": "may not be load-balanced",
+     "nth": 0
+    },
+    {
+     "out": "precheck-install",
+     "has": "Only one GUI",
+     "nth": 0
+    },
+    {
+     "out": "precheck-install",
+     "has": "nsd1 only has one server",
+     "nth": 0
+    },
+    {
+     "out": "precheck-install",
+     "has": "ok=10",
+     "nth": 0
+    },
+    {
+     "out": "precheck-install",
+     "has": "Pre-check successful",
+     "nth": 0
+    },
+    "",
+    {
+     "duration": "precheck-install",
+     "label": "Operation time"
+    }
+   ],
+   "narration": "The install precheck validates the configuration without changing anything. It reports warnings: the NSDs may not be load balanced, there is one GUI server, and each NSD has a single server. The runbook treats these as expected for a small lab with node-local disks. The network checks pass and every node reports failed equals zero. It took about a minute and a half.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "precheck-install"
+    ]
+   }
+  },
+  {
+   "title": "8. Run the install",
+   "lines": [
+    {
+     "cmd": "install",
+     "n": 0
+    },
+    {
+     "count": "install",
+     "has": "FAILED - RETRYING: [scale-server1-rqhtc64k]: wait-daemon-active",
+     "all_have": "wait-daemon-active",
+     "text": "{n} x FAILED - RETRYING: wait-daemon-active (scale-server1)"
+    },
+    {
+     "count": "install",
+     "has": "FAILED - RETRYING: [scale-gui1-rqhtc64k]: Wait until gpfsgui",
+     "all_have": "gpfsgui",
+     "text": "{n} x FAILED - RETRYING: wait for gpfsgui (scale-gui1)"
+    },
+    {
+     "out": "install",
+     "has": "Create new cluster",
+     "nth": 0
+    },
+    {
+     "out": "install",
+     "has": "Create new NSDs",
+     "nth": 0
+    },
+    {
+     "out": "install",
+     "has": "Create new filesystem",
+     "nth": 0
+    },
+    {
+     "out": "install",
+     "has": ": ok=160",
+     "nth": 0
+    },
+    {
+     "out": "install",
+     "has": ": ok=90",
+     "nth": 0
+    },
+    {
+     "out": "install",
+     "has": "Installation successful",
+     "nth": 0
+    }
+   ],
+   "narration": "The install itself is one command and took about twenty-six minutes. The log shows a few retry lines while the toolkit waits for the GPFS daemon on the first server and for the GUI service to come up; the waits ended and the run continued. The tasks that create the cluster, the NSDs and the filesystems run, and the toolkit finishes with seven GPFS nodes active.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "install"
+    ]
+   }
+  },
+  {
+   "title": "9. Check the install",
+   "lines": [
+    {
+     "cmd": "postcheck-install",
+     "n": 0
+    },
+    {
+     "out": "postcheck-install",
+     "has": "server licenses",
+     "nth": 0
+    },
+    {
+     "out": "postcheck-install",
+     "has": "GPFS ACTIVE",
+     "nth": 0
+    },
+    {
+     "out": "postcheck-install",
+     "has": "NSDs ACTIVE",
+     "nth": 0
+    },
+    {
+     "out": "postcheck-install",
+     "has": "Performance Monitoring ACTIVE",
+     "nth": 0
+    },
+    {
+     "out": "postcheck-install",
+     "has": "GUI ACTIVE",
+     "nth": 0
+    },
+    {
+     "out": "postcheck-install",
+     "has": "SUCCESS",
+     "nth": 0
+    },
+    {
+     "out": "postcheck-install",
+     "has": "All services running",
+     "nth": 0
+    },
+    "",
+    {
+     "duration": "postcheck-install",
+     "label": "Operation time"
+    }
+   ],
+   "narration": "The install postcheck verifies the result. GPFS is active on all nodes, the NSDs are active, performance monitoring and the GUI are active, and it ends with success and all services running. It also reports the licenses enabled on the cluster, which you should check against what you own.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "postcheck-install"
+    ]
+   }
+  },
+  {
+   "title": "10. Precheck the deploy",
+   "lines": [
+    {
+     "cmd": "precheck-deploy",
+     "n": 0
+    },
+    {
+     "out": "precheck-deploy",
+     "has": "NSDs are in a valid state",
+     "nth": 0
+    },
+    {
+     "out": "precheck-deploy",
+     "has": "protocol precheck OK",
+     "nth": 0
+    },
+    {
+     "out": "precheck-deploy",
+     "has": "S3 precheck OK",
+     "nth": 0
+    },
+    {
+     "out": "precheck-deploy",
+     "has": "SMB precheck OK",
+     "nth": 0
+    },
+    {
+     "out": "precheck-deploy",
+     "has": "NFS precheck OK",
+     "nth": 0
+    },
+    {
+     "out": "precheck-deploy",
+     "has": "all other protocol nodes",
+     "nth": 0
+    },
+    {
+     "out": "precheck-deploy",
+     "has": "Pre-check successful",
+     "nth": 0
+    },
+    "",
+    {
+     "duration": "precheck-deploy",
+     "label": "Operation time"
+    }
+   ],
+   "narration": "The deploy precheck now covers the protocols. The NSDs are in a valid state, the protocol, S3, SMB and NFS prechecks all pass, and so does the network check between protocol nodes. This precheck took almost four minutes here.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "precheck-deploy"
+    ]
+   }
+  },
+  {
+   "title": "11. Deploy the protocols",
+   "lines": [
+    {
+     "cmd": "deploy",
+     "n": 0
+    },
+    {
+     "out": "deploy",
+     "has": "ASYNC FAILED",
+     "nth": 0
+    },
+    "One Ansible async job reported FAILED; the play went on.",
+    "Recap: failed=0 everywhere, and the postcheck passes.",
+    "The cause of that line was not investigated.",
+    "",
+    {
+     "out": "deploy",
+     "has": ": ok=60",
+     "nth": 0
+    },
+    {
+     "out": "deploy",
+     "has": ": ok=34",
+     "nth": 0
+    },
+    {
+     "out": "deploy",
+     "has": "Successfully installed and configured protocols",
+     "nth": 0
+    },
+    "",
+    {
+     "duration": "deploy",
+     "label": "Operation time"
+    }
+   ],
+   "narration": "Deploy creates the filesystems and brings up Cluster Export Services with NFS, SMB and S3. It took about seventeen and a half minutes. One line in the log says ASYNC FAILED for a background Ansible job on the first server. The play carried on, every host in the recap shows failed equals zero, and the postcheck passes, but the cause of that line was not investigated. The toolkit ends by reporting protocols installed and configured on two protocol nodes.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "deploy"
+    ]
+   }
+  },
+  {
+   "title": "12. Check the deploy",
+   "lines": [
+    {
+     "cmd": "postcheck-deploy",
+     "n": 0
+    },
+    {
+     "out": "postcheck-deploy",
+     "has": "File systems have been created",
+     "nth": 0
+    },
+    {
+     "out": "postcheck-deploy",
+     "has": "Filesystem ACTIVE",
+     "nth": 0
+    },
+    {
+     "out": "postcheck-deploy",
+     "has": "Cluster Export Services ACTIVE",
+     "nth": 0
+    },
+    {
+     "out": "postcheck-deploy",
+     "has": "S3 ACTIVE",
+     "nth": 0
+    },
+    {
+     "out": "postcheck-deploy",
+     "has": "SMB ACTIVE",
+     "nth": 0
+    },
+    {
+     "out": "postcheck-deploy",
+     "has": "NFS ACTIVE",
+     "nth": 0
+    },
+    {
+     "out": "postcheck-deploy",
+     "has": "SUCCESS",
+     "nth": 0
+    },
+    {
+     "out": "postcheck-deploy",
+     "has": "All services running",
+     "nth": 0
+    },
+    "",
+    {
+     "duration": "postcheck-deploy",
+     "label": "Operation time"
+    }
+   ],
+   "narration": "The deploy postcheck confirms the filesystems were created, and that Cluster Export Services, S3, SMB and NFS are all active.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "postcheck-deploy"
+    ]
+   }
+  },
+  {
+   "title": "13. Verify the export addresses",
+   "lines": [
+    {
+     "cmd": "ces-verify",
+     "n": 0
+    },
+    {
+     "out": "ces-verify",
+     "from": "Address",
+     "to": "10.249.128.201"
+    },
+    "",
+    {
+     "cmd": "ces-verify",
+     "n": 1
+    },
+    {
+     "out": "ces-verify",
+     "from": "Enabled services",
+     "to": "scale-proto1"
+    },
+    "",
+    "(run on scale-proto1 over SSH from the installer node)"
+   ],
+   "narration": "The last real check is outside the toolkit. The mmces command shows both export addresses assigned, one to each protocol node, and all three services running on both. An export address left unassigned is the failure the runbook warns about, and it did not happen here.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "ces-verify"
+    ]
+   }
+  },
+  {
+   "title": "14. The SMB TIPS status",
+   "lines": [
+    {
+     "cmd": "mmhealth-smb",
+     "n": 0
+    },
+    {
+     "out": "mmhealth-smb",
+     "has": "SMB           TIPS",
+     "nth": 0
+    },
+    {
+     "out": "mmhealth-smb",
+     "has": "SMBGlobalStats is not configured",
+     "nth": 0
+    },
+    {
+     "out": "mmhealth-smb",
+     "has": "ctdb_state_up",
+     "nth": 0
+    },
+    {
+     "out": "mmhealth-smb",
+     "has": "smbd_up",
+     "nth": 0
+    },
+    "",
+    "TIPS here only means perfmon sensors are not configured."
+   ],
+   "narration": "Health shows a TIPS status for SMB. The events say the SMB performance sensors are not configured, which affects performance statistics only. The service events below are healthy: the CTDB state is healthy and the SMB daemon is running. The runbook records this as expected and leaves the sensors alone.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "mmhealth-smb"
+    ]
+   }
+  },
+  {
+   "title": "What the run took",
+   "lines": [
+    {
+     "duration": "setup",
+     "label": "setup"
+    },
+    {
+     "duration": "nsd-add",
+     "label": "nsd add (6)"
+    },
+    {
+     "duration": "cluster-config",
+     "label": "cluster config"
+    },
+    {
+     "duration": "precheck-install",
+     "label": "install --precheck"
+    },
+    {
+     "duration": "install",
+     "label": "install"
+    },
+    {
+     "duration": "postcheck-install",
+     "label": "install --postcheck"
+    },
+    {
+     "duration": "precheck-deploy",
+     "label": "deploy --precheck"
+    },
+    {
+     "duration": "deploy",
+     "label": "deploy"
+    },
+    {
+     "duration": "postcheck-deploy",
+     "label": "deploy --postcheck"
+    },
+    "",
+    "Backend operation windows. The toolkit itself reported",
+    "26 minutes 27 seconds for the install."
+   ],
+   "narration": "Altogether the operations listed took about fifty minutes, almost all of it the install and the deploy. Defining nodes and storage took seconds. The waiting between phases in the original session is not included in these timings.",
+   "source": {
+    "capture": "2026-10-05-run",
+    "phases": [
+     "setup",
+     "nsd-add",
+     "cluster-config",
+     "precheck-install",
+     "install",
+     "postcheck-install",
+     "precheck-deploy",
+     "deploy",
+     "postcheck-deploy"
+    ]
+   }
+  }
+ ]
+}

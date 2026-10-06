@@ -3,9 +3,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
-const slugs = ['mcp-install-and-debug','terminal-overview','mcp-extra-examples','ces-nfs-case-study'];
-for (const slug of slugs) {
-  const file = fs.readFileSync(path.join(__dirname, slug+'.html'), 'utf8');
+// Players live next to their track (docs/walkthroughs/<track>/<name>.html).
+const players = ['mcp/install-and-debug','cli/install-run','mcp/extra-examples','mcp/ces-nfs-case-study'];
+for (const slug of players) {
+  const file = fs.readFileSync(path.join(__dirname, '..', slug+'.html'), 'utf8');
   const js = file.match(/<script>([\s\S]*?)<\/script>/)[1];
   const elements = new Map();
   const handlers = {};

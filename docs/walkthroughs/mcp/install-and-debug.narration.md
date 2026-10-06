@@ -2,7 +2,7 @@
 
 An edited historical installation followed by its diagnostic debugging epilogue.
 
-Generated from the matching JSON in `recordings/sources/`. Edit that source, then rebuild.
+Generated from the matching JSON in `docs/walkthroughs/_build/sources/`. Edit that source, then rebuild.
 
 Pace: 135 words/minute + 2 seconds per chapter. Total: 6:46.67.
 
