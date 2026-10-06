@@ -19,6 +19,7 @@ CAPTURES = ROOT / 'captures'                      # verbatim excerpts of a real 
 # source slug -> output stem under docs/walkthroughs/ (adds .cast, .html, .gif, .narration.md)
 SLUGS = {
     'mcp-install-and-debug': 'mcp/install-and-debug',
+    'mcp-real-run': 'mcp/real-run',
     'cli-run': 'cli/install-run',
     'mcp-extra-examples': 'mcp/extra-examples',
     'ces-nfs-case-study': 'mcp/ces-nfs-case-study',
@@ -63,9 +64,16 @@ def resolve(items, cap):
         if isinstance(item, str):
             out.append(item)
             continue
-        ph = cap['phases'][item.get('cmd') or item.get('out') or item.get('count') or item['duration']]
+        ph = cap['phases'][item.get('cmd') or item.get('out') or item.get('count') or item.get('at') or item.get('all') or item['duration']]
         if 'cmd' in item:
             out.append('$ ' + display(ph['commands'][item.get('n', 0)]))
+        elif 'all' in item:
+            out.extend(Pre(display(line)) for line in ph['lines'])
+        elif 'at' in item:
+            idx = [i for i, line in enumerate(ph['lines']) if item['has'] in line]
+            assert idx and 'line_times' in ph, ('no timed line in capture', item)
+            sec = ph['line_times'][idx[item.get('nth', 0)]]
+            out.append(f"+{int(sec // 60)}:{sec % 60:04.1f}  {item['label']}")
         elif 'duration' in item:
             from datetime import datetime
             a, b = (datetime.fromisoformat(ph[k]) for k in ('started_at', 'finished_at'))
@@ -78,7 +86,8 @@ def resolve(items, cap):
             lines = ph['lines']
             first = next(i for i, line in enumerate(lines) if item['from'] in line)
             last = next(i for i, line in enumerate(lines) if i >= first and item['to'] in line)
-            out.extend(Pre(display(line)) for line in lines[first:last + 1])
+            cut = item.get('trim', [])  # optional trailing text removed so a wide table fits the screen; stated in the source
+            out.extend(Pre(re.sub('|'.join(map(re.escape, cut)) or r'\Z', '', display(line)).rstrip()) for line in lines[first:last + 1])
         else:
             hits = [line for line in ph['lines'] if item['has'] in line]
             assert hits, ('not in capture', item)

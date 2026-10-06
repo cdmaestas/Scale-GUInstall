@@ -466,6 +466,17 @@ the protocols exist, and the SMB/S3 sensors were not added afterwards on
 this toolkit version (6.0.1.1). That cause is the likely one but was not
 confirmed, so don't treat it as established.
 
+**Observed on the 2026-10-06 run: these TIPS cleared on their own.** The SMB
+`smb_sensors_not_configured` TIPS began at 18:08:27 (when SMB came up) and
+`mmhealth node show SMB -v` showed `smb_sensors_active` for both sensors at
+18:58:27, exactly 50 minutes later, with nothing changed; CES had rolled up
+to `HEALTHY` too. Only the GPFS TIPS (`gpfs_maxfilestocache_small`,
+`total_memory_small`, a consequence of the lab VMs' memory size) remained.
+So wait about an hour and look again before configuring anything. This also
+means the cause suggested above, sensors never added, is wrong or at least
+incomplete: the toolkit evidently configured them, just late. See the
+[verification recording](walkthroughs/cli/verification-run.gif).
+
 Left as-is on purpose: the fix would be a `mmperfmon config update` for
 those sensors, which changes cluster-wide Performance Monitoring config.
 Do it only if you need SMB or S3 performance metrics. Anything other than a

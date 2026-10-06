@@ -40,8 +40,11 @@ The builder checks source ranges, line width, screen height, scene order, cast t
 - `{"out": "<phase>", "from": "<text>", "to": "<text>"}`: a block of consecutive lines, kept unwrapped for tables.
 - `{"count": "<phase>", "has": "<text>", "all_have": "<text>", "text": "{n} x ..."}`: how many logged lines match, asserting that every match also contains `all_have`.
 - `{"duration": "<phase>", "label": "..."}`: the operation's finish minus start time.
+- `{"at": "<phase>", "has": "<text>", "nth": 0, "label": "..."}`: a `+m:ss` mark from the real timestamp of the logged line containing the text (needs the phase's parallel `line_times`, seconds since the toolkit log's first line).
+- `{"all": "<phase>"}`: every line of a derived phase, e.g. `install-slow-tasks`, whose lines the capture script computes from the log timestamps.
+- A `from`/`to` block may carry `"trim": [...]`, trailing text removed from each line so a wide table fits the screen; say so on screen when used.
 
-A capture file records, per phase, the echoed `commands`, `started_at` / `finished_at`, and the verbatim `lines` used (headline lines only for very long logs), plus a `note` where something was not seen. `captures/2026-10-05-run.json` was assembled from the backend's operation logs for that run. A source sets its own on-screen `footer` and `note`; the reenactment text is the default. Per-line timing is not recorded, so playback pacing is generated like the others.
+A capture file records, per phase, the echoed `commands`, `started_at` / `finished_at`, and the verbatim `lines` used (headline lines only for very long logs), plus a `note` where something was not seen. `captures/2026-10-06-run.json` (used by `cli-run.json`) was assembled by `make_capture_2026-10-06.py`: the install and deploy phases' lines and `line_times` come from the toolkit's own timestamped logs, the short phases from the backend's operation records. `captures/2026-10-05-run.json` is the earlier run's capture, from backend operation logs. A source sets its own on-screen `footer` and `note`; the reenactment text is the default. Playback pacing is generated like the others; only the `at` marks are real times.
 
 ## Files and boundaries
 
