@@ -1,27 +1,28 @@
 {
- "title": "CLI walkthrough: a real installation, command by command",
- "description": "The spectrumscale commands the backend ran during one real installation on 2026-10-05, with lines quoted from the toolkit's own output. Pacing is generated.",
+ "title": "CLI walkthrough: a real installation, command by command, with real timing",
+ "description": "The spectrumscale commands the backend ran during one real installation on 2026-10-06, with lines and timestamps quoted from the toolkit's own logs. Playback pacing is generated; the +m:ss times on screen are real.",
  "words_per_minute": 135,
  "buffer_seconds": 2,
- "footer": "RECORDED RUN 2026-10-05 | Real commands and output; generated pacing.",
- "note": "Built from the logged output of one real run. Silent playback; read the synchronized narration aloud. Starts paused.",
+ "footer": "RECORDED RUN 2026-10-06 | Real commands, output, log times; generated pacing.",
+ "note": "Built from the toolkit's own logs and the backend's operation records for one real run. Silent playback; read the synchronized narration aloud. Starts paused.",
  "scenes": [
   {
    "title": "A real run, command by command",
    "lines": [
-    "REAL RUN | 2026-10-05 | IBM Storage Scale 6.0.1.1",
+    "REAL RUN | 2026-10-06 | IBM Storage Scale 6.0.1.1",
     "Installer node plus seven cluster nodes | NFS, SMB and S3",
     "",
     "Commands are the ones the backend executed on the installer",
-    "node. Output lines are quoted from its operation logs.",
+    "node. Output lines are quoted from the toolkit's own logs.",
     "The toolkit path is shortened to \".../\" and INFO markers are",
-    "dropped. Pacing is generated: per-line timing was not recorded.",
+    "dropped. \"+m:ss\" times are real: seconds since the toolkit's",
+    "log opened. Playback pacing is generated.",
     "",
     "The GUI and the MCP tools run these same commands."
    ],
-   "narration": "This is the command line behind one real installation. Each screen shows the spectrumscale commands the backend ran on the installer node, with lines quoted from the toolkit's own output. Nobody typed these here: they were issued through the MCP tools and the GUI. The pacing is generated, but the commands and output are real.",
+   "narration": "This is the command line behind one real installation. Each screen shows the spectrumscale commands the backend ran on the installer node, with lines quoted from the toolkit's own logs. Where you see a plus sign and a time, that is the real time from the toolkit's log. Nobody typed these here: they were issued through the MCP tools and the GUI. The playback pacing is generated, but the commands, output and log times are real.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": []
    }
   },
@@ -32,30 +33,18 @@
      "cmd": "setup",
      "n": 0
     },
-    {
-     "out": "setup",
-     "has": "Your ansible controller",
-     "nth": 0
-    },
-    {
-     "out": "setup",
-     "has": "Port 10080",
-     "nth": 0
-    },
-    {
-     "out": "setup",
-     "has": "SUCCESS",
-     "nth": 0
-    },
     "",
     {
      "duration": "setup",
      "label": "Operation time"
-    }
+    },
+    "",
+    "The backend did not save the setup output in this run;",
+    "only the command and its time window are shown."
    ],
-   "narration": "First the toolkit installs its installation service on the installer node. The command is spectrumscale setup with the installer's address. The output confirms the Ansible controller will use that address and that port 10080 serves the packages. It finished in under three seconds.",
+   "narration": "First the toolkit installs its installation service on the installer node. The command is spectrumscale setup with the installer's address. It finished in under three seconds. The backend did not keep the output of this step in this run, so only the command and its timing are shown.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "setup"
     ]
@@ -106,7 +95,7 @@
    ],
    "narration": "Next the seven nodes are defined, one node delete and one node add each. The FATAL line is expected on a first run, because the delete finds nothing to remove. The warning about hosts file ordering is also expected; the runbook notes both. The info lines show the roles each node receives.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "node-config"
     ]
@@ -118,7 +107,12 @@
     {
      "out": "node-list",
      "from": "GPFS                   Admin",
-     "to": "scale-server2"
+     "to": "scale-server2",
+     "trim": [
+      "  rhel9  x86_64",
+      "    OS   Arch",
+      "  OS   Arch"
+     ]
     },
     "",
     {
@@ -127,11 +121,12 @@
      "to": "HDFS"
     },
     "",
-    "Read after the protocols were applied (step 6)."
+    "Read after the protocols were applied (step 6).",
+    "(OS and architecture columns, rhel9 x86_64, trimmed to fit)"
    ],
    "narration": "The node list shows the result. Two nodes are NSD, manager and quorum; the GUI node is admin, quorum and GUI; the two protocol nodes are managers and protocol nodes; the two clients have no roles. This listing was read after the protocols were applied, so its protocol block already shows S3, SMB and NFS enabled.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "node-list"
     ]
@@ -158,7 +153,7 @@
    ],
    "narration": "Six NSDs are defined from the three free disks on each storage server: one for the CES shared root filesystem and two for fs1, with failure groups one and two. Two of the six add commands are shown, and the table below is the toolkit's own listing. The dataOnly disks join a pool named data.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "nsd-add",
      "nsd-list"
@@ -198,7 +193,7 @@
    ],
    "narration": "Call home is on by default, and without settings the precheck fails, so it is disabled here. The cluster settings set the ephemeral port range to 60000 through 61000 and leave performance monitoring on.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "callhome",
      "cluster-config"
@@ -255,7 +250,7 @@
    ],
    "narration": "The CES settings name the shared root filesystem, its mount point, the network interface and two export addresses. These two commands were run from the GUI's Apply Protocols panel, which prints the same command and output. The warning about CIDR notation only means the toolkit stays in legacy mode. Then NFS, SMB and S3 are enabled.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "protocols"
     ]
@@ -311,7 +306,7 @@
    ],
    "narration": "The install precheck validates the configuration without changing anything. It reports warnings: the NSDs may not be load balanced, there is one GUI server, and each NSD has a single server. The runbook treats these as expected for a small lab with node-local disks. The network checks pass and every node reports failed equals zero. It took about a minute and a half.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "precheck-install"
     ]
@@ -325,31 +320,42 @@
      "n": 0
     },
     {
+     "at": "install",
+     "has": "Create new cluster",
+     "label": "task: create new cluster"
+    },
+    {
      "count": "install",
-     "has": "FAILED - RETRYING: [scale-server1-rqhtc64k]: wait-daemon-active",
+     "has": "FAILED - RETRYING: [scale-server1-l7kej84k]: wait-daemon-active",
      "all_have": "wait-daemon-active",
      "text": "{n} x FAILED - RETRYING: wait-daemon-active (scale-server1)"
     },
     {
+     "at": "install",
+     "has": "wait-daemon-active",
+     "label": "  (all logged at one instant; see next chapter)"
+    },
+    {
+     "at": "install",
+     "has": "Create new NSDs",
+     "label": "task: create new NSDs"
+    },
+    {
+     "at": "install",
+     "has": "Create new filesystem",
+     "label": "task: create new filesystem(s)"
+    },
+    {
      "count": "install",
-     "has": "FAILED - RETRYING: [scale-gui1-rqhtc64k]: Wait until gpfsgui",
+     "has": "FAILED - RETRYING: [scale-gui1-l7kej84k]: Wait until gpfsgui",
      "all_have": "gpfsgui",
      "text": "{n} x FAILED - RETRYING: wait for gpfsgui (scale-gui1)"
     },
     {
-     "out": "install",
-     "has": "Create new cluster",
-     "nth": 0
-    },
-    {
-     "out": "install",
-     "has": "Create new NSDs",
-     "nth": 0
-    },
-    {
-     "out": "install",
-     "has": "Create new filesystem",
-     "nth": 0
+     "at": "install",
+     "has": "PLAY RECAP",
+     "nth": 0,
+     "label": "play recap (every host failed=0)"
     },
     {
      "out": "install",
@@ -362,18 +368,52 @@
      "nth": 0
     },
     {
+     "at": "install",
+     "has": "Installation successful",
+     "label": "finished"
+    },
+    {
      "out": "install",
      "has": "Installation successful",
      "nth": 0
+    },
+    "",
+    {
+     "duration": "install",
+     "label": "Operation time"
     }
    ],
-   "narration": "The install itself is one command and took about twenty-six minutes. The log shows a few retry lines while the toolkit waits for the GPFS daemon on the first server and for the GUI service to come up; the waits ended and the run continued. The tasks that create the cluster, the NSDs and the filesystems run, and the toolkit finishes with seven GPFS nodes active.",
+   "narration": "The install itself is one command and took about twenty-four and a half minutes; the toolkit reports twenty-four minutes thirty-two seconds. The times on screen are from the toolkit's log. The cluster is created about seven and a half minutes in, the NSDs and filesystems follow, and the recap shows failed equals zero on every host. The log also shows retry lines while the toolkit waits for the GPFS daemon on the first server and for the GUI service; the waits ended and the run continued. It finishes with seven GPFS nodes active.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "install"
     ]
    }
+  },
+  {
+   "title": "Install: where the time went",
+   "source": {
+    "capture": "2026-10-06-run",
+    "phases": [
+     "install",
+     "install-slow-tasks"
+    ]
+   },
+   "lines": [
+    "Longest gaps between TASK lines in the install log:",
+    "",
+    "seconds  start   task",
+    {
+     "all": "install-slow-tasks"
+    },
+    "",
+    "",
+    "Retry lines are written when a task returns, so all",
+    "four wait-daemon-active retries carry the same",
+    "timestamp. They show that retries happened, not when."
+   ],
+   "narration": "This is where the install time went, read from the log. The longest gaps between task lines are package work on the nodes and starting the GPFS daemons, which took a little over two minutes. Tasks run in parallel across nodes, so this is spacing in the log, not the cost on one node. One more thing the timestamps show: the retry lines are all stamped at the same instant, because the toolkit writes them when the task returns. They tell you retries happened, but not when."
   },
   {
    "title": "9. Check the install",
@@ -425,7 +465,7 @@
    ],
    "narration": "The install postcheck verifies the result. GPFS is active on all nodes, the NSDs are active, performance monitoring and the GUI are active, and it ends with success and all services running. It also reports the licenses enabled on the cluster, which you should check against what you own.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "postcheck-install"
     ]
@@ -479,9 +519,9 @@
      "label": "Operation time"
     }
    ],
-   "narration": "The deploy precheck now covers the protocols. The NSDs are in a valid state, the protocol, S3, SMB and NFS prechecks all pass, and so does the network check between protocol nodes. This precheck took almost four minutes here.",
+   "narration": "The deploy precheck now covers the protocols. The NSDs are in a valid state, the protocol, S3, SMB and NFS prechecks all pass, and so does the network check between protocol nodes. This precheck took about two and a half minutes here.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "precheck-deploy"
     ]
@@ -495,14 +535,20 @@
      "n": 0
     },
     {
-     "out": "deploy",
+     "at": "deploy",
      "has": "ASYNC FAILED",
-     "nth": 0
+     "label": "ASYNC FAILED on scale-server1"
     },
     "One Ansible async job reported FAILED; the play went on.",
     "Recap: failed=0 everywhere, and the postcheck passes.",
-    "The cause of that line was not investigated.",
+    "The log has no error text for it. It sits between the CES",
+    "licence task and \"Collect status of ces nodes\".",
     "",
+    {
+     "at": "deploy",
+     "has": ": ok=60",
+     "label": "second play recap"
+    },
     {
      "out": "deploy",
      "has": ": ok=60",
@@ -512,6 +558,11 @@
      "out": "deploy",
      "has": ": ok=34",
      "nth": 0
+    },
+    {
+     "at": "deploy",
+     "has": "Successfully installed and configured protocols",
+     "label": "finished"
     },
     {
      "out": "deploy",
@@ -524,13 +575,36 @@
      "label": "Operation time"
     }
    ],
-   "narration": "Deploy creates the filesystems and brings up Cluster Export Services with NFS, SMB and S3. It took about seventeen and a half minutes. One line in the log says ASYNC FAILED for a background Ansible job on the first server. The play carried on, every host in the recap shows failed equals zero, and the postcheck passes, but the cause of that line was not investigated. The toolkit ends by reporting protocols installed and configured on two protocol nodes.",
+   "narration": "Deploy creates the filesystems and brings up Cluster Export Services with NFS, SMB and S3. It took about seventeen and a half minutes. One line in the log, four minutes forty-two seconds in, says ASYNC FAILED for a background Ansible job on the first server. The play carried on, every host in both recaps shows failed equals zero, and the postcheck passes. The log has no error text for that job, so the cause is still not known. The toolkit ends by reporting protocols installed and configured on two protocol nodes.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "deploy"
     ]
    }
+  },
+  {
+   "title": "Deploy: where the time went",
+   "source": {
+    "capture": "2026-10-06-run",
+    "phases": [
+     "deploy",
+     "deploy-slow-tasks"
+    ]
+   },
+   "lines": [
+    "Longest gaps between TASK lines in the deploy log:",
+    "",
+    "seconds  start   task",
+    {
+     "all": "deploy-slow-tasks"
+    },
+    "",
+    "",
+    "Deploy installs the protocol, perfmon and GUI packages on",
+    "the nodes, so package installation dominates again."
+   ],
+   "narration": "The same view for deploy. Package installation dominates again: the performance monitoring and GUI packages, and the S3 packages, each take a minute or two. Configuring SMB took about forty-seven seconds. As before, this is spacing between task lines in the log."
   },
   {
    "title": "12. Check the deploy",
@@ -587,7 +661,7 @@
    ],
    "narration": "The deploy postcheck confirms the filesystems were created, and that Cluster Export Services, S3, SMB and NFS are all active.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "postcheck-deploy"
     ]
@@ -613,14 +687,14 @@
     {
      "out": "ces-verify",
      "from": "Enabled services",
-     "to": "scale-proto1"
+     "to": "scale-proto2"
     },
     "",
     "(run on scale-proto1 over SSH from the installer node)"
    ],
    "narration": "The last real check is outside the toolkit. The mmces command shows both export addresses assigned, one to each protocol node, and all three services running on both. An export address left unassigned is the failure the runbook warns about, and it did not happen here.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "ces-verify"
     ]
@@ -654,11 +728,13 @@
      "nth": 0
     },
     "",
-    "TIPS here only means perfmon sensors are not configured."
+    "TIPS here only means perfmon sensors are not configured.",
+    "About 50 minutes later they cleared on their own (verification",
+    "recording: smb_sensors_active at 18:58:27, SMB HEALTHY)."
    ],
-   "narration": "Health shows a TIPS status for SMB. The events say the SMB performance sensors are not configured, which affects performance statistics only. The service events below are healthy: the CTDB state is healthy and the SMB daemon is running. The runbook records this as expected and leaves the sensors alone.",
+   "narration": "Health shows a TIPS status for SMB. The events say the SMB performance sensors are not configured, which affects performance statistics only. The service events below are healthy: the CTDB state is healthy and the SMB daemon is running. The runbook records this as expected and leaves the sensors alone. A later look, about fifty minutes after the deploy, showed those sensors active and SMB healthy with nothing changed, so the TIPS cleared by itself. The verification recording shows it.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "mmhealth-smb"
     ]
@@ -705,11 +781,11 @@
     },
     "",
     "Backend operation windows. The toolkit itself reported",
-    "26 minutes 27 seconds for the install."
+    "24 minutes 32 seconds for the install."
    ],
-   "narration": "Altogether the operations listed took about fifty minutes, almost all of it the install and the deploy. Defining nodes and storage took seconds. The waiting between phases in the original session is not included in these timings.",
+   "narration": "Altogether the operations listed took a little under forty-seven minutes, almost all of it the install and the deploy. Defining nodes and storage took seconds. The waiting between phases in the original session is not included in these timings.",
    "source": {
-    "capture": "2026-10-05-run",
+    "capture": "2026-10-06-run",
     "phases": [
      "setup",
      "nsd-add",

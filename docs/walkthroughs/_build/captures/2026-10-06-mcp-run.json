@@ -1,0 +1,210 @@
+{
+ "run": "2026-10-06 MCP calls",
+ "environment": "TechZone l7kej84k; Claude Code session driving the scale-guinstall MCP server",
+ "provenance": "Each call line is derived from the recorded tool call and its result; user lines are verbatim user messages.",
+ "toolkit_path": "/usr/lpp/mmfs/6.0.1.1/ansible-toolkit/spectrumscale",
+ "phases": {
+  "ready": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "USER: \"ok new techzone environment is up. tunnel is up. server is up\"",
+    "",
+    "> ping()",
+    "  ok: true",
+    "> probe_mmfs()",
+    "  version 6.0.1.1, toolkit .../spectrumscale",
+    "> check_ansible()",
+    "  [OK] ansible-core 2.14.18 is compatible (< 2.24).",
+    "> probe_interfaces()",
+    "  eth0 10.249.129.192",
+    "> check_operation()",
+    "  status: idle"
+   ]
+  },
+  "disks": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "> list_devices(node=\"scale-server1\")",
+    "  10 block devices; free disks: vdd vde vdf (100 GB each)",
+    "> list_devices(node=\"scale-server2\")",
+    "  10 block devices; free disks: vdd vde vdf (100 GB each)"
+   ]
+  },
+  "setup": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "> start_setup(dir=\"/usr/lpp/mmfs/6.0.1.1\", ip=\"10.249.129.192\", dry_run=true)",
+    "  dry run: $ sudo -n .../spectrumscale setup -s 10.249.129.192",
+    "> start_setup(dir=\"/usr/lpp/mmfs/6.0.1.1\", ip=\"10.249.129.192\", dry_run=false)",
+    "  started: true",
+    "> check_operation()",
+    "  status: success in 2.5s"
+   ]
+  },
+  "nodes": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "> start_node_config(nodes=[7 items], dry_run=false)",
+    "    scale-server1  nsd manager quorum",
+    "    scale-server2  nsd manager quorum",
+    "    scale-gui1     gui quorum admin",
+    "    scale-proto1   protocol manager",
+    "    scale-proto2   protocol manager",
+    "    scale-client1  (no roles)",
+    "    scale-client2  (no roles)",
+    "  started; first command: spectrumscale node delete scale-server1",
+    "> spectrumscale_running()  x11, every ~2 s, until it returns []",
+    "> check_operation()",
+    "  status: success in 33.7s"
+   ]
+  },
+  "nodes-readback": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "> list_nodes()",
+    "    scale-client1-l7kej84k   (no roles)",
+    "    scale-client2-l7kej84k   (no roles)",
+    "    scale-gui1-l7kej84k      admin quorum gui",
+    "    scale-proto1-l7kej84k    manager protocol",
+    "    scale-proto2-l7kej84k    manager protocol",
+    "    scale-server1-l7kej84k   quorum manager nsd",
+    "    scale-server2-l7kej84k   quorum manager nsd"
+   ]
+  },
+  "nsds": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "> start_nsd_add(nsds=[6 items], dry_run=false)",
+    "    scale-server1  /dev/vdd  fg 1  dataAndMetadata  system cesSharedRoot",
+    "    scale-server1  /dev/vde  fg 1  dataAndMetadata  system fs1",
+    "    scale-server1  /dev/vdf  fg 1  dataOnly         data   fs1",
+    "    scale-server2  /dev/vdd  fg 2  dataAndMetadata  system cesSharedRoot",
+    "    scale-server2  /dev/vde  fg 2  dataAndMetadata  system fs1",
+    "    scale-server2  /dev/vdf  fg 2  dataOnly         data   fs1",
+    "> list_nsds()",
+    "  6 NSDs listed"
+   ]
+  },
+  "settings": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "> start_callhome(enable=false, dry_run=false)",
+    "  spectrumscale callhome disable",
+    "> start_cluster_config_apply(gpfs_flags=[1 items], perfmon=true, dry_run=false)",
+    "  spectrumscale config gpfs --ephemeral_port_range 60000-61000"
+   ]
+  },
+  "precheck-install": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "> start_phase(phase=\"precheck-install\", dry_run=false)",
+    "  spectrumscale install --precheck"
+   ]
+  },
+  "install": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "USER: \"go ahead with install\"",
+    "",
+    "> start_phase(phase=\"install\", dry_run=false)",
+    "  spectrumscale install",
+    "> spectrumscale_running()  x2 while it ran",
+    "> check_operation()",
+    "  Error: result (120,371 characters across 1,243 lines) exceeds the",
+    "  maximum allowed tokens; the output was saved to a file and read",
+    "  from there."
+   ],
+   "note": "The overflow is a real limit of the tool result size, not an install failure."
+  },
+  "postcheck-install": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "> start_phase(phase=\"postcheck-install\", dry_run=false)",
+    "  spectrumscale install --postcheck"
+   ]
+  },
+  "continue": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "(new session, after the context was cleared; the user pasted a hand-off note)",
+    "USER: \"go for it\"",
+    "",
+    "> ping()",
+    "  ok: true",
+    "> spectrumscale_running()",
+    "  processes: 0"
+   ]
+  },
+  "deploy-mistake": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "> start_phase(phase=\"precheck-deploy\", dry_run=true)",
+    "  [ERROR] Toolkit not usable: .../ansible-toolkit exists but is not a",
+    "  regular file.",
+    "(the toolkit argument must be the spectrumscale file, not its folder)",
+    "> start_phase(phase=\"precheck-deploy\", dry_run=true)",
+    "  [DRY RUN] Inputs validated; command not executed."
+   ]
+  },
+  "deploy": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "> start_phase(phase=\"precheck-deploy\", dry_run=false)",
+    "> check_operation()",
+    "  status: success in 156.9s",
+    "> start_phase(phase=\"deploy\", dry_run=false)",
+    "  started: true",
+    "(waited with ssh checks from the Mac, 15 s apart, while the deploy ran)",
+    "> check_operation()",
+    "  Error: result (134,772 characters across 2,062 lines) exceeds the maximum;",
+    "  saved to a file and read from there.",
+    "> start_phase(phase=\"postcheck-deploy\", dry_run=false)",
+    "> check_operation()",
+    "  status: success in 9.7s"
+   ]
+  },
+  "readback-after": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "> list_nodes()",
+    "  7 nodes, protocols S3 SMB NFS enabled (from raw listing)"
+   ]
+  },
+  "user-record": {
+   "commands": [],
+   "started_at": null,
+   "finished_at": null,
+   "lines": [
+    "USER: \"record and then the build?\""
+   ]
+  }
+ }
+}
