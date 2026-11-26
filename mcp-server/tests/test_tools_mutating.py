@@ -186,7 +186,9 @@ async def test_start_phase_dry_run_preview(backend_url, _fake_toolkit_exists):
     assert any(e["type"] == "dryrun" for e in result["events"])
 
 
-async def test_start_setup_dry_run_preview(backend_url, _fake_toolkit_exists):
+async def test_start_setup_dry_run_preview(backend_url, _fake_toolkit_exists, ss, monkeypatch):
+    # The endpoint requires a system Python >= 3.10, which the test host may lack.
+    monkeypatch.setattr(ss, "find_compliant_python", lambda: (3, 12, "3.12.0", "/usr/bin/python3.12"))
     result = await tools.start_setup(dir="/tmp", ip="127.0.0.1", dry_run=True)
     assert any(e["type"] == "dryrun" for e in result["events"])
 
