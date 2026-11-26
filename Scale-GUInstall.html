@@ -4387,7 +4387,11 @@ async function loadNSDsFromCluster(btn) {
   btn.disabled = true;
   const data = await _fetchList('/api/list/nsds', 'nsds-load-log', 'nsd list');
   if (data && data.nsds) {
-    const imported = data.nsds.filter(n => n.disk && !state.nsds.find(x => x.disk === n.disk));
+    // A device path is only unique on its server (/dev/sdb exists on many), so
+    // match on both. `server` from the toolkit may list several, primary first.
+    const nsdKey = n => `${n.server.split(',')[0]} ${n.disk}`;
+    const configured = new Set(state.nsds.map(nsdKey));
+    const imported = data.nsds.filter(n => n.disk && !configured.has(nsdKey(n)));
     imported.forEach(n => state.nsds.push(n));
     const skipped = data.nsds.length - imported.length;
     _showLoadLog('nsds-load-log', `[OK] Imported ${imported.length} NSD(s)${skipped ? `, skipped ${skipped} duplicate(s)` : ''}.`, 'success');
