@@ -2661,7 +2661,7 @@
             <div class="checkbox-group" style="margin-bottom:var(--spacing-05)">
               <label class="checkbox-item">
                 <input type="checkbox" id="pop-overwrite">
-                <div><span>Overwrite existing cluster definition</span><span class="label-desc">Replaces any existing configuration in the toolkit</span></div>
+                <div><span>Overwrite existing cluster definition</span><span class="label-desc">Replaces any existing configuration in the toolkit. Needed after running setup, which creates one.</span></div>
               </label>
             </div>
             <div style="margin-bottom:var(--spacing-05)">
@@ -4411,6 +4411,10 @@ async function loadFilesystemFromCluster(btn) {
     if (fs.replication) {
       const sel = document.getElementById('fs-replication');
       [...sel.options].forEach(o => { if (o.value === fs.replication) sel.value = fs.replication; });
+    }
+    if (fs.metadataReplication) {
+      const sel = document.getElementById('fs-meta-rep');
+      [...sel.options].forEach(o => { if (o.value === fs.metadataReplication) sel.value = fs.metadataReplication; });
     }
     _showLoadLog('fs-load-log', `[OK] Populated filesystem "${fs.name}".`, 'success');
     updateFSPreview();

@@ -350,6 +350,8 @@ async def start_config_populate(
     discovery. overwrite answers the toolkit's own confirmation prompt when
     a cluster definition already exists (y if True, n if False) — the
     process never sits waiting on invisible interactive input either way.
+    With overwrite False and an existing definition (`setup` creates one)
+    nothing is imported and the operation ends in error.
     Use check_operation to see the result of a real run."""
     return await _mutate(
         "POST", "/api/stream/populate", dry_run,
