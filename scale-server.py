@@ -1459,6 +1459,35 @@ def _parse_table(output):
     return rows
 
 
+def _parse_filesystem_table(output):
+    """
+    Parse `spectrumscale filesystem list`. Column titles contain spaces
+    ("Default Data Replicas"), so the header is split on runs of two or more
+    spaces and each data row on whitespace (no value contains a space).
+
+    Returns a list of {title: value} dicts, empty only when the toolkit says no
+    filesystem is configured. Raises ValueError for any output it cannot read,
+    so a caller never has to substitute a value.
+    """
+    lines = [re.sub(r"^\[\s*\w+\s*\]", "", ln).strip() for ln in output.splitlines()]
+    lines = [ln for ln in lines if ln]
+    for i, line in enumerate(lines):
+        titles = re.split(r"\s{2,}", line)
+        if titles[0] == "Name" and len(titles) > 1:
+            rows = []
+            for row in lines[i + 1:]:
+                values = row.split()
+                if len(values) != len(titles):
+                    raise ValueError(f"unreadable filesystem list row: {row!r}")
+                rows.append(dict(zip(titles, values, strict=True)))
+            if rows:
+                return rows
+            break
+    if any("No file systems are configured" in ln for ln in lines):
+        return []
+    raise ValueError("unrecognized `filesystem list` output")
+
+
 def _parse_kv(output):
     """
     Parse spectrumscale config output into a dict.
@@ -1591,14 +1620,19 @@ def list_nsds():
         disk = row.get("disk", row.get("device", row.get("path", ""))).strip()
         if not disk:
             continue
-        nsds.append({
+        nsd = {
             "disk":         disk,
             "server":       row.get("server", row.get("servers", row.get("primary_server", ""))).strip(),
             "backup":       row.get("backup", row.get("backup_server", "")).strip(),
-            "failureGroup": row.get("fg", row.get("failuregroup", row.get("failure_group", "1"))).strip() or "1",
-            "usage":        row.get("usage", "dataAndMetadata").strip() or "dataAndMetadata",
-            "size":         row.get("size", "").strip(),
-        })
+            "failureGroup": row.get("fg", row.get("failuregroup", row.get("failure_group", ""))).strip(),
+            "usage":        row.get("usage", "").strip(),
+            "size":         row.get("size(gb)", row.get("size", "")).strip(),
+        }
+        missing = [k for k in ("server", "failureGroup", "usage") if not nsd[k]]
+        if missing:
+            return jsonify({"ok": False, "raw": raw,
+                            "error": f"`nsd list` gave no {', '.join(missing)} for {disk}"})
+        nsds.append(nsd)
 
     return jsonify({"ok": True, "raw": raw, "nsds": nsds})
 
@@ -1617,18 +1651,19 @@ def list_filesystem():
     if rc != 0:
         return jsonify({"ok": False, "error": raw.strip(), "raw": raw})
 
-    rows = _parse_table(raw)
-    filesystems = []
-    for row in rows:
-        name = row.get("name", row.get("filesystem", row.get("fs", ""))).strip()
-        if not name:
-            continue
-        filesystems.append({
-            "name":        name,
-            "mount":       row.get("mount", row.get("mount_point", "/gpfs/data")).strip(),
-            "blocksize":   row.get("block_size", row.get("blocksize", "256K")).strip(),
-            "replication": row.get("replication", row.get("data_rep", "2")).strip(),
-        })
+    try:
+        filesystems = [{
+            "name":                row["Name"],
+            "mount":               row["Mountpoint"],
+            "blocksize":           row["BlockSize"],
+            "replication":         row["Default Data Replicas"],
+            "metadataReplication": row["Default Metadata Replicas"],
+        } for row in _parse_filesystem_table(raw)]
+    except KeyError as exc:
+        return jsonify({"ok": False, "raw": raw,
+                        "error": f"`filesystem list` output has no {exc.args[0]!r} column"})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc), "raw": raw})
 
     return jsonify({"ok": True, "raw": raw, "filesystems": filesystems})
 
@@ -1745,8 +1780,28 @@ def stream_populate():
             # already exists — answer from the Overwrite checkbox so the
             # process can never sit waiting on invisible interactive input.
             answer = "y\n" if overwrite else "n\n"
-            rc = yield from stream_process(cmd, stdin_text=answer, dry_run=dry_run, op=op)
-            if rc == 0:
+            # A declined prompt makes the toolkit exit 0 without importing
+            # anything, so the exit code alone cannot be trusted.
+            output = stream_process(cmd, stdin_text=answer, dry_run=dry_run, op=op)
+            skipped = False
+            while True:
+                try:
+                    chunk = next(output)
+                except StopIteration as stop:
+                    rc = stop.value
+                    break
+                skipped = skipped or "will not be populated" in chunk
+                yield chunk
+            if rc == 0 and skipped:
+                for line in ("[ERROR] Nothing was imported: a cluster definition already exists "
+                             "and the toolkit was told to keep it.",
+                             "[ERROR] Enable 'Overwrite existing cluster definition' and run it again "
+                             "(`spectrumscale setup` creates a definition, so this applies after setup too)."):
+                    yield sse("error", line)
+                    _append_operation_line(op, line)
+                if op:
+                    _release_operation(op, "error")
+            elif rc == 0:
                 yield sse_final_status(dry_run, "[OK] Cluster definition populated successfully.")
                 if op:
                     _release_operation(op, "success")
