@@ -97,8 +97,8 @@ def test_returns_busy_when_operation_already_running(ss, path):
     assert "some-other-op" in body
 
 
-@pytest.mark.parametrize("action", ["suspend", "resume"])
-def test_ces_builds_the_subcommand_before_the_node_list(ss, monkeypatch, action):
+@pytest.mark.parametrize("action,flag", [("suspend", "--stop"), ("resume", "--start")])
+def test_ces_builds_the_documented_command(ss, monkeypatch, action, flag):
     captured = {}
 
     def fake_stream_process(cmd, **kwargs):
@@ -114,7 +114,7 @@ def test_ces_builds_the_subcommand_before_the_node_list(ss, monkeypatch, action)
     )
     resp.get_data()
     assert captured["cmd"] == [
-        "sudo", "-n", f"{ss.MMFS_BIN}/mmces", "node", action, "-N", "bg1,bg2",
+        "sudo", "-n", f"{ss.MMFS_BIN}/mmces", "node", action, "-N", "bg1,bg2", flag,
     ]
 
 

@@ -1,6 +1,6 @@
 # Changelog
 
-- New `/api/stream/ces/suspend` and `/api/stream/ces/resume` endpoints and MCP tools `start_ces_suspend` and `start_ces_resume` (`mmces node suspend|resume -N <nodes>`, dry run by default). An offline upgrade needs them: the toolkit refuses to designate a protocol node offline until CES is suspended on it.
+- New `/api/stream/ces/suspend` and `/api/stream/ces/resume` endpoints and MCP tools `start_ces_suspend` and `start_ces_resume` (`mmces node suspend -N <nodes> --stop` and `mmces node resume -N <nodes> --start`, dry run by default), following IBM's 6.0.1 offline upgrade procedure. An offline upgrade needs them: the toolkit refuses to designate a protocol node offline until CES is suspended on it.
 
 - `--skip ssh` is now the default for the install and deploy phases and their pre/post-checks, and for the upgrade precheck, run and postcheck (new, ticked checkbox on the Upgrade page): `/api/stream/phase` and the MCP `start_phase` tool apply it unless `skip_ssh=false` is passed (the web page's checkbox was already ticked). `upgrade showversions` never receives it.
 

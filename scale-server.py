@@ -3421,7 +3421,7 @@ def stream_upgrade_offline_nodes():
 
 
 def _stream_mm_node_command(mm_binary, nodes, dry_run, op_name, source, success_verb,
-                            subcommand=()):
+                            subcommand=(), extra=()):
     """
     Shared body for mmshutdown/mmstartup/`mmces node ...`: all take
     `-N <comma-list>` (after any subcommand words), all are node-identity-sensitive in exactly the way this session's
@@ -3445,7 +3445,7 @@ def _stream_mm_node_command(mm_binary, nodes, dry_run, op_name, source, success_
                                "Wait for it to finish or call check_operation.")
             return
     try:
-        cmd = ["sudo", "-n"] + mmcmd(mm_binary, *subcommand, "-N", ",".join(nodes))
+        cmd = ["sudo", "-n"] + mmcmd(mm_binary, *subcommand, "-N", ",".join(nodes), *extra)
         yield sse("info", f"$ {' '.join(cmd)}")
         rc = yield from stream_process(cmd, dry_run=dry_run, op=op)
         if rc == 0:
@@ -3504,8 +3504,8 @@ def stream_gpfs_startup():
 @app.route("/api/stream/ces/suspend", methods=["POST", "OPTIONS"])
 def stream_ces_suspend():
     """
-    `mmces node suspend -N <node1,node2,...>` — suspends Cluster Export
-    Services on protocol nodes. Required before `spectrumscale upgrade
+    `mmces node suspend -N <node1,node2,...> --stop` — suspends Cluster
+    Export Services on protocol nodes and stops their protocol services. Required before `spectrumscale upgrade
     config offline -N <node>` will accept a protocol node (confirmed live:
     "cannot be designated for offline upgrade until the Cluster Export
     Service (CES) has been suspended on it"). Undo with ces/resume.
@@ -3518,14 +3518,14 @@ def stream_ces_suspend():
     source  = request.headers.get("X-Scale-Client", "web")
     return sse_response(_stream_mm_node_command(
         "mmces", nodes, dry_run, "ces-suspend", source, "suspended in CES",
-        subcommand=("node", "suspend")))
+        subcommand=("node", "suspend"), extra=("--stop",)))
 
 
 @app.route("/api/stream/ces/resume", methods=["POST", "OPTIONS"])
 def stream_ces_resume():
     """
-    `mmces node resume -N <node1,node2,...>` — resumes Cluster Export
-    Services on suspended protocol nodes, normally after an offline upgrade
+    `mmces node resume -N <node1,node2,...> --start` — resumes suspended
+    protocol nodes and starts their protocol services, normally after an offline upgrade
     and mmstartup.
     """
     if request.method == "OPTIONS":
@@ -3536,7 +3536,7 @@ def stream_ces_resume():
     source  = request.headers.get("X-Scale-Client", "web")
     return sse_response(_stream_mm_node_command(
         "mmces", nodes, dry_run, "ces-resume", source, "resumed in CES",
-        subcommand=("node", "resume")))
+        subcommand=("node", "resume"), extra=("--start",)))
 
 
 # ---------------------------------------------------------------------------

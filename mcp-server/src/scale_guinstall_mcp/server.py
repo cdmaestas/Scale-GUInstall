@@ -495,8 +495,8 @@ async def start_gpfs_startup(nodes: list[str], dry_run: bool = True) -> dict:
 
 @mcp.tool()
 async def start_ces_suspend(nodes: list[str], dry_run: bool = True) -> dict:
-    """Run `mmces node suspend -N <node1,node2,...>` to suspend Cluster
-    Export Services on protocol nodes. Required before
+    """Run `mmces node suspend -N <node1,node2,...> --stop` to suspend
+    protocol nodes and stop their protocol services. Required before
     start_upgrade_offline_nodes will accept a protocol node. Protocol
     exports are not served from a suspended node; undo with
     start_ces_resume. Use check_operation to see the result of a real run."""
@@ -508,8 +508,8 @@ async def start_ces_suspend(nodes: list[str], dry_run: bool = True) -> dict:
 
 @mcp.tool()
 async def start_ces_resume(nodes: list[str], dry_run: bool = True) -> dict:
-    """Run `mmces node resume -N <node1,node2,...>` to resume Cluster Export
-    Services on suspended protocol nodes, normally after an offline upgrade
+    """Run `mmces node resume -N <node1,node2,...> --start` to resume
+    suspended protocol nodes and start their protocol services, normally after an offline upgrade
     and start_gpfs_startup. Use check_operation to see the result of a real
     run."""
     return await _mutate(
