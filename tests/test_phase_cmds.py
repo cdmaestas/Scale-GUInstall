@@ -28,12 +28,7 @@ def test_upgrade_phases_use_positional_subcommands_not_flags(ss):
         assert not any(a.startswith("-") for a in args), f"{phase} should have no flags: {args}"
 
 
-def test_skip_ssh_phases_derived_from_install_and_deploy_only(ss):
-    for phase in ss._SKIP_SSH_PHASES:
-        assert "install" in phase or "deploy" in phase
-    for phase in ss.PHASE_CMDS:
-        if "install" in phase or "deploy" in phase:
-            assert phase in ss._SKIP_SSH_PHASES
-    # Upgrade phases must never get --skip ssh appended.
-    for phase in ("upgrade-precheck", "upgrade-run", "upgrade-postcheck", "upgrade-showversions"):
-        assert phase not in ss._SKIP_SSH_PHASES
+def test_skip_ssh_phases_cover_checks_and_runs(ss):
+    expected = {p for p in ss.PHASE_CMDS if "install" in p or "deploy" in p}
+    expected |= {"upgrade-precheck", "upgrade-run", "upgrade-postcheck"}
+    assert ss._SKIP_SSH_PHASES == expected

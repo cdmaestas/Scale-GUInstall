@@ -423,13 +423,15 @@ async def start_cluster_config_apply(
 
 @mcp.tool()
 async def start_phase(
-    toolkit: str, phase: str, skip_ssh: bool = False, confirm: bool = False, dry_run: bool = True
+    toolkit: str, phase: str, skip_ssh: bool = True, confirm: bool = False, dry_run: bool = True
 ) -> dict:
     """Run one install/deploy/upgrade phase of the spectrumscale toolkit.
     phase is one of: precheck-install, install, postcheck-install,
     enable-daemon, nodeid-define, precheck-deploy, deploy, postcheck-deploy,
     upgrade-precheck, upgrade-run, upgrade-postcheck, upgrade-showversions.
-    skip_ssh only applies to phases that support it. confirm answers "y" to
+    skip_ssh (`--skip ssh`) is on by default and applies to the
+    install and deploy phases and their pre/post-checks, and to
+    upgrade-precheck, upgrade-run and upgrade-postcheck. confirm answers "y" to
     an interactive confirmation prompt some phases raise — confirmed live:
     upgrade-run asks "Do you want to continue the parallel offline upgrade
     process? [y/N]" when every node is designated offline (via

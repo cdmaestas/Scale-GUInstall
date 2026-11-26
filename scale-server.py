@@ -3291,13 +3291,17 @@ PHASE_CMDS = {
     "upgrade-showversions": ["upgrade", "showversions"],
 }
 
-_SKIP_SSH_PHASES = {p for p in PHASE_CMDS if "install" in p or "deploy" in p}
+# Every install, deploy and upgrade check/run; showversions only reports packages.
+_SKIP_SSH_PHASES = {p for p in PHASE_CMDS if "install" in p or "deploy" in p} | {
+    "upgrade-precheck", "upgrade-run", "upgrade-postcheck",
+}
 
 @app.route("/api/stream/phase")
 def stream_phase():
     toolkit,  _tk_err  = resolve_path(request.args.get("toolkit", "").strip())
     phase    = request.args.get("phase", "").strip()
-    skip_ssh = request.args.get("skip_ssh", "false").lower() in ("true", "1", "yes")
+    # On by default for the phases that support it; callers opt out explicitly.
+    skip_ssh = request.args.get("skip_ssh", "true").lower() not in ("false", "0", "no")
     dry_run  = request.args.get("dry_run", "false").lower() in ("true", "1", "yes")
     # Some phases prompt for interactive confirmation — e.g. `upgrade run`
     # asks "Do you want to continue the parallel offline upgrade process?
