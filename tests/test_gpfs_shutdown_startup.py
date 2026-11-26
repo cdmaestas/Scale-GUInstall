@@ -95,3 +95,35 @@ def test_returns_busy_when_operation_already_running(ss, path):
     body = resp.get_data(as_text=True)
     assert '"type": "busy"' in body
     assert "some-other-op" in body
+
+
+@pytest.mark.parametrize("action", ["suspend", "resume"])
+def test_ces_builds_the_subcommand_before_the_node_list(ss, monkeypatch, action):
+    captured = {}
+
+    def fake_stream_process(cmd, **kwargs):
+        captured["cmd"] = cmd
+        yield ss.sse("normal", "running")
+        return 0
+
+    monkeypatch.setattr(ss, "stream_process", fake_stream_process)
+    resp = ss.app.test_client().post(
+        f"/api/stream/ces/{action}",
+        headers={"X-Scale-Token": ss._AUTH_TOKEN},
+        json={"nodes": ["bg1", "bg2"], "dry_run": False},
+    )
+    resp.get_data()
+    assert captured["cmd"] == [
+        "sudo", "-n", f"{ss.MMFS_BIN}/mmces", "node", action, "-N", "bg1,bg2",
+    ]
+
+
+@pytest.mark.parametrize("action", ["suspend", "resume"])
+def test_ces_defaults_to_dry_run_and_rejects_bad_nodes(ss, action):
+    client = ss.app.test_client()
+    headers = {"X-Scale-Token": ss._AUTH_TOKEN}
+    preview = client.post(f"/api/stream/ces/{action}", headers=headers, json={"nodes": ["bg1"]})
+    assert '"type": "dryrun"' in preview.get_data(as_text=True)
+    assert ss._current_operation is None
+    bad = client.post(f"/api/stream/ces/{action}", headers=headers, json={"nodes": ["bg1; reboot"]})
+    assert "Invalid node hostname" in bad.get_data(as_text=True)

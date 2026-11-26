@@ -78,6 +78,16 @@ async def test_start_gpfs_startup_dry_run_preview(backend_url):
     assert any(e["type"] == "dryrun" for e in result["events"])
 
 
+async def test_start_ces_suspend_dry_run_preview(backend_url):
+    result = await tools.start_ces_suspend(nodes=["node1"], dry_run=True)
+    assert any("mmces node suspend -N node1" in e["line"] for e in result["events"])
+
+
+async def test_start_ces_resume_dry_run_preview(backend_url):
+    result = await tools.start_ces_resume(nodes=["node1"], dry_run=True)
+    assert any("mmces node resume -N node1" in e["line"] for e in result["events"])
+
+
 async def test_start_release_latest_dry_run_preview(backend_url):
     result = await tools.start_release_latest(dry_run=True)
     assert any(e["type"] == "dryrun" for e in result["events"])
